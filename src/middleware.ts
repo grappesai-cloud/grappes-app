@@ -14,6 +14,7 @@ const PUBLIC_PATHS = new Set<string>([
   '/500',
   '/sitemap.xml',
   '/robots.txt',
+  '/api/health',
 ]);
 
 const PUBLIC_PREFIXES = [

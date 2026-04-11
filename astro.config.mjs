@@ -14,6 +14,9 @@ export default defineConfig({
   },
 
   vite: {
+    optimizeDeps: {
+      include: ['@supabase/supabase-js'],
+    },
     build: {
       rollupOptions: {
         external: ['puppeteer', 'sharp'],

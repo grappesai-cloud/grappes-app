@@ -221,21 +221,21 @@ export async function sendWelcomeEmail(params: {
   to: string;
   name?: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const greeting = params.name ? `Bun venit, ${escapeHtml(params.name)}.` : 'Bun venit.';
+  const greeting = params.name ? `Welcome, ${escapeHtml(params.name)}.` : 'Welcome.';
   const html = wrapEmail(greeting, `
-    <p style="margin:0 0 24px;">Contul tău este activ. Poți genera un website complet cu AI în câteva minute.</p>
-    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Ce poți face</p>
+    <p style="margin:0 0 24px;">Your account is active. Generate a complete website with AI in minutes.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">What you can do</p>
     <ul style="margin:0 0 4px;padding-left:18px;font-size:14px;line-height:2.2;color:#6b7280;">
-      <li>Descrie ce vrei și primești un site complet</li>
-      <li>Editează orice secțiune cu instrucțiuni</li>
-      <li>Publică pe domeniu cu un click</li>
+      <li>Describe what you want and get a complete site</li>
+      <li>Edit any section by describing the change</li>
+      <li>Publish to your domain in one click</li>
     </ul>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Deschide dashboard-ul →')}
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Open dashboard →')}
   `);
 
   return sendPlatformEmail({
     to: params.to,
-    subject: 'Bun venit pe Grappes! 🚀',
+    subject: 'Welcome to Grappes! 🚀',
     html,
   });
 }
@@ -248,17 +248,17 @@ export async function sendSiteLiveEmail(params: {
   siteName: string;
   siteUrl: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const html = wrapEmail(`${escapeHtml(params.siteName)} este live.`, `
-    <p style="margin:0 0 24px;">Site-ul tău a fost publicat cu succes și este disponibil online.</p>
-    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Adresă</p>
+  const html = wrapEmail(`${escapeHtml(params.siteName)} is live.`, `
+    <p style="margin:0 0 24px;">Your site has been published and is now live.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">URL</p>
     <p style="margin:0;"><a href="${escapeHtml(params.siteUrl)}" style="color:#0a0a0a;text-decoration:underline;word-break:break-all;">${escapeHtml(params.siteUrl)}</a></p>
-    ${emailBtn(escapeHtml(params.siteUrl), 'Vizitează site-ul →')}
-    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Poți edita oricând din dashboard.</p>
+    ${emailBtn(escapeHtml(params.siteUrl), 'Visit site →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">You can edit it anytime from your dashboard.</p>
   `);
 
   return sendPlatformEmail({
     to: params.to,
-    subject: `✦ ${params.siteName} este live!`,
+    subject: `✦ ${params.siteName} is live!`,
     html,
   });
 }
@@ -275,11 +275,11 @@ export async function sendReferralPayoutAlert(params: {
     console.error('[resend] ADMIN_EMAIL not set — payout alert not sent');
     return { success: false, error: 'ADMIN_EMAIL not configured' };
   }
-  const html = wrapEmail('Referral payout de procesat', `
-    <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:500;">${escapeHtml(params.referrerEmail)}</span> a acumulat <span style="color:#0a0a0a;font-weight:700;">${params.amount.toFixed(2)}€</span> din referrals.</p>
-    <p style="margin:0;">Contactează-l pe email și cere-i IBAN-ul pentru a procesa plata.</p>
+  const html = wrapEmail('Referral payout to process', `
+    <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:500;">${escapeHtml(params.referrerEmail)}</span> has accumulated <span style="color:#0a0a0a;font-weight:700;">${params.amount.toFixed(2)}€</span> in referral earnings.</p>
+    <p style="margin:0;">Reach out to them and request their IBAN to process the payout.</p>
   `);
-  return sendPlatformEmail({ to: adminEmail, subject: `Referral payout — ${params.amount.toFixed(2)}€ pentru ${params.referrerEmail}`, html });
+  return sendPlatformEmail({ to: adminEmail, subject: `Referral payout — ${params.amount.toFixed(2)}€ for ${params.referrerEmail}`, html });
 }
 
 /**
@@ -291,23 +291,23 @@ export async function sendReferralEarnedEmail(params: {
   newBalance: number;
   plan: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const planLabel = params.plan === 'agency' ? 'Lifetime' : params.plan === 'pro' ? 'Anual' : 'Lunar';
-  const html = wrapEmail(`+${params.amount}€ din referral`, `
-    <p style="margin:0 0 24px;">Cineva referit de tine a achiziționat planul <span style="color:#0a0a0a;font-weight:600;">${planLabel}</span>.</p>
+  const planLabel = params.plan === 'agency' ? 'Lifetime' : params.plan === 'pro' ? 'Annual' : 'Monthly';
+  const html = wrapEmail(`+${params.amount}€ referral earned`, `
+    <p style="margin:0 0 24px;">Someone you referred just purchased the <span style="color:#0a0a0a;font-weight:600;">${planLabel}</span> plan.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 24px;">
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Câștigat acum</td>
+        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Earned now</td>
         <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">+${params.amount}€</td>
       </tr>
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;">Sold disponibil</td>
+        <td style="padding:12px 0;color:#9ca3af;">Balance</td>
         <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;">${params.newBalance.toFixed(2)}€</td>
       </tr>
     </table>
-    ${params.newBalance >= 50 ? `<p style="margin:0 0 4px;font-size:14px;color:#059669;font-weight:500;">Ai atins minimul de 50€ — te contactăm pentru plată.</p>` : `<p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">La 50€ acumulate procesăm plata pe contul tău bancar.</p>`}
-    ${emailBtn(`${SITE_URL}/dashboard/referrals`, 'Vezi statisticile →')}
+    ${params.newBalance >= 50 ? `<p style="margin:0 0 4px;font-size:14px;color:#059669;font-weight:500;">You've reached the 50€ minimum — we'll contact you to process payout.</p>` : `<p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">Once you reach 50€ we'll process a bank payout.</p>`}
+    ${emailBtn(`${SITE_URL}/dashboard/referrals`, 'View stats →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `+${params.amount}€ câștigat din referral Grappes`, html });
+  return sendPlatformEmail({ to: params.to, subject: `+${params.amount}€ earned from Grappes referral`, html });
 }
 
 /**
@@ -317,12 +317,12 @@ export async function sendSubscriptionCancelledEmail(params: {
   to: string;
   siteName: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const html = wrapEmail('Abonamentul a expirat', `
-    <p style="margin:0 0 24px;">Abonamentul pentru <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> a fost anulat. Site-ul nu mai este activ.</p>
-    <p style="margin:0 0 4px;">Poți reactiva oricând din dashboard.</p>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Reactivează →')}
+  const html = wrapEmail('Subscription cancelled', `
+    <p style="margin:0 0 24px;">The subscription for <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> has been cancelled. The site is no longer active.</p>
+    <p style="margin:0 0 4px;">You can reactivate anytime from your dashboard.</p>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Reactivate →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — abonament expirat`, html });
+  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — subscription cancelled`, html });
 }
 
 /**
@@ -333,13 +333,13 @@ export async function sendDeploymentFailedEmail(params: {
   siteName: string;
   error?: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const html = wrapEmail('Deployment eșuat', `
-    <p style="margin:0 0 24px;">Publicarea site-ului <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> a eșuat.</p>
+  const html = wrapEmail('Deployment failed', `
+    <p style="margin:0 0 24px;">The deployment of <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> failed.</p>
     ${params.error ? `<p style="margin:0 0 24px;font-size:13px;color:#9ca3af;font-family:monospace;background:#f9fafb;padding:12px;border-radius:6px;">${escapeHtml(params.error)}</p>` : ''}
-    <p style="margin:0 0 4px;">Încearcă din nou din dashboard sau contactează suportul.</p>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Deschide dashboard-ul →')}
+    <p style="margin:0 0 4px;">Retry from your dashboard or contact support.</p>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Open dashboard →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — deployment eșuat`, html });
+  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — deployment failed`, html });
 }
 
 /**
@@ -353,10 +353,10 @@ export async function sendDomainPurchaseFailedEmail(params: {
   const adminEmail = import.meta.env.ADMIN_EMAIL;
   if (!adminEmail) return { success: false, error: 'ADMIN_EMAIL not configured' };
   const html = wrapEmail('Domain purchase failed', `
-    <p style="margin:0 0 24px;">Achiziția domeniului <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.domain)}</span> a eșuat după plată.</p>
-    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Detalii</p>
+    <p style="margin:0 0 24px;">The purchase of the domain <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.domain)}</span> failed after payment.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Details</p>
     <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">Project: ${escapeHtml(params.projectId)}</p>
-    <p style="margin:0;font-size:13px;color:#9ca3af;">Eroare: ${escapeHtml(params.error)}</p>
+    <p style="margin:0;font-size:13px;color:#9ca3af;">Error: ${escapeHtml(params.error)}</p>
   `);
   return sendPlatformEmail({ to: adminEmail, subject: `⚠ Domain failed: ${params.domain}`, html });
 }
@@ -369,24 +369,24 @@ export async function sendPaymentConfirmedEmail(params: {
   editsAdded: number;
   totalExtra: number;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
-  const html = wrapEmail('Plată confirmată', `
-    <p style="margin:0 0 24px;">Am adăugat <span style="color:#0a0a0a;font-weight:700;">+${params.editsAdded} editări</span> în contul tău.</p>
+  const html = wrapEmail('Payment confirmed', `
+    <p style="margin:0 0 24px;">We've added <span style="color:#0a0a0a;font-weight:700;">+${params.editsAdded} edits</span> to your account.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 24px;">
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Editări adăugate</td>
+        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Edits added</td>
         <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">+${params.editsAdded}</td>
       </tr>
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;">Total editări rămase</td>
+        <td style="padding:12px 0;color:#9ca3af;">Total edits remaining</td>
         <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;">${params.totalExtra}</td>
       </tr>
     </table>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Continuă editarea →')}
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Continue editing →')}
   `);
 
   return sendPlatformEmail({
     to: params.to,
-    subject: `+${params.editsAdded} editări adăugate în contul tău`,
+    subject: `+${params.editsAdded} edits added to your account`,
     html,
   });
 }
