@@ -22,7 +22,7 @@ const initialPhase = (conv?.phase ?? 'discovery') as string;
 
 <Dashboard title={`Onboarding — ${project.name}`} projectId={project.id}>
   <div class="page-header">
-    <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
+    <a href={`/dashboard/${project.id}`} class="back-link">← Back to project</a>
   </div>
 
   <OnboardingChat
@@ -47,7 +47,7 @@ const initialPhase = (conv?.phase ?? 'discovery') as string;
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;

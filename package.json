@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lighthouse": "node scripts/lighthouse.mjs",
-    "visual-qa": "node scripts/visual-qa.mjs"
+    "visual-qa": "node scripts/visual-qa.mjs",
+    "preflight": "node scripts/preflight.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

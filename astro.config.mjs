@@ -30,12 +30,8 @@ export default defineConfig({
 
   integrations: [
     react(),
-    sentry({
-      dsn: process.env.SENTRY_DSN || '',
-      environment: process.env.NODE_ENV || 'production',
-      tracesSampleRate: 0.1, // 10% of requests for performance monitoring
-      // Only enable if DSN is set — graceful no-op otherwise
-      enabled: !!process.env.SENTRY_DSN,
-    }),
+    // Sentry SDK options live in sentry.client.config.js + sentry.server.config.js
+    // (inline integration options are deprecated in @sentry/astro 10+)
+    sentry(),
   ],
 });
