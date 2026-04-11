@@ -1,0 +1,98 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+import { db } from '../../../lib/db';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const project = await db.projects.findById(id!);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+---
+
+<Dashboard title={`Preview — ${project.name}`} projectId={project.id}>
+  <div class="page-header">
+    <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
+    <h1 data-en="Preview">Previzualizare</h1>
+    <p class="subtitle">{project.name}</p>
+  </div>
+
+  {project.preview_url ? (
+    <div class="preview-frame">
+      <div class="preview-bar">
+        <span>{project.preview_url}</span>
+        <a href={project.preview_url} target="_blank" rel="noopener" data-en="Open ↗">Deschide ↗</a>
+      </div>
+      <iframe src={project.preview_url} title={project.name} />
+    </div>
+  ) : (
+    <div class="placeholder-notice">
+      <p data-en="No preview available yet. Deploy your project first.">Nicio previzualizare disponibilă. Publică proiectul mai întâi.</p>
+      <a href={`/dashboard/${project.id}`} class="btn" data-en="Go to project">Mergi la proiect</a>
+    </div>
+  )}
+</Dashboard>
+
+<style>
+  .page-header { margin-bottom: 2.5rem; }
+  .back-link {
+    color: #71717a;
+    text-decoration: none;
+    font-size: 0.875rem;
+    display: inline-block;
+    margin-bottom: 1rem;
+    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .back-link:hover { color: #fafafa; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #fafafa;
+  }
+  .subtitle { color: #71717a; margin-top: 0.25rem; font-size: 1rem; }
+  .preview-frame { border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; overflow: hidden; }
+  .preview-bar {
+    background: #111113;
+    padding: 0.625rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.8rem;
+    color: #71717a;
+  }
+  .preview-bar a { color: #7c3aed; text-decoration: none; transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .preview-bar a:hover { color: #a78bfa; }
+  iframe { width: 100%; height: 70vh; border: none; display: block; }
+  .placeholder-notice {
+    background: #111113;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: #a1a1aa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+  .btn {
+    background: linear-gradient(135deg, #7c3aed, #3b82f6);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px -8px rgba(124,58,237,0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn:hover { transform: none; }
+  }
+</style>

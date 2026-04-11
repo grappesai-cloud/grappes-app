@@ -1,0 +1,110 @@
+---
+if (Astro.locals.user) return Astro.redirect('/dashboard');
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const email    = (formData.get('email') as string)?.trim().toLowerCase();
+  const password = formData.get('password') as string;
+
+  if (!email || !password) {
+    error = 'Email și parola sunt obligatorii.';
+  } else {
+    const { error: authError } = await Astro.locals.supabase.auth.signInWithPassword({ email, password });
+    if (authError) {
+      error = authError.message;
+    } else {
+      return Astro.redirect('/dashboard');
+    }
+  }
+}
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In — Grappes</title>
+    <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+    
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="auth-header">
+      <div class="auth-container">
+        <a href="/" class="auth-logo">
+          <img src="/assets/grappes/logo.png" alt="Grappes" />
+        </a>
+        <a href="/sign-up" class="auth-header-btn">
+          <span>Create account</span>
+          <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="auth-main">
+      <div class="auth-container auth-grid">
+        <!-- Left branding -->
+        <div class="auth-brand">
+          <h1 class="auth-title">Welcome back</h1>
+        </div>
+
+        <!-- Right form -->
+        <div class="auth-form-wrap">
+          <div class="auth-form-card">
+            <h2 class="auth-form-title">Sign in</h2>
+            <p class="auth-form-sub">Access your account</p>
+
+            <button type="button" id="googleBtn" class="auth-google-btn">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.26c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg>
+              <span>Continue with Google</span>
+            </button>
+
+            <div class="auth-divider"><span>or</span></div>
+
+            <form method="POST">
+              {error && <p class="auth-error">{error}</p>}
+
+              <div class="auth-field">
+                <div class="auth-input-wrap">
+                  <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m2 7 10 6 10-6"/></svg>
+                  <input name="email" type="email" required autocomplete="email"  placeholder="Email address" />
+                </div>
+              </div>
+
+              <div class="auth-field">
+                <div class="auth-input-wrap">
+                  <svg class="auth-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <input name="password" type="password" required autocomplete="current-password"  placeholder="Password" />
+                </div>
+              </div>
+
+              <button type="submit" class="auth-submit-btn">
+                <span>Sign in</span>
+                <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
+              </button>
+            </form>
+
+            <p class="auth-footer-link">
+              <span>Don't have an account?</span> <a href="/sign-up">Create one</a>
+            </p>
+            <p class="auth-footer-link" style="margin-top:12px;">
+              <a href="/forgot-password">Forgot password?</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <link rel="stylesheet" href="/assets/grappes/auth.css" />
+
+    <script is:inline>
+      document.getElementById('googleBtn')?.addEventListener('click', () => {
+        window.location.href = '/api/auth/google';
+      });
+    </script>
+  </body>
+</html>

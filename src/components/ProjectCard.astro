@@ -1,0 +1,144 @@
+---
+import type { Project } from '../lib/db';
+
+interface Props {
+  project: Project;
+}
+
+const { project } = Astro.props;
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'acum';
+  if (h < 1) return `acum ${m}m`;
+  if (d < 1) return `acum ${h}h`;
+  return `acum ${d}z`;
+}
+
+function timeAgoEn(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'just now';
+  if (h < 1) return `${m}m ago`;
+  if (d < 1) return `${h}h ago`;
+  return `${d}d ago`;
+}
+
+const initial = project.name[0]?.toUpperCase() ?? '?';
+const hasPreview = !!project.preview_url;
+---
+
+<a href={`/dashboard/${project.id}`}
+  style="display:block;text-decoration:none;color:#fff;border-radius:16px;overflow:hidden;transition:all 0.4s cubic-bezier(0.16,1,0.3,1);"
+  class="pc-card"
+>
+  <div style="position:relative;border-radius:16px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%);border:1px solid rgba(255,255,255,0.08);box-shadow:0 4px 24px -1px rgba(28,9,61,0.2);transition:all 0.4s cubic-bezier(0.16,1,0.3,1);"
+    class="pc-card-inner">
+
+    <!-- Visual top -->
+    <div style={`position:relative;height:${hasPreview ? '200px' : '160px'};overflow:hidden;background:linear-gradient(135deg,rgba(0,255,151,0.08) 0%,rgba(0,164,175,0.05) 50%,rgba(0,2,15,0.3) 100%);`}>
+      {hasPreview ? (
+        <iframe src={project.preview_url} title={project.name} loading="lazy" tabindex="-1"
+          style="width:200%;height:200%;transform:scale(0.5);transform-origin:top left;border:none;pointer-events:none;display:block;" />
+      ) : (
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+          <div style="width:80px;height:80px;border-radius:50%;background:rgba(0,255,151,0.1);border:1px solid rgba(0,255,151,0.2);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;color:#00ff97;text-transform:uppercase;">
+            {initial}
+          </div>
+        </div>
+      )}
+      <!-- Gradient overlay -->
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(0,2,15,0.7) 100%);pointer-events:none;"></div>
+    </div>
+
+    <!-- Content -->
+    <div style="padding:28px 32px 32px;position:relative;">
+      <h3 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.04em;color:#fff;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:40px;">
+        {project.name}
+      </h3>
+      <p style="font-size:15px;color:rgba(255,255,255,0.45);margin:0;">
+        {hasPreview
+          ? <span data-time={project.updated_at} data-time-en={timeAgoEn(project.updated_at)}>{timeAgo(project.updated_at)}</span>
+          : <span data-en="Your first site — let's build it">Primul tău site — hai să-l construim</span>
+        }
+      </p>
+
+      <!-- Arrow button -->
+      <div style="position:absolute;bottom:28px;right:28px;width:48px;height:48px;border-radius:50%;background:#00ff97;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(0.8);transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1);"
+        class="pc-arrow">
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="#00020f"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="#00020f"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="#00020f"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="#00020f"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="#00020f"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="#00020f"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="#00020f"/></svg>
+      </div>
+    </div>
+
+    <!-- Delete -->
+    <button type="button" class="pc-del"
+      style="position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;border:none;background:rgba(0,0,0,0.4);backdrop-filter:blur(10px);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:all 0.25s;z-index:4;"
+      data-project-id={project.id}
+      data-project-name={project.name}
+      title="Șterge proiect"
+      onclick="event.preventDefault();event.stopPropagation();"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </button>
+  </div>
+</a>
+
+<style is:global>
+  .pc-card:hover .pc-card-inner {
+    transform: translateY(-8px);
+    border-color: rgba(0,255,151,0.2) !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(0,255,151,0.06) !important;
+  }
+  .pc-card:hover .pc-arrow {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+  }
+  .pc-card:hover .pc-del {
+    opacity: 1 !important;
+  }
+  .pc-del:hover {
+    background: rgba(220,38,38,0.6) !important;
+    color: #fff !important;
+  }
+</style>
+
+<script is:inline>
+(function(){
+  var lang=(localStorage.getItem('i18nextLng')||'ro').split('-')[0];
+  if(lang!=='en') return;
+  document.addEventListener('DOMContentLoaded',function(){
+    document.querySelectorAll('[data-time-en]').forEach(function(el){el.textContent=el.getAttribute('data-time-en');});
+  });
+})();
+
+document.addEventListener('click', async function(e) {
+  var btn = e.target.closest('.pc-del');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var id = btn.dataset.projectId;
+  var name = btn.dataset.projectName;
+  var _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  var confirmMsg = _isEn ? ('Delete "' + name + '"? This cannot be undone.') : ('Ștergi "' + name + '"? Această acțiune nu poate fi anulată.');
+  if (!confirm(confirmMsg)) return;
+  btn.disabled = true;
+  btn.innerHTML = '…';
+  try {
+    var res = await fetch('/api/projects/' + id + '/delete', { method: 'POST' });
+    if (res.ok) {
+      var card = btn.closest('.pc-card');
+      if (card) {
+        card.style.transition = 'opacity 0.3s, transform 0.3s';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.95)';
+        setTimeout(function() { card.remove(); }, 300);
+      }
+    } else { alert('Failed to delete.'); btn.disabled = false; }
+  } catch { alert('Network error.'); btn.disabled = false; }
+});
+</script>

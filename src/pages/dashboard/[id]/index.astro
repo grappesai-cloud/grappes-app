@@ -1,0 +1,2579 @@
+---
+import OnboardingChat from '../../../components/islands/OnboardingChat.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import { db } from '../../../lib/db';
+import { getSitePrice } from '../../../lib/site-billing';
+import { generateShareToken } from '../../preview/[projectId]';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const project = await db.projects.findById(id!);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+
+const shouldLaunch = new URL(Astro.request.url).searchParams.get('launch') === '1';
+const justActivated = new URL(Astro.request.url).searchParams.get('activated') === '1';
+
+const [brief, conversation, deployments] = await Promise.all([
+  db.briefs.findByProjectId(id!),
+  db.conversations.findByProjectId(id!),
+  db.deployments.findByProject(id!),
+]);
+
+const isOnboarding = ['onboarding'].includes(project.status);
+const isBriefReady = project.status === 'brief_ready';
+const isLaunching  = ['generating'].includes(project.status);
+const isDeploying  = project.status === 'deploying';
+const isGenerated  = project.status === 'generated';
+const isLive       = project.status === 'live';
+const isFailed     = project.status === 'failed';
+const hasPreview   = isGenerated || isLive || isDeploying;
+const briefCompleteness = brief?.completeness ?? 0;
+const shareToken = generateShareToken(id!);
+const siteUrl = import.meta.env.SITE ?? import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+const sharePreviewUrl = `${siteUrl}/preview/${id}?token=${shareToken}`;
+const hasConversation = conversation && conversation.messages && conversation.messages.length >= 2;
+const canForceGenerate = isOnboarding && (briefCompleteness >= 0.3 || hasConversation);
+const canLaunch    = ['brief_ready', 'generated', 'failed'].includes(project.status) || canForceGenerate;
+
+// ── Billing status ──────────────────────────────────────────────────────────
+const billingStatus = project.billing_status ?? 'free';
+const isBillingActive = billingStatus === 'active';
+const isFreeSite      = billingStatus === 'free';
+const isExpiredSite   = billingStatus === 'expired';
+const showActivate    = (isFreeSite || isExpiredSite) && hasPreview;
+
+const expiresAt = project.expires_at ? new Date(project.expires_at) : null;
+const daysRemaining = expiresAt
+  ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000))
+  : null;
+
+// Prices for activation modal
+const activatePrices = {
+  monthly:  getSitePrice('monthly'),
+  annual:   getSitePrice('annual'),
+  lifetime: getSitePrice('lifetime'),
+};
+
+const previewUrl = `/preview/${project.id}`;
+
+// ── Extract section IDs server-side so the sidebar populates instantly ────────
+// Parse <section> / <nav> / <footer> tags from stored HTML and derive IDs,
+// mirroring the logic in addDataSectionAttributes (html-compat.ts).
+const serverSectionIds: string[] = [];
+if (hasPreview) {
+  const gen = await db.generatedFiles.findLatest(id!);
+  const rawHtml = gen?.files?.['__html__full'] ?? '';
+  if (rawHtml) {
+    let sIdx = 0;
+    const tagRe = /<(section|nav|footer)\b([^>]*?)>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRe.exec(rawHtml)) !== null) {
+      const tag = m[1].toLowerCase();
+      const attrs = m[2];
+      // Check existing data-section
+      const dsMatch = attrs.match(/\bdata-section\s*=\s*["']([^"']*)["']/i);
+      if (dsMatch && dsMatch[1] && dsMatch[1] !== 'full') {
+        serverSectionIds.push(dsMatch[1]);
+        continue;
+      }
+      if (tag === 'nav')    { serverSectionIds.push('nav');    continue; }
+      if (tag === 'footer') { serverSectionIds.push('footer'); continue; }
+      // Derive from id or class
+      const idM  = attrs.match(/\bid\s*=\s*["']([^"']+)["']/i);
+      const clsM = attrs.match(/\bclass\s*=\s*["']([^"']+)["']/i);
+      if (idM) {
+        serverSectionIds.push(idM[1].trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+      } else if (clsM) {
+        const cls = clsM[1].trim().split(/\s+/).find((c: string) => c.length > 2 && !/^\d/.test(c)) ?? clsM[1].trim().split(/\s+/)[0];
+        serverSectionIds.push(cls.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+      } else {
+        serverSectionIds.push(`section-${++sIdx}`);
+      }
+    }
+  }
+}
+
+const LAUNCH_STEPS = [
+  { key: 'confirming_brief',  label: 'Confirmând brieful' },
+  { key: 'merging_assets',    label: 'Pregătind asset-urile' },
+  { key: 'generating_site',   label: 'Generând website-ul cu AI' },
+];
+
+const currentSubstatus = project.substatus ?? null;
+const currentStepIdx = currentSubstatus
+  ? LAUNCH_STEPS.findIndex(s => s.key === currentSubstatus) : -1;
+---
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{project.name} — Grappes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    /* RESET */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background: #00020f;
+      color: #eef2ff; font-size: 14px; line-height: 1.5;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; cursor: pointer; }
+    input, textarea { font: inherit; }
+
+    /* LAYOUT */
+    .app { display: flex; flex-direction: column; height: 100vh; padding: 12px; gap: 12px; }
+
+    /* Top bar */
+    .topbar {
+      height: 56px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px;
+      background: rgba(14, 20, 55, 0.85);
+      backdrop-filter: blur(60px) saturate(1.4);
+      -webkit-backdrop-filter: blur(60px) saturate(1.4);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 999px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.45);
+      position: relative;
+      z-index: 950;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-logo {
+      font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+      font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: #fff;
+    }
+    .topbar-logo-accent {
+      background: linear-gradient(135deg, #00ff97, #00a4af);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .topbar-link {
+      color: rgba(255,255,255,0.5); font-size: 0.875rem; font-weight: 500;
+      padding: 6px 14px; border-radius: 8px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .topbar-link:hover { color: #fff; background: rgba(255,255,255,0.08); }
+    .topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+    .topbar-signout {
+      background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+      color: rgba(255,255,255,0.5); font-size: 0.75rem; padding: 5px 12px; cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .topbar-signout:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+    .topbar-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, #00ff97, #00a4af);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 600; color: #00020f;
+      text-transform: uppercase; flex-shrink: 0;
+    }
+    .topbar-project { color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-status { margin-left: 4px; }
+
+    .topbar-center { display: flex; align-items: center; gap: 8px; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .topbar-quota {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px; border-radius: 20px;
+      border: 1px solid rgba(0,255,151,0.2);
+      background: rgba(0,255,151,0.06);
+      color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 500;
+    }
+    .topbar-quota svg { color: #00ff97; flex-shrink: 0; }
+    .topbar-quota.warn { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
+    .topbar-quota.warn svg { color: #f59e0b; }
+    .topbar-quota.empty { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.06); }
+    .topbar-quota.empty svg { color: #ef4444; }
+    .topbar-btn {
+      padding: 6px 16px; border-radius: 12px; font-size: 12px; font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .topbar-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+    .topbar-btn--primary { background: #00ff97; color: #00020f; border-color: transparent; font-weight: 600; }
+    .topbar-btn--primary:hover { background: #00e088; box-shadow: 0 4px 16px -4px rgba(0,255,151,0.4); }
+    .topbar-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .topbar-btn--upsell { background: rgba(251,191,36,0.12); color: #f6ad55; border-color: rgba(251,191,36,0.25); font-weight: 600; text-decoration: none; }
+    .topbar-btn--upsell:hover { background: rgba(251,191,36,0.2); border-color: rgba(251,191,36,0.4); }
+    .topbar-btn--share { cursor: pointer; text-decoration: none; }
+    .topbar-back { color: rgba(255,255,255,0.4); font-size: 13px; transition: color 0.2s; }
+    .topbar-back:hover { color: #fff; }
+
+    /* Main split */
+    .main { flex: 1; display: flex; overflow: hidden; gap: 12px; border-radius: 24px; }
+
+    /* Left panel */
+    .panel {
+      width: 380px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(80px) saturate(1.2);
+      -webkit-backdrop-filter: blur(80px) saturate(1.2);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    /* Right preview */
+    .preview {
+      flex: 1; display: flex; flex-direction: column;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(60px);
+      -webkit-backdrop-filter: blur(60px);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+      position: relative;
+    }
+    .preview-iframe {
+      flex: 1; border: none; width: 100%; height: 100%;
+      background: #fff; border-radius: 16px;
+      transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .preview-wrapper {
+      flex: 1; display: flex; justify-content: center; align-items: stretch;
+      overflow: hidden; padding: 12px;
+    }
+    /* Empty state */
+    .preview-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+    }
+    .preview-empty-icon { font-size: 48px; opacity: 0.15; color: #fff; }
+    .preview-empty-text { font-size: 14px; color: rgba(255,255,255,0.4); max-width: 280px; text-align: center; line-height: 1.7; font-weight: 500; }
+
+    /* PANEL PHASES */
+
+    /* Phase: onboarding chat */
+    .phase-onboarding { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .phase-onboarding :global(.chat-container) {
+      flex: 1; display: flex; flex-direction: column; min-height: 0;
+      background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+      border: none; border-radius: 0; box-shadow: none;
+      height: auto; max-height: none;
+    }
+    .phase-onboarding :global(.messages) { flex: 1; overflow-y: auto; background: transparent; min-height: 0; }
+
+    /* Phase: brief ready */
+    .phase-brief { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; overflow-y: auto; }
+    .brief-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
+    .brief-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
+    .brief-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
+    .brief-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
+    .brief-card-value { font-size: 13px; color: rgba(255,255,255,0.6); }
+    .brief-actions { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* Phase: launching/generating */
+    .phase-launch { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; }
+    .launch-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
+    .launch-bar { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
+    .launch-bar-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .launch-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
+    .launch-step.done { color: #38a169; }
+    .launch-step.active { color: #fff; font-weight: 500; }
+    .launch-step.pending { color: rgba(255,255,255,0.3); }
+    .lstep-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 12px; }
+    .lstep-spinner { width: 14px; height: 14px; border: 2px solid rgba(0,255,151,0.2); border-top-color: #00ff97; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .launch-note { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: auto; }
+
+    /* Section list header */
+    .section-list-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px 4px; flex-shrink: 0;
+    }
+    .section-list-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.06em; }
+    .history-toggle-btn {
+      display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+      border-radius: 8px; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.45);
+      background: none; border: 1px solid transparent;
+      transition: all 0.2s cubic-bezier(0.16,1,0.3,1);
+    }
+    .history-toggle-btn:hover, .history-toggle-btn.active {
+      color: #fff; border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.07);
+    }
+
+    /* History panel */
+    .history-panel {
+      background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0; max-height: 200px; overflow-y: auto;
+    }
+    .history-list { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+    .history-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px; border-radius: 8px; font-size: 12px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    }
+    .history-item-meta { color: rgba(255,255,255,0.5); }
+    .history-restore-btn {
+      font-size: 11px; font-weight: 600; color: #00a4af; padding: 2px 8px;
+      border: 1px solid rgba(0,164,175,0.3); border-radius: 12px; background: none;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .history-restore-btn:hover { background: rgba(0,164,175,0.1); }
+
+    /* QA status — hidden from user */
+    .qa-status-bar { display: none !important; }
+
+    /* Phase: edit (generated/live) */
+    .phase-edit { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    .section-list { padding: 10px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; max-height: 180px; overflow-y: auto; }
+    .section-item {
+      padding: 9px 14px; border-radius: 10px; font-size: 13px; cursor: pointer;
+      color: rgba(255,255,255,0.5); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);
+      font-weight: 500; letter-spacing: 0.01em;
+    }
+    .section-item:hover { background: rgba(255,255,255,0.06); color: #fff; border-color: rgba(255,255,255,0.12); }
+    .section-item.active { background: rgba(0,255,151,0.08); color: #00ff97; border-color: rgba(0,255,151,0.25); }
+
+    /* Visual editor controls */
+    .ve-hint { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.5; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .ve-controls { padding: 12px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .ve-group { display: flex; flex-direction: column; gap: 4px; }
+    .ve-row { display: flex; gap: 10px; }
+    .ve-grow { flex: 1; }
+    .ve-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.06em; }
+    .ve-select {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+      color: #fff; font-size: 12px; padding: 6px 8px; outline: none; width: 100%;
+    }
+    .ve-select:focus { border-color: #7c3aed; }
+    .ve-input-num {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+      color: #fff; font-size: 12px; padding: 6px 8px; width: 100%; outline: none; -moz-appearance: textfield;
+    }
+    .ve-input-num:focus { border-color: #7c3aed; }
+    .ve-btn-row { display: flex; gap: 4px; }
+    .ve-btn {
+      width: 30px; height: 30px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; padding: 0;
+    }
+    .ve-btn:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+    .ve-btn.ve-active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+    .ve-italic-btn { font-style: italic; font-family: serif; }
+    .ve-color { width: 100%; height: 30px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: transparent; cursor: pointer; padding: 2px; }
+    .ve-color::-webkit-color-swatch-wrapper { padding: 1px; }
+    .ve-color::-webkit-color-swatch { border-radius: 4px; border: none; }
+
+    .ve-bg-toggle {
+      display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06); cursor: pointer; user-select: none;
+    }
+    .ve-bg-toggle-btn {
+      position: relative; width: 36px; height: 20px; border-radius: 10px;
+      background: rgba(255,255,255,0.12); border: none; cursor: pointer; transition: background 0.2s; padding: 0;
+    }
+    .ve-bg-toggle-btn::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+      border-radius: 50%; background: #fff; transition: transform 0.2s;
+    }
+    .ve-bg-toggle-btn.active { background: #7c3aed; }
+    .ve-bg-toggle-btn.active::after { transform: translateX(16px); }
+    .ve-bg-toggle-label { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; }
+    .ve-bg-toggle-btn.active + .ve-bg-toggle-label { color: #c4b5fd; }
+
+    .ve-bg-picker { display: none; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .ve-bg-picker.active { display: flex; flex-direction: column; gap: 6px; }
+    .ve-bg-picker .ve-label { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.06em; }
+    .ve-bg-section-name { font-size: 11px; color: #c4b5fd; font-weight: 600; margin-bottom: 2px; }
+
+    .ve-bgimg-picker { display: none; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-direction: column; gap: 8px; }
+    .ve-bgimg-picker.active { display: flex; }
+    .ve-bgimg-preview {
+      width: 100%; height: 80px; border-radius: 6px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1); overflow: hidden;
+      background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ve-bgimg-none { font-size: 11px; color: rgba(255,255,255,0.3); }
+    .ve-bgimg-change { width: 100%; padding: 8px; font-size: 12px; }
+
+    .ve-delete-wrap { padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .ve-delete-btn {
+      width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);
+      background: rgba(239,68,68,0.08); color: #f87171; font-size: 12px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: all 0.15s;
+    }
+    .ve-delete-btn:hover { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.5); color: #fca5a5; }
+
+    /* Image dialog */
+    .img-dialog-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .img-dialog-overlay.active { display: flex; }
+    .img-dialog {
+      background: #0d1229; border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
+      padding: 24px; width: 420px; max-width: 90vw; display: flex; flex-direction: column; gap: 16px;
+    }
+    .img-dialog-title { font-size: 15px; font-weight: 600; color: #fff; margin: 0; }
+    .img-dialog-preview {
+      width: 100%; height: 160px; border-radius: 8px; background: rgba(255,255,255,0.04);
+      border: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+      overflow: hidden; cursor: pointer; position: relative;
+    }
+    .img-dialog-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .img-dialog-preview .img-drop-text {
+      color: rgba(255,255,255,0.35); font-size: 13px; text-align: center; pointer-events: none;
+    }
+    .img-dialog-preview.dragover { border-color: #7c3aed; background: rgba(124,58,237,0.08); }
+    .img-dialog-url {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+      color: #fff; font-size: 13px; padding: 10px 12px; outline: none; width: 100%;
+    }
+    .img-dialog-url:focus { border-color: #7c3aed; }
+    .img-dialog-url::placeholder { color: rgba(255,255,255,0.3); }
+    .img-dialog-or { text-align: center; font-size: 11px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.1em; }
+    .img-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .img-dialog-btn {
+      padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
+    }
+    .img-dialog-cancel { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); }
+    .img-dialog-cancel:hover { background: rgba(255,255,255,0.12); color: #fff; }
+    .img-dialog-save { background: #7c3aed; color: #fff; }
+    .img-dialog-save:hover { background: #6d28d9; }
+    .img-dialog-save:disabled { opacity: 0.4; cursor: not-allowed; }
+    .img-dialog-uploading { font-size: 12px; color: #c4b5fd; display: none; }
+
+    .edit-quota-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .quota-label { font-size: 11px; color: rgba(255,255,255,0.5); }
+    .quota-label.warn { color: #f59e0b; }
+    .quota-label.empty { color: #ef4444; font-weight: 600; }
+    .quota-buy { font-size: 11px; font-weight: 600; color: #00a4af; text-decoration: none; padding: 2px 8px; border: 1px solid rgba(0,164,175,0.3); border-radius: 20px; transition: all 0.15s; }
+    .quota-buy:hover { background: rgba(0,164,175,0.1); }
+
+    .edit-input-area { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+    .edit-suggestions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .edit-suggestion {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .edit-suggestion:hover { color: #fff; border-color: rgba(0,255,151,0.4); background: rgba(255,255,255,0.08); }
+    .edit-tip { position: relative; display: flex; justify-content: flex-end; margin-bottom: 6px; }
+    .edit-tip-icon {
+      width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700; font-style: italic;
+      background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.35); border: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;
+      font-family: Georgia, serif; line-height: 1;
+    }
+    .edit-tip-icon:hover, .edit-tip-icon.active { color: #00ff97; border-color: rgba(0,255,151,0.4); background: rgba(0,255,151,0.08); }
+    .edit-tip-popup {
+      display: none; position: absolute; bottom: calc(100% + 8px); right: 0; width: 240px;
+      background: #1a1a2e; border: 1px solid rgba(0,255,151,0.2); border-radius: 10px;
+      padding: 10px 14px; font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.7);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 10;
+    }
+    .edit-tip-popup.show { display: block; animation: tipFadeIn 0.2s ease; }
+    .edit-tip-popup strong { color: #00ff97; }
+    @keyframes tipFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .edit-form { display: flex; gap: 8px; }
+    .edit-input {
+      flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+      color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 13px; outline: none;
+      transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .edit-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.15); }
+    .edit-input::placeholder { color: rgba(255,255,255,0.25); }
+    .edit-send {
+      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      padding: 8px 18px; font-size: 13px; font-weight: 600;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .edit-send:hover { background: #00e088; box-shadow: 0 4px 12px -4px rgba(0,255,151,0.4); }
+    .edit-send:disabled { opacity: 0.4; cursor: not-allowed; }
+    .edit-global {
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .edit-global:hover { color: #ff9800; border-color: rgba(255,152,0,0.4); background: rgba(255,152,0,0.08); }
+    .edit-global:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Phase: failed */
+    .phase-failed { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 12px; }
+    .failed-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #f87171; }
+    .failed-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
+
+    /* Live banner */
+    .live-banner {
+      padding: 8px 16px; background: rgba(34,197,94,0.08);
+      border-bottom: 1px solid rgba(34,197,94,0.12);
+      display: flex; align-items: center; gap: 8px; font-size: 12px; flex-shrink: 0;
+      border-radius: 16px 16px 0 0;
+    }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+    .live-url { color: #4ade80; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .panel { width: 100%; height: 50%; }
+      .topbar-center { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- TOP BAR -->
+    <nav class="topbar">
+      <div class="topbar-left">
+        <a href="/dashboard" class="topbar-logo">Web<span class="topbar-logo-accent">Now</span></a>
+      </div>
+
+      <div class="topbar-center">
+        <a href="/dashboard" class="topbar-link">Projects</a>
+        <div class="topbar-sep"></div>
+        <span class="topbar-project">{project.name}</span>
+      </div>
+
+      <div class="topbar-right">
+        {hasPreview && project.preview_url && !project.preview_url.startsWith('/') && (
+          <a href={project.preview_url} target="_blank" class="topbar-btn">View Live ↗</a>
+        )}
+        {hasPreview && (
+          <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share Preview'},1500)})`}>Share Preview</button>
+        )}
+        {/* Billing status badge */}
+        {isBillingActive && (
+          <span class="billing-badge billing-badge--active">✓ Activ</span>
+        )}
+        {isFreeSite && daysRemaining !== null && isLive && (
+          <span class={`billing-badge ${daysRemaining <= 2 ? 'billing-badge--warn' : 'billing-badge--free'}`}>
+            {daysRemaining > 0 ? `${daysRemaining}z gratis` : 'Expirat'}
+          </span>
+        )}
+        {isExpiredSite && (
+          <span class="billing-badge billing-badge--expired">Expirat</span>
+        )}
+
+        {hasPreview && isBillingActive && (
+          <button class="topbar-btn topbar-btn--primary" id="publish-btn">
+            {isLive ? 'Re-publish' : 'Publish ✦'}
+          </button>
+        )}
+        {hasPreview && !isBillingActive && (
+          <>
+            <button class="topbar-btn topbar-btn--primary" id="publish-btn">
+              {isLive ? 'Re-publish' : 'Publish ✦'}
+            </button>
+            <button class="topbar-btn topbar-btn--activate" id="activate-btn" data-en="Subscribe & Publish">Abonează-te ✦</button>
+          </>
+        )}
+        {canLaunch && !isLaunching && !hasPreview && (
+          <button class="topbar-btn topbar-btn--primary" id="launch-btn">
+            {isFailed ? 'Retry →' : 'Generate ✦'}
+          </button>
+        )}
+        <a href="/dashboard/account" class="topbar-avatar" title="Cont">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
+      </div>
+    </nav>
+
+    <!-- MAIN SPLIT -->
+    <div class="main">
+
+      <!-- LEFT PANEL -->
+      <div class="panel">
+
+        {/* Live banner */}
+        {isLive && project.preview_url && !project.preview_url.startsWith('/') && (
+          <div class="live-banner">
+            <div class="live-dot"></div>
+            <span>Live:</span>
+            <a href={project.preview_url} target="_blank" class="live-url">{project.preview_url} ↗</a>
+          </div>
+        )}
+
+        {/* Custom domain strip — only for active paid sites */}
+        {isLive && isBillingActive && (
+          <div class="domain-strip" id="domain-strip">
+            {project.custom_domain ? (
+              <div class="domain-set">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span class="domain-set-name">{project.custom_domain}</span>
+                {project.domain_verified
+                  ? <span class="domain-verified-badge">✓ Verificat</span>
+                  : <span class="domain-pending-badge">⏳ Pendinte</span>
+                }
+                <button class="domain-remove-btn" id="domain-remove-btn" title="Șterge domeniu">×</button>
+              </div>
+            ) : (
+              <div class="domain-actions">
+                <button class="domain-add-btn" id="domain-add-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  Am deja domeniu
+                </button>
+                <span class="domain-or">sau</span>
+                <button class="domain-buy-btn" id="domain-buy-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  Cumpără domeniu nou
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Phase: Onboarding */}
+        {(isOnboarding || isBriefReady) && (
+          <div class="phase-onboarding">
+            <OnboardingChat
+              projectId={project.id}
+              initialMessages={conversation?.messages ?? []}
+              initialCompleteness={brief?.completeness ?? 0}
+              initialPhase={conversation?.phase ?? 'discovery'}
+            />
+          </div>
+        )}
+
+        {/* Phase: Generating */}
+        {isLaunching && (
+          <div class="phase-launch" id="launch-panel">
+            <div>
+              <p class="launch-title">Generăm website-ul...</p>
+              <p style="font-size: 12px; color: #71717a; margin-top: 4px;">Durează 60-120 secunde</p>
+            </div>
+            <div class="launch-bar">
+              <div class="launch-bar-fill" id="launch-fill"
+                style={`width: ${currentStepIdx >= 0 ? Math.round((currentStepIdx + 1) / LAUNCH_STEPS.length * 100) : 10}%`}>
+              </div>
+            </div>
+            <div id="launch-steps">
+              {LAUNCH_STEPS.map((step, i) => (
+                <div class={`launch-step ${i < currentStepIdx ? 'done' : i === currentStepIdx ? 'active' : 'pending'}`} data-key={step.key}>
+                  <span class="lstep-icon">{i < currentStepIdx ? '✓' : i === currentStepIdx ? '' : '○'}</span>
+                  <span>{step.label}</span>
+                  {i === currentStepIdx && <div class="lstep-spinner"></div>}
+                </div>
+              ))}
+            </div>
+            <p class="launch-note">Nu închide pagina.</p>
+          </div>
+        )}
+
+        {/* Phase: Edit (generated/live) — Visual editor sidebar */}
+        {hasPreview && (
+          <div class="phase-edit">
+            <div class="ve-hint" id="ve-hint" data-en="Click an element to select it. Double-click to edit.">
+              Click pe element pentru selecție. Dublu-click pentru editare.
+            </div>
+
+            <!-- Background edit mode toggle -->
+            <div class="ve-bg-toggle">
+              <button id="ve-bg-toggle-btn" class="ve-bg-toggle-btn" title="Editare fundal secțiuni"></button>
+              <span class="ve-bg-toggle-label" data-en="Edit section backgrounds">Editare fundal secțiuni</span>
+            </div>
+            <div class="ve-bg-picker" id="ve-bg-picker">
+              <div class="ve-bg-section-name" id="ve-bg-section-name"></div>
+              <label class="ve-label" data-en="Section background">Fundal secțiune</label>
+              <input type="color" id="ve-section-bg-color" class="ve-color" />
+              <button id="ve-section-delete-btn2" class="ve-delete-btn" style="margin-top:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span data-en="Delete section">Șterge secțiunea</span>
+              </button>
+            </div>
+
+            <!-- Background image mode toggle -->
+            <div class="ve-bg-toggle">
+              <button id="ve-bgimg-toggle-btn" class="ve-bg-toggle-btn" title="Editare imagini fundal"></button>
+              <span class="ve-bg-toggle-label" data-en="Edit background images">Editare imagini fundal</span>
+            </div>
+            <div class="ve-bgimg-picker" id="ve-bgimg-picker">
+              <div class="ve-bg-section-name" id="ve-bgimg-section-name"></div>
+              <div class="ve-bgimg-preview" id="ve-bgimg-preview">
+                <span class="ve-bgimg-none" id="ve-bgimg-none">Fără imagine fundal</span>
+              </div>
+              <button class="img-dialog-btn img-dialog-save ve-bgimg-change" id="ve-bgimg-change">Schimbă imaginea</button>
+              <button id="ve-section-delete-btn" class="ve-delete-btn" style="margin-top:8px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span data-en="Delete section">Șterge secțiunea</span>
+              </button>
+            </div>
+
+            <!-- Visual editor controls (shown on element select) -->
+            <div class="ve-controls" id="ve-controls" style="display:none;">
+              <div class="ve-group">
+                <label class="ve-label" data-en="Font">Font</label>
+                <select id="ve-font-family" class="ve-select"></select>
+              </div>
+              <div class="ve-row">
+                <div class="ve-group ve-grow">
+                  <label class="ve-label" data-en="Size">Mărime</label>
+                  <input type="number" id="ve-font-size" class="ve-input-num" min="8" max="120" />
+                </div>
+                <div class="ve-group">
+                  <label class="ve-label">&nbsp;</label>
+                  <div class="ve-btn-row">
+                    <button id="ve-bold" class="ve-btn" title="Bold">B</button>
+                    <button id="ve-italic" class="ve-btn ve-italic-btn" title="Italic">I</button>
+                  </div>
+                </div>
+              </div>
+              <div class="ve-group">
+                <label class="ve-label" data-en="Alignment">Aliniere</label>
+                <div class="ve-btn-row">
+                  <button id="ve-align-left" class="ve-btn ve-active" title="Left">☰</button>
+                  <button id="ve-align-center" class="ve-btn" title="Center">☰</button>
+                  <button id="ve-align-right" class="ve-btn" title="Right">☰</button>
+                </div>
+              </div>
+              <div class="ve-row">
+                <div class="ve-group">
+                  <label class="ve-label" data-en="Text color">Culoare text</label>
+                  <input type="color" id="ve-text-color" class="ve-color" />
+                </div>
+                <div class="ve-group">
+                  <label class="ve-label" data-en="Background">Fundal</label>
+                  <input type="color" id="ve-bg-color" class="ve-color" />
+                </div>
+              </div>
+              <div class="ve-delete-wrap" id="ve-delete-wrap">
+                <button id="ve-delete-btn" class="ve-delete-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  <span data-en="Delete element">Șterge element</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* Phase: Failed */}
+        {isFailed && !canLaunch && (
+          <div class="phase-failed">
+            <p class="failed-title">Generation failed</p>
+            <p class="failed-sub">Click "Retry" in the top bar to try again.</p>
+          </div>
+        )}
+      </div>
+
+      <!-- RIGHT PREVIEW -->
+      <div class="preview">
+        {hasPreview ? (
+          <div class="preview-wrapper" id="preview-wrapper">
+            <iframe class="preview-iframe" id="preview-iframe" src={`${previewUrl}?edit`} title={project.name}></iframe>
+            <div id="multipage-banner" style="display:none;">
+              <div class="mp-inner">
+                <div class="mp-spinner"></div>
+                <div class="mp-content">
+                  <p class="mp-label">Multi-page site</p>
+                  <p id="mp-text" class="mp-text">Generating inner pages...</p>
+                  <div class="mp-bar"><div id="mp-fill" class="mp-fill" style="width:0%"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div class="preview-empty" id="preview-empty">
+            <div class="preview-empty-icon">◇</div>
+            <p class="preview-empty-text">
+              {isLaunching
+                ? 'Website-ul se generează...'
+                : isOnboarding
+                ? 'Completează onboarding-ul în panoul stâng pentru a genera website-ul.'
+                : isBriefReady
+                ? 'Brief-ul e gata. Apasă "Generate" pentru a crea website-ul.'
+                : isFailed
+                ? 'Generarea a eșuat. Apasă "Retry" pentru a reîncerca.'
+                : 'Preview-ul va apărea aici după generare.'
+              }
+            </p>
+          </div>
+        )}
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Image upload dialog -->
+  <div class="img-dialog-overlay" id="img-dialog-overlay">
+    <div class="img-dialog">
+      <p class="img-dialog-title">Schimbă imaginea</p>
+      <div class="img-dialog-preview" id="img-dialog-drop">
+        <img id="img-dialog-thumb" style="display:none" />
+        <span class="img-drop-text" id="img-drop-text">Click sau trage o imagine aici</span>
+      </div>
+      <input type="file" id="img-dialog-file" accept="image/*" style="display:none" />
+      <div class="img-dialog-or">sau</div>
+      <input type="text" class="img-dialog-url" id="img-dialog-url" placeholder="Lipește URL imagine..." />
+      <span class="img-dialog-uploading" id="img-dialog-uploading">Se încarcă...</span>
+      <div class="img-dialog-actions">
+        <button class="img-dialog-btn img-dialog-cancel" id="img-dialog-cancel">Anulează</button>
+        <button class="img-dialog-btn img-dialog-save" id="img-dialog-save" disabled>Salvează</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activate modal -->
+  <div id="activate-modal">
+    <div class="activate-backdrop" id="activate-backdrop"></div>
+    <div class="activate-dialog">
+      <p class="activate-title">Activează site-ul</p>
+      <p class="activate-sub">Alege perioada — site-ul rămâne live și editabil.</p>
+      <div class="activate-plans">
+        <div class="activate-plan" data-billing="monthly">
+          <div class="ap-left">
+            <span class="ap-name">Lunar</span>
+            <span class="ap-desc">Reînnoire automată lunară</span>
+          </div>
+          <div class="ap-right">
+            <span class="ap-price">{activatePrices.monthly}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /lună</span></span>
+          </div>
+        </div>
+        <div class="activate-plan highlight" data-billing="annual">
+          <div class="ap-left">
+            <span class="ap-name">Anual ★</span>
+            <span class="ap-desc">Cel mai bun preț — un an întreg</span>
+          </div>
+          <div class="ap-right">
+            <span class="ap-price">{activatePrices.annual}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /an</span></span>
+          </div>
+        </div>
+        <div class="activate-plan" data-billing="lifetime">
+          <div class="ap-left">
+            <span class="ap-name">Lifetime</span>
+            <span class="ap-desc">Plătești o singură dată, pentru totdeauna</span>
+          </div>
+          <div class="ap-right">
+            <span class="ap-price">{activatePrices.lifetime}€</span>
+          </div>
+        </div>
+      </div>
+      <p class="activate-loading" id="activate-loading">Se redirecționează către Stripe...</p>
+    </div>
+  </div>
+
+  <!-- Activated success banner -->
+  <div id="activated-banner">✓ Site activat cu succes!</div>
+
+  <!-- Domain modal -->
+  <div id="domain-modal">
+    <div class="domain-backdrop" id="domain-backdrop"></div>
+    <div class="domain-dialog">
+      <p class="domain-modal-title">Adaugă domeniu custom</p>
+      <p class="domain-modal-sub">Introdu domeniul tău (ex: <code>domeniu.com</code> sau <code>www.domeniu.com</code>).</p>
+      <input class="domain-input" id="domain-input" type="text" placeholder="domeniu.com" autocomplete="off" spellcheck="false" />
+      <div id="domain-modal-error" class="domain-modal-error" hidden></div>
+      <button class="domain-modal-btn" id="domain-modal-save">Salvează domeniu</button>
+
+      <div id="domain-ns-section" hidden>
+        <p class="domain-ns-title">Schimbă nameserverele domeniului tău la registrar:</p>
+        <div class="domain-ns-list">
+          <div class="domain-ns-item">
+            <code>ns1.vercel-dns.com</code>
+            <button class="domain-ns-copy" data-value="ns1.vercel-dns.com">Copiază</button>
+          </div>
+          <div class="domain-ns-item">
+            <code>ns2.vercel-dns.com</code>
+            <button class="domain-ns-copy" data-value="ns2.vercel-dns.com">Copiază</button>
+          </div>
+        </div>
+        <p class="domain-ns-note">După ce schimbi nameserverele, propagarea DNS poate dura 24–48h. Site-ul tău va fi accesibil pe domeniul custom odată ce Vercel verifică domeniul.</p>
+        <button class="domain-modal-close-btn" id="domain-modal-close">Am înțeles, închide</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Buy domain modal -->
+  <div id="buy-domain-modal">
+    <div class="buy-domain-backdrop" id="buy-domain-backdrop"></div>
+    <div class="buy-domain-dialog">
+      <p class="buy-domain-title">Cumpără domeniu nou</p>
+      <p class="buy-domain-sub">Verifică disponibilitatea și cumpără direct prin platformă.</p>
+
+      <div class="buy-domain-search">
+        <input class="buy-domain-input" id="buy-domain-input" type="text" placeholder="exemplu.com" autocomplete="off" spellcheck="false" />
+        <button class="buy-domain-check-btn" id="buy-domain-check-btn">Verifică</button>
+      </div>
+
+      <div id="buy-domain-result" hidden>
+        <!-- filled by JS -->
+      </div>
+
+      <div id="buy-domain-error" class="buy-domain-error" hidden></div>
+      <div id="buy-domain-success" class="buy-domain-success" hidden></div>
+    </div>
+  </div>
+
+  <!-- Onboarding Tour Overlay -->
+  {hasPreview && (
+    <div id="tour-overlay" style="display:none;">
+      <div class="tour-backdrop"></div>
+      <div class="tour-tooltip" id="tour-tooltip">
+        <div class="tour-step-indicator" id="tour-step-indicator">1 / 3</div>
+        <p class="tour-text" id="tour-text"></p>
+        <div class="tour-actions">
+          <button class="tour-next-btn" id="tour-next-btn">Înainte →</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <style>
+    /* Multi-page continuation banner */
+    #multipage-banner {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(15,15,20,0.92); backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,255,151,0.2); border-radius: 16px;
+      padding: 14px 20px; z-index: 50; min-width: 280px; max-width: 380px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .mp-inner { display: flex; align-items: center; gap: 14px; }
+    .mp-spinner {
+      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid rgba(0,255,151,0.2);
+      border-top-color: #00ff97;
+      animation: mpSpin 0.8s linear infinite;
+    }
+    @keyframes mpSpin { to { transform: rotate(360deg); } }
+    .mp-content { flex: 1; min-width: 0; }
+    .mp-label { font-size: 10px; font-weight: 700; color: #00ff97; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .mp-text { font-size: 13px; color: rgba(255,255,255,0.85); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mp-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .mp-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+
+    /* Tour overlay */
+    .tour-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 900;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    .tour-tooltip {
+      position: fixed; z-index: 901; max-width: 280px;
+      background: rgba(255,255,255,0.95); color: #1a1a2e;
+      border-radius: 16px; padding: 20px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes slideUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+    .tour-step-indicator { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.4); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .tour-text { font-size: 14px; line-height: 1.6; color: #1a1a2e; margin: 0 0 16px; }
+    .tour-next-btn {
+      background: #00ff97; color: #1a1a2e; border: none; border-radius: 20px;
+      padding: 8px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; width: 100%;
+    }
+    .tour-next-btn:hover { background: #00e088; }
+
+    /* Billing badges */
+    .billing-badge {
+      display: inline-flex; align-items: center;
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    }
+    .billing-badge--active  { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+    .billing-badge--free    { background: rgba(96,165,250,0.12); color: #93c5fd; border: 1px solid rgba(96,165,250,0.25); }
+    .billing-badge--warn    { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+    .billing-badge--expired { background: rgba(239,68,68,0.12);  color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+    .topbar-btn--activate { background: rgba(167,139,250,0.15); color: #c4b5fd; border-color: rgba(167,139,250,0.3); font-weight: 600; }
+    .topbar-btn--activate:hover { background: rgba(167,139,250,0.25); border-color: rgba(167,139,250,0.5); }
+
+    /* Activate modal */
+    #activate-modal {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #activate-modal.open { display: flex; }
+    .activate-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px); cursor: pointer;
+    }
+    .activate-dialog {
+      position: relative; z-index: 1;
+      background: #0d1229; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; padding: 32px; width: 100%; max-width: 480px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    }
+    .activate-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .activate-sub { font-size: 13px; color: rgba(255,255,255,0.45); margin-bottom: 24px; }
+    .activate-plans { display: flex; flex-direction: column; gap: 10px; }
+    .activate-plan {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-radius: 14px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04);
+      transition: all 0.2s ease;
+    }
+    .activate-plan:hover { border-color: rgba(167,139,250,0.4); background: rgba(167,139,250,0.08); }
+    .activate-plan.highlight { border-color: rgba(167,139,250,0.5); background: rgba(167,139,250,0.1); }
+    .ap-left { display: flex; flex-direction: column; gap: 2px; }
+    .ap-name { font-size: 14px; font-weight: 600; color: #fff; }
+    .ap-desc { font-size: 12px; color: rgba(255,255,255,0.4); }
+    .ap-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+    .ap-price { font-size: 20px; font-weight: 800; color: #fff; }
+    .ap-discount { font-size: 11px; color: #a78bfa; font-weight: 600; }
+    .activate-loading { text-align: center; padding: 16px; color: rgba(255,255,255,0.5); font-size: 13px; display: none; }
+
+    /* Activated banner */
+    #activated-banner {
+      display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3);
+      color: #4ade80; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600;
+      z-index: 200; backdrop-filter: blur(10px);
+    }
+
+    /* Domain strip */
+    .domain-strip {
+      padding: 6px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0; display: flex; align-items: center;
+    }
+    .domain-add-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: 1px dashed rgba(255,255,255,0.18); border-radius: 8px;
+      color: rgba(255,255,255,0.4); font-size: 12px; font-weight: 500; padding: 5px 12px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .domain-add-btn:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+    .domain-set {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .domain-set svg { color: rgba(255,255,255,0.4); flex-shrink: 0; }
+    .domain-set-name { font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 500; }
+    .domain-verified-badge {
+      font-size: 11px; font-weight: 600; color: #4ade80;
+      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2);
+      padding: 2px 8px; border-radius: 12px;
+    }
+    .domain-pending-badge {
+      font-size: 11px; font-weight: 600; color: #fbbf24;
+      background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2);
+      padding: 2px 8px; border-radius: 12px;
+    }
+    .domain-remove-btn {
+      background: none; border: none; color: rgba(255,255,255,0.3); font-size: 16px;
+      cursor: pointer; padding: 0 4px; line-height: 1; transition: color 0.15s;
+    }
+    .domain-remove-btn:hover { color: #f87171; }
+
+    /* Domain modal */
+    #domain-modal {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #domain-modal.open { display: flex; }
+    .domain-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px); cursor: pointer;
+    }
+    .domain-dialog {
+      position: relative; z-index: 1;
+      background: #0d1229; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; padding: 32px; width: 100%; max-width: 440px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .domain-modal-title { font-size: 17px; font-weight: 700; color: #fff; }
+    .domain-modal-sub { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.6; }
+    .domain-modal-sub code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+    .domain-input {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .domain-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.12); }
+    .domain-input::placeholder { color: rgba(255,255,255,0.25); }
+    .domain-modal-error {
+      font-size: 13px; color: #f87171;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      padding: 8px 12px; border-radius: 8px;
+    }
+    .domain-modal-btn {
+      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      padding: 11px 20px; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s; align-self: flex-start;
+    }
+    .domain-modal-btn:hover { background: #00e088; }
+    .domain-modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .domain-ns-section { display: flex; flex-direction: column; gap: 10px; }
+    .domain-ns-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .domain-ns-list { display: flex; flex-direction: column; gap: 8px; }
+    .domain-ns-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 10px 14px;
+    }
+    .domain-ns-item code { font-size: 13px; color: #00ff97; letter-spacing: 0.02em; }
+    .domain-ns-copy {
+      font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5);
+      background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+      padding: 3px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .domain-ns-copy:hover { color: #fff; border-color: rgba(255,255,255,0.35); }
+    .domain-ns-note {
+      font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.6;
+    }
+    .domain-modal-close-btn {
+      background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+      padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; align-self: flex-start;
+    }
+    .domain-modal-close-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+    /* Domain strip: two action buttons */
+    .domain-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .domain-or { font-size: 11px; color: rgba(255,255,255,0.25); }
+    .domain-buy-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0,255,151,0.08); border: 1px solid rgba(0,255,151,0.2); border-radius: 8px;
+      color: #00ff97; font-size: 12px; font-weight: 600; padding: 5px 12px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .domain-buy-btn:hover { background: rgba(0,255,151,0.15); border-color: rgba(0,255,151,0.4); }
+
+    /* Buy domain modal */
+    #buy-domain-modal {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #buy-domain-modal.open { display: flex; }
+    .buy-domain-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px); cursor: pointer;
+    }
+    .buy-domain-dialog {
+      position: relative; z-index: 1;
+      background: #0d1229; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px; padding: 32px; width: 100%; max-width: 460px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .buy-domain-title { font-size: 17px; font-weight: 700; color: #fff; }
+    .buy-domain-sub { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.6; margin-top: -6px; }
+    .buy-domain-search { display: flex; gap: 8px; }
+    .buy-domain-input {
+      flex: 1; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .buy-domain-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.12); }
+    .buy-domain-input::placeholder { color: rgba(255,255,255,0.25); }
+    .buy-domain-check-btn {
+      background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .buy-domain-check-btn:hover { background: rgba(255,255,255,0.17); }
+    .buy-domain-check-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Result card */
+    .buy-domain-result-card {
+      border-radius: 14px; padding: 18px 20px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .buy-domain-result-card.available {
+      background: rgba(0,255,151,0.06); border: 1px solid rgba(0,255,151,0.2);
+    }
+    .buy-domain-result-card.unavailable {
+      background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2);
+    }
+    .bdr-left { display: flex; flex-direction: column; gap: 4px; }
+    .bdr-name { font-size: 15px; font-weight: 700; color: #fff; }
+    .bdr-status-available { font-size: 12px; color: #4ade80; font-weight: 600; }
+    .bdr-status-unavailable { font-size: 12px; color: #f87171; font-weight: 600; }
+    .bdr-price { font-size: 13px; color: rgba(255,255,255,0.5); }
+    .bdr-premium { font-size: 11px; color: #fbbf24; font-weight: 600; }
+    .buy-confirm-btn {
+      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.2s; white-space: nowrap; flex-shrink: 0;
+    }
+    .buy-confirm-btn:hover { background: #00e088; }
+    .buy-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .buy-domain-error {
+      font-size: 13px; color: #f87171;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      padding: 10px 14px; border-radius: 10px;
+    }
+    .buy-domain-success {
+      font-size: 13px; color: #4ade80; line-height: 1.6;
+      background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2);
+      padding: 14px 16px; border-radius: 10px;
+    }
+  </style>
+
+  <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, shouldLaunch, LAUNCH_STEPS, previewUrl, justActivated, showActivate, serverSectionIds }}>
+    // LANGUAGE
+    const _lang = (localStorage.getItem('i18nextLng') || 'ro').split('-')[0];
+    document.querySelectorAll('.edit-suggestion[data-msg-ro]').forEach(btn => {
+      const msg = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo;
+      if (msg) { btn.dataset.msg = msg; btn.textContent = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo; }
+    });
+
+    // EDIT QUOTA — load on mount and update UI
+    const quotaBar   = document.getElementById('edit-quota-bar');
+    const quotaLabel = document.getElementById('quota-label');
+    const buyBtn     = document.getElementById('buy-edits-btn');
+
+    async function loadQuota() {
+      try {
+        const res  = await fetch('/api/billing/edit-quota');
+        if (!res.ok) return;
+        const q = await res.json();
+        renderQuota(q);
+      } catch {}
+    }
+
+    function renderQuota(q) {
+      const isRo = _lang !== 'en';
+      const remaining = q.remaining ?? 0;
+
+      // Topbar pill
+      const topbarQuota = document.getElementById('topbar-quota');
+      const topbarLabel = document.getElementById('topbar-quota-label');
+      if (topbarQuota && topbarLabel) {
+        topbarQuota.className = 'topbar-quota' + (remaining <= 0 ? ' empty' : remaining <= 3 ? ' warn' : '');
+        topbarLabel.textContent = remaining <= 0
+          ? (isRo ? '0 credite' : '0 credits')
+          : (isRo ? `${remaining} credite` : `${remaining} credits`);
+      }
+
+      // Inline bar (below suggestions)
+      if (quotaBar && quotaLabel) {
+        quotaBar.style.display = 'flex';
+        if (remaining <= 0) {
+          quotaLabel.textContent = isRo ? '0 editări rămase' : '0 edits left';
+          quotaLabel.className = 'quota-label empty';
+          if (buyBtn) buyBtn.style.display = 'inline';
+        } else {
+          quotaLabel.textContent = isRo
+            ? `${remaining} editări rămase`
+            : `${remaining} edits left`;
+          quotaLabel.className = `quota-label${remaining <= 1 ? ' warn' : ''}`;
+          if (buyBtn) buyBtn.style.display = remaining <= 2 ? 'inline' : 'none';
+        }
+      }
+    }
+
+    if (buyBtn) {
+      buyBtn.addEventListener('click', async e => {
+        e.preventDefault();
+        buyBtn.textContent = '...';
+        try {
+          const res  = await fetch('/api/billing/buy-edits', { method: 'POST' });
+          const data = await res.json();
+          if (data.url) window.location.href = data.url;
+          else alert(data.error || 'Stripe not configured yet.');
+        } catch {
+          alert('Error. Try again.');
+        }
+        buyBtn.textContent = '+ 10 editări / €5';
+      });
+    }
+
+    if (hasPreview) loadQuota();
+
+    // ACTIVATE MODAL
+    const activateModal    = document.getElementById('activate-modal');
+    const activateBackdrop = document.getElementById('activate-backdrop');
+    const activateLoading  = document.getElementById('activate-loading');
+    const activatedBanner  = document.getElementById('activated-banner');
+
+    document.getElementById('activate-btn')?.addEventListener('click', () => {
+      if (activateModal) { activateModal.style.display = 'flex'; activateModal.classList.add('open'); }
+    });
+    activateBackdrop?.addEventListener('click', () => {
+      if (activateModal) { activateModal.style.display = 'none'; activateModal.classList.remove('open'); }
+    });
+
+    document.querySelectorAll('.activate-plan').forEach(plan => {
+      plan.addEventListener('click', async () => {
+        const billingType = plan.dataset.billing;
+        if (!billingType) return;
+        if (activateLoading) activateLoading.style.display = 'block';
+        document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = 'none');
+        try {
+          const res  = await fetch('/api/billing/activate-site', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, billingType }),
+          });
+          const data = await res.json();
+          if (data.url) {
+            window.location.href = data.url;
+          } else {
+            alert(data.error || 'Eroare la creare sesiune Stripe.');
+            if (activateLoading) activateLoading.style.display = 'none';
+            document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
+          }
+        } catch {
+          alert('Eroare de rețea. Încearcă din nou.');
+          if (activateLoading) activateLoading.style.display = 'none';
+          document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
+        }
+      });
+    });
+
+    // Show success banner if redirected back after activation
+    if (justActivated && activatedBanner) {
+      activatedBanner.style.display = 'block';
+      setTimeout(() => { activatedBanner.style.display = 'none'; }, 4000);
+    }
+
+    // Show banner after domain purchase redirect
+    if (new URLSearchParams(window.location.search).get('domain_purchased') === '1') {
+      const b = document.createElement('div');
+      b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:200;backdrop-filter:blur(10px);';
+      b.textContent = '✓ Domeniu cumpărat! Va fi activ în câteva minute.';
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 5000);
+      window.history.replaceState({}, '', `/dashboard/${projectId}`);
+    }
+
+    // VIEWPORT TOGGLES (panel sidebar)
+
+    // ONBOARDING TOUR
+    const TOUR_KEY = 'grappes_tour_done';
+    const isEn = _lang === 'en';
+
+    const TOUR_STEPS = isEn ? [
+      { text: 'Select a section from the list on the left to start editing it.', anchor: '#section-list' },
+      { text: 'Describe the change you want in Romanian or English.', anchor: '#edit-input' },
+      { text: 'Publish your site with one click using the Publish button above.', anchor: '#publish-btn' },
+    ] : [
+      { text: 'Selectează o secțiune din lista din stânga pentru a o edita.', anchor: '#section-list' },
+      { text: 'Descrie modificarea dorită în română sau engleză.', anchor: '#edit-input' },
+      { text: 'Publică site-ul cu un click folosind butonul Publish de sus.', anchor: '#publish-btn' },
+    ];
+
+    if (hasPreview && !localStorage.getItem(TOUR_KEY)) {
+      let tourStep = 0;
+      const overlay = document.getElementById('tour-overlay');
+      const tooltip = document.getElementById('tour-tooltip');
+      const stepInd = document.getElementById('tour-step-indicator');
+      const tourText = document.getElementById('tour-text');
+      const nextBtn = document.getElementById('tour-next-btn');
+
+      function positionTourTooltip(anchorSelector) {
+        const anchor = document.querySelector(anchorSelector);
+        if (!anchor || !tooltip) return;
+        const rect = anchor.getBoundingClientRect();
+        const tipW = 280, tipH = 140;
+        let top = rect.bottom + 12;
+        let left = rect.left;
+        if (top + tipH > window.innerHeight) top = rect.top - tipH - 12;
+        if (left + tipW > window.innerWidth) left = window.innerWidth - tipW - 16;
+        if (left < 8) left = 8;
+        tooltip.style.top = top + 'px';
+        tooltip.style.left = left + 'px';
+      }
+
+      function showTourStep(step) {
+        if (!overlay || !tourText || !stepInd || !nextBtn) return;
+        overlay.style.display = 'block';
+        const s = TOUR_STEPS[step];
+        stepInd.textContent = `${step + 1} / ${TOUR_STEPS.length}`;
+        tourText.textContent = s.text;
+        nextBtn.textContent = step === TOUR_STEPS.length - 1
+          ? (isEn ? 'Got it!' : 'Am înțeles!')
+          : (isEn ? 'Next →' : 'Înainte →');
+        positionTourTooltip(s.anchor);
+      }
+
+      nextBtn?.addEventListener('click', () => {
+        tourStep++;
+        if (tourStep >= TOUR_STEPS.length) {
+          if (overlay) overlay.style.display = 'none';
+          localStorage.setItem(TOUR_KEY, '1');
+        } else {
+          showTourStep(tourStep);
+        }
+      });
+
+      // Show tour after sections load (small delay)
+      setTimeout(() => showTourStep(0), 1500);
+    }
+
+    // VERSION HISTORY
+    const historyToggleBtn = document.getElementById('history-toggle-btn');
+    const historyPanel = document.getElementById('history-panel');
+    const historyList = document.getElementById('history-list');
+    let historyLoaded = false;
+
+    historyToggleBtn?.addEventListener('click', async () => {
+      const isOpen = historyPanel?.style.display !== 'none';
+      if (isOpen) {
+        if (historyPanel) historyPanel.style.display = 'none';
+        historyToggleBtn.classList.remove('active');
+      } else {
+        if (historyPanel) historyPanel.style.display = 'block';
+        historyToggleBtn.classList.add('active');
+        if (!historyLoaded) {
+          historyLoaded = true;
+          await loadHistory();
+        }
+      }
+    });
+
+    async function loadHistory() {
+      if (!historyList) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}/versions`);
+        if (!res.ok) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Eroare la încărcare.</div>'; return; }
+        const { versions } = await res.json();
+        if (!versions?.length) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">' + (isEn ? 'No versions yet.' : 'Nicio versiune încă.') + '</div>'; return; }
+
+        historyList.innerHTML = '';
+        versions.forEach(v => {
+          const dt = new Date(v.created_at).toLocaleString(isEn ? 'en-GB' : 'ro-RO', { dateStyle: 'short', timeStyle: 'short' });
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          item.innerHTML = `
+            <span class="history-item-meta">v${v.version} — ${dt}</span>
+            <button class="history-restore-btn" data-version="${v.version}">${isEn ? 'Restore' : 'Restaurează'}</button>
+          `;
+          item.querySelector('.history-restore-btn')?.addEventListener('click', async (e) => {
+            const btn = e.target;
+            btn.textContent = '…';
+            btn.disabled = true;
+            await fetch(`/api/projects/${projectId}/versions/restore`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ version: v.version }),
+            });
+            window.location.reload();
+          });
+          historyList.appendChild(item);
+        });
+      } catch {
+        historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Eroare.</div>';
+      }
+    }
+
+    // QA STATUS
+    if (hasPreview) {
+      fetch(`/api/projects/${projectId}/qa-status`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const bar = document.getElementById('qa-status-bar');
+          if (!bar || !data) return;
+          bar.style.display = 'block';
+          const issues = data.issues ?? 0;
+          if (issues === 0) {
+            bar.innerHTML = '<span class="qa-badge ok">✓ QA OK</span>';
+          } else {
+            bar.innerHTML = `<span class="qa-badge warn">⚠ ${issues} ${isEn ? 'issue' + (issues === 1 ? '' : 's') : 'problem' + (issues === 1 ? 'ă' : 'e')}</span>`;
+          }
+        })
+        .catch(() => {});
+    }
+
+    // CUSTOM DOMAIN
+    const domainModal    = document.getElementById('domain-modal');
+    const domainBackdrop = document.getElementById('domain-backdrop');
+    const domainInput    = /** @type {HTMLInputElement|null} */ (document.getElementById('domain-input'));
+    const domainSaveBtn  = /** @type {HTMLButtonElement|null} */ (document.getElementById('domain-modal-save'));
+    const domainErrEl    = document.getElementById('domain-modal-error');
+    const domainNsSection = document.getElementById('domain-ns-section');
+    const domainCloseBtn = document.getElementById('domain-modal-close');
+
+    document.getElementById('domain-add-btn')?.addEventListener('click', () => {
+      if (domainModal) domainModal.classList.add('open');
+      if (domainNsSection) domainNsSection.hidden = true;
+      if (domainErrEl) { domainErrEl.hidden = true; }
+      if (domainInput) domainInput.value = '';
+      setTimeout(() => domainInput?.focus(), 100);
+    });
+
+    domainBackdrop?.addEventListener('click', () => domainModal?.classList.remove('open'));
+    domainCloseBtn?.addEventListener('click', () => domainModal?.classList.remove('open'));
+
+    domainSaveBtn?.addEventListener('click', async () => {
+      const domain = domainInput?.value.trim();
+      if (!domain) return;
+      domainSaveBtn.disabled = true;
+      domainSaveBtn.textContent = 'Se salvează...';
+      if (domainErrEl) domainErrEl.hidden = true;
+
+      try {
+        const res  = await fetch(`/api/projects/${projectId}/domain`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domain }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          if (domainErrEl) { domainErrEl.textContent = data.error || 'Eroare. Încearcă din nou.'; domainErrEl.hidden = false; }
+        } else {
+          // Hide form, show nameservers
+          domainSaveBtn.style.display = 'none';
+          if (domainInput) domainInput.style.display = 'none';
+          if (domainNsSection) domainNsSection.hidden = false;
+        }
+      } catch {
+        if (domainErrEl) { domainErrEl.textContent = 'Eroare de rețea. Încearcă din nou.'; domainErrEl.hidden = false; }
+      }
+      domainSaveBtn.disabled = false;
+      domainSaveBtn.textContent = 'Salvează domeniu';
+    });
+
+    // Copy nameserver buttons
+    document.querySelectorAll('.domain-ns-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.value ?? '';
+        navigator.clipboard.writeText(val).then(() => {
+          btn.textContent = 'Copiat ✓';
+          setTimeout(() => { btn.textContent = 'Copiază'; }, 2000);
+        });
+      });
+    });
+
+    // Remove domain
+    document.getElementById('domain-remove-btn')?.addEventListener('click', async () => {
+      if (!confirm('Ești sigur că vrei să ștergi domeniul custom?')) return;
+      await fetch(`/api/projects/${projectId}/domain`, { method: 'DELETE' });
+      window.location.reload();
+    });
+
+    // BUY DOMAIN MODAL
+    const buyDomainModal    = document.getElementById('buy-domain-modal');
+    const buyDomainBackdrop = document.getElementById('buy-domain-backdrop');
+    const buyDomainInput    = /** @type {HTMLInputElement|null} */ (document.getElementById('buy-domain-input'));
+    const buyDomainCheckBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('buy-domain-check-btn'));
+    const buyDomainResult   = document.getElementById('buy-domain-result');
+    const buyDomainError    = document.getElementById('buy-domain-error');
+    const buyDomainSuccess  = document.getElementById('buy-domain-success');
+
+    document.getElementById('domain-buy-btn')?.addEventListener('click', () => {
+      buyDomainModal?.classList.add('open');
+      if (buyDomainResult) { buyDomainResult.hidden = true; buyDomainResult.innerHTML = ''; }
+      if (buyDomainError)  { buyDomainError.hidden = true; }
+      if (buyDomainSuccess){ buyDomainSuccess.hidden = true; }
+      if (buyDomainInput)  buyDomainInput.value = '';
+      setTimeout(() => buyDomainInput?.focus(), 100);
+    });
+    buyDomainBackdrop?.addEventListener('click', () => buyDomainModal?.classList.remove('open'));
+
+    function showBuyError(msg) {
+      if (buyDomainError) { buyDomainError.textContent = msg; buyDomainError.hidden = false; }
+    }
+
+    buyDomainCheckBtn?.addEventListener('click', checkDomain);
+    buyDomainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkDomain(); });
+
+    async function checkDomain() {
+      const name = buyDomainInput?.value.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*/,'');
+      if (!name) return;
+      if (buyDomainError)  buyDomainError.hidden = true;
+      if (buyDomainResult) { buyDomainResult.hidden = true; buyDomainResult.innerHTML = ''; }
+      if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = true; buyDomainCheckBtn.textContent = 'Se verifică...'; }
+
+      try {
+        const res  = await fetch(`/api/domains/check?name=${encodeURIComponent(name)}`);
+        const data = await res.json();
+
+        if (!res.ok) { showBuyError(data.error || 'Eroare la verificare.'); return; }
+
+        if (!buyDomainResult) return;
+        buyDomainResult.hidden = false;
+
+        if (data.available) {
+          const vercelPriceUsd = data.price ?? 0;
+          // Platform charge = Vercel price (≈EUR) + markup (shown from API)
+          // We'll fetch the exact charge from the buy-domain endpoint, but estimate here
+          const markupEur = 5; // default; actual value from DOMAIN_MARKUP_EUR env
+          const chargeEur = Math.ceil(vercelPriceUsd) + markupEur;
+          const priceText = vercelPriceUsd ? `${chargeEur}€ / an` : 'Preț indisponibil';
+          const premiumNote = data.premium ? '<span class="bdr-premium">★ Domeniu premium</span>' : '';
+          buyDomainResult.innerHTML = `
+            <div class="buy-domain-result-card available">
+              <div class="bdr-left">
+                <span class="bdr-name">${name}</span>
+                <span class="bdr-status-available">✓ Disponibil</span>
+                <span class="bdr-price">${priceText}</span>
+                ${premiumNote}
+              </div>
+              <button class="buy-confirm-btn" id="buy-confirm-btn" data-name="${name}" data-price="${vercelPriceUsd}">
+                Cumpără
+              </button>
+            </div>
+          `;
+          document.getElementById('buy-confirm-btn')?.addEventListener('click', confirmPurchase);
+        } else {
+          buyDomainResult.innerHTML = `
+            <div class="buy-domain-result-card unavailable">
+              <div class="bdr-left">
+                <span class="bdr-name">${name}</span>
+                <span class="bdr-status-unavailable">✗ Indisponibil</span>
+              </div>
+            </div>
+          `;
+        }
+      } catch {
+        showBuyError('Eroare de rețea. Încearcă din nou.');
+      } finally {
+        if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = false; buyDomainCheckBtn.textContent = 'Verifică'; }
+      }
+    }
+
+    async function confirmPurchase(e) {
+      const btn = /** @type {HTMLButtonElement} */ (e.currentTarget);
+      const name       = btn.dataset.name;
+      const priceUsd   = Number(btn.dataset.price) || 0;
+
+      btn.disabled = true; btn.textContent = 'Se pregătește plata...';
+      if (buyDomainError) buyDomainError.hidden = true;
+
+      try {
+        const res  = await fetch('/api/billing/buy-domain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, domainName: name, domainPriceUsd: priceUsd }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.url) {
+          showBuyError(data.error || 'Eroare la creare sesiune de plată. Încearcă din nou.');
+          btn.disabled = false; btn.textContent = 'Cumpără';
+          return;
+        }
+
+        // Redirect to Stripe Checkout
+        window.location.href = data.url;
+      } catch {
+        showBuyError('Eroare de rețea. Încearcă din nou.');
+        btn.disabled = false; btn.textContent = 'Cumpără';
+      }
+    }
+
+    // LAUNCH
+    document.getElementById('launch-btn')?.addEventListener('click', triggerLaunch);
+
+    if (shouldLaunch && !isLaunching && !isLive) {
+      triggerLaunch();
+    }
+
+    async function triggerLaunch() {
+      const btn = document.getElementById('launch-btn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+      const res = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
+      if (res.ok) { window.location.reload(); }
+      else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Generation failed.');
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate ✦'; }
+      }
+    }
+
+    // MULTI-PAGE CONTINUATION
+    function showMpBanner(progress) {
+      const banner = document.getElementById('multipage-banner');
+      if (!banner) return;
+      banner.style.display = 'block';
+      updateMpBanner(progress);
+    }
+    function updateMpBanner(progress) {
+      const text = document.getElementById('mp-text');
+      const fill = document.getElementById('mp-fill');
+      if (text) text.textContent = `Generating page ${progress.done + 1}/${progress.total}...`;
+      if (fill) fill.style.width = `${Math.round(progress.done / progress.total * 100)}%`;
+    }
+    function hideMpBanner() {
+      const banner = document.getElementById('multipage-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    async function runMultiPageContinuation(progress) {
+      showMpBanner(progress);
+      while (progress.done < progress.total) {
+        try {
+          const res = await fetch(`/api/projects/${projectId}/launch/continue`, { method: 'POST' });
+          if (!res.ok) break;
+          const data = await res.json();
+          progress = { done: data.doneCount, total: data.total };
+          updateMpBanner(progress);
+          if (data.allDone) break;
+        } catch { break; }
+      }
+      hideMpBanner();
+    }
+
+    // On load: resume continuation if page is generated but multi-page is incomplete
+    if (isGenerated) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/projects/${projectId}/launch`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.multiPageProgress && data.multiPageProgress.done < data.multiPageProgress.total) {
+            await runMultiPageContinuation(data.multiPageProgress);
+            window.location.reload();
+          }
+        } catch {}
+      })();
+    }
+
+    // POLL WHILE GENERATING
+    if (isLaunching) {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/projects/${projectId}/launch`);
+          if (!res.ok) return;
+          const data = await res.json();
+          updateLaunchUI(data.substatus, data.status);
+          if (data.status === 'generated' || data.status === 'live') {
+            clearInterval(interval);
+            if (data.multiPageProgress && data.multiPageProgress.done < data.multiPageProgress.total) {
+              // Home page done — reload to show preview, then continue inner pages
+              setTimeout(() => window.location.reload(), 300);
+            } else {
+              setTimeout(() => window.location.reload(), 500);
+            }
+          } else if (data.status === 'failed') {
+            clearInterval(interval);
+            window.location.reload();
+          }
+        } catch {}
+      }, 2000);
+    }
+
+    function updateLaunchUI(substatus, status) {
+      const steps = document.querySelectorAll('.launch-step');
+      const targetIdx = substatus ? LAUNCH_STEPS.findIndex(s => s.key === substatus) : -1;
+      steps.forEach((step, i) => {
+        const icon = step.querySelector('.lstep-icon');
+        if (i < targetIdx) { step.className = 'launch-step done'; if (icon) icon.textContent = '✓'; }
+        else if (i === targetIdx) { step.className = 'launch-step active'; if (icon) icon.textContent = ''; }
+        else { step.className = 'launch-step pending'; if (icon) icon.textContent = '○'; }
+      });
+      const pct = targetIdx >= 0 ? Math.round((targetIdx + 1) / LAUNCH_STEPS.length * 100) : 10;
+      const fill = document.getElementById('launch-fill');
+      if (fill) fill.style.width = pct + '%';
+    }
+
+    // PUBLISH
+    document.getElementById('publish-btn')?.addEventListener('click', async function() {
+      this.disabled = true; this.textContent = 'Publishing…';
+      const res = await fetch(`/api/projects/${projectId}/publish`, { method: 'POST' });
+      if (res.ok) {
+        this.textContent = 'Published ✓';
+        // Poll for live status
+        const poll = setInterval(async () => {
+          const r = await fetch(`/api/projects/${projectId}/launch`);
+          const d = await r.json();
+          if (d.status === 'live') { clearInterval(poll); window.location.reload(); }
+        }, 3000);
+      } else {
+        this.disabled = false; this.textContent = 'Publish ✦';
+        alert('Publish failed. Try again.');
+      }
+    });
+
+    // EDIT MODE (sections + chat)
+    if (hasPreview) {
+      let activeSectionId = null;
+      let activeElement = null; // { selector, outerHTML, tag } — set when user clicks an element
+      let chatHistory = [];
+      var _isEn = (document.documentElement.lang || 'ro') === 'en';
+
+      // Load section list from preview iframe
+      const iframe = document.getElementById('preview-iframe');
+      const sectionList = document.getElementById('section-list');
+
+      function populateSections(ids) {
+        if (!sectionList) return;
+        if (!ids || !ids.length) {
+          sectionList.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px;padding:8px 12px">No sections found.</div>';
+          return;
+        }
+        sectionList.innerHTML = '';
+        ids.forEach(id => {
+          const div = document.createElement('div');
+          div.className = 'section-item';
+          div.textContent = id.charAt(0).toUpperCase() + id.slice(1);
+          div.dataset.sectionId = id;
+          div.addEventListener('click', () => selectSection(id));
+          sectionList.appendChild(div);
+        });
+      }
+
+      // Listen for messages from iframe
+      let veDebounce = null;
+      window.addEventListener('message', e => {
+        if (e.data?.type === 'sections-ready') populateSections(e.data.sectionIds);
+        if (e.data?.type === 'section-click') selectSection(e.data.sectionId);
+        if (e.data?.type === 'element-click') selectElement(e.data);
+        if (e.data?.type === 'element-deselect') { clearElement(); hideVeControls(); }
+
+        // Visual editor: populate controls on element select
+        if (e.data?.type === 'wn-select') {
+          activeElement = { wnId: e.data.wnId, tag: e.data.tag, elType: e.data.elType };
+          showVeControls(e.data);
+        }
+        if (e.data?.type === 'wn-deselect') hideVeControls();
+
+        // Image edit: open upload dialog
+        if (e.data?.type === 'wn-request-image') {
+          iframe?.contentWindow?.postMessage({ type: 'wn-image-dialog-ack' }, '*');
+          openImageDialog(e.data.wnId, e.data.currentSrc || '');
+        }
+
+        // Text edit: open prompt (no separate edit page needed)
+        if (e.data?.type === 'wn-request-text') {
+          iframe?.contentWindow?.postMessage({ type: 'wn-text-dialog-ack' }, '*');
+          var newText = prompt(_isEn ? 'Edit text:' : 'Editează textul:', e.data.text || '');
+          if (newText !== null && newText !== e.data.text) {
+            iframe?.contentWindow?.postMessage({ type: 'wn-update-text', wnId: e.data.wnId, value: newText }, '*');
+            fetch('/api/projects/' + projectId + '/edit-content', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ wnId: e.data.wnId, prop: 'innerHTML', value: newText }),
+            }).catch(function(){});
+          }
+        }
+
+        // Save edits from iframe (image prompt etc)
+        if (e.data?.type === 'wn-edit') {
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: e.data.wnId, prop: e.data.prop, value: e.data.value }),
+          }).catch(function(){});
+        }
+      });
+
+      function showDeleteBtn(label) {
+        var wrap = document.getElementById('ve-delete-wrap');
+        if (wrap) {
+          wrap.style.display = '';
+          var span = wrap.querySelector('span');
+          if (span) span.textContent = label || (_isEn ? 'Delete element' : 'Șterge element');
+        }
+      }
+      function hideDeleteBtn() {
+        // Delete btn is inside ve-controls; hidden when panel hides
+      }
+
+      function showVeControls(data) {
+        var panel = document.getElementById('ve-controls');
+        if (!panel) return;
+        if (data.elType === 'image') {
+          // Image: show only delete button
+          panel.style.display = 'flex';
+          panel.querySelectorAll('.ve-group, .ve-row').forEach(function(g) { g.style.display = 'none'; });
+          showDeleteBtn(_isEn ? 'Delete image' : 'Șterge imaginea');
+          document.getElementById('ve-hint').style.display = 'none';
+          return;
+        }
+        if (data.elType !== 'text') {
+          // container: only show bg color + delete
+          panel.style.display = 'flex';
+          panel.querySelectorAll('.ve-group').forEach(function(g) { g.style.display = 'none'; });
+          var groups = panel.querySelectorAll('.ve-group');
+          var bgGroup = groups[groups.length - 1];
+          if (bgGroup) { bgGroup.style.display = 'flex'; bgGroup.parentElement.style.display = 'flex'; }
+          document.getElementById('ve-bg-color').value = rgbToHex(data.bgColor);
+          showDeleteBtn(_isEn ? 'Delete element' : 'Șterge element');
+          document.getElementById('ve-hint').style.display = 'none';
+          return;
+        }
+
+        panel.style.display = 'flex';
+        panel.querySelectorAll('.ve-group, .ve-row').forEach(g => g.style.display = '');
+
+        // Font family
+        var fontSel = document.getElementById('ve-font-family');
+        var currentFont = (data.fontFamily || '').split(',')[0].replace(/['"]/g, '').trim();
+        var fonts = data.fonts || [];
+        if (currentFont && fonts.indexOf(currentFont) === -1) fonts.unshift(currentFont);
+        fonts = ['sans-serif', 'serif', 'monospace'].concat(fonts);
+        fontSel.innerHTML = fonts.map(f =>
+          '<option value="' + f + '"' + (f === currentFont ? ' selected' : '') + '>' + f + '</option>'
+        ).join('');
+
+        document.getElementById('ve-font-size').value = data.fontSize || 16;
+
+        var isBold = parseInt(data.fontWeight) >= 600 || data.fontWeight === 'bold';
+        document.getElementById('ve-bold').classList.toggle('ve-active', isBold);
+        document.getElementById('ve-italic').classList.toggle('ve-active', data.fontStyle === 'italic');
+
+        var align = (data.textAlign || 'left').replace('start', 'left').replace('end', 'right');
+        ['left', 'center', 'right'].forEach(d => document.getElementById('ve-align-' + d).classList.toggle('ve-active', d === align));
+
+        document.getElementById('ve-text-color').value = rgbToHex(data.color);
+        document.getElementById('ve-bg-color').value = rgbToHex(data.bgColor);
+
+        document.getElementById('ve-hint').style.display = 'none';
+        showDeleteBtn(_isEn ? 'Delete element' : 'Șterge element');
+      }
+
+      function hideVeControls() {
+        var panel = document.getElementById('ve-controls');
+        if (panel) panel.style.display = 'none';
+        var hint = document.getElementById('ve-hint');
+        if (hint) hint.style.display = '';
+        hideDeleteBtn();
+      }
+
+      function veApply(jsProp, cssProp, value) {
+        if (!activeElement?.wnId) return;
+        iframe?.contentWindow?.postMessage({ type: 'wn-update-style', wnId: activeElement.wnId, prop: jsProp, value: value }, '*');
+        clearTimeout(veDebounce);
+        veDebounce = setTimeout(function() {
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: activeElement.wnId, prop: cssProp, value: value }),
+          }).catch(function(){});
+        }, 500);
+      }
+
+      function rgbToHex(rgb) {
+        if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)' || rgb === 'color(srgb 0 0 0 / 0)') return '#000000';
+        if (rgb.startsWith('#')) return rgb.length === 4
+          ? '#' + rgb[1]+rgb[1] + rgb[2]+rgb[2] + rgb[3]+rgb[3]
+          : rgb.slice(0, 7);
+        // Chrome 128+ returns color(srgb r g b) with values 0-1
+        if (rgb.startsWith('color(srgb')) {
+          var s = rgb.match(/[\d.]+/g);
+          if (!s || s.length < 3) return '#000000';
+          return '#' + [s[0],s[1],s[2]].map(x => {
+            var n = Math.round(parseFloat(x) * 255);
+            return Math.min(255, Math.max(0, n)).toString(16).padStart(2,'0');
+          }).join('');
+        }
+        // Standard rgb(r, g, b) / rgba(r, g, b, a) with values 0-255
+        var m = rgb.match(/[\d.]+/g);
+        if (!m || m.length < 3) return '#000000';
+        return '#' + [m[0],m[1],m[2]].map(x => {
+          var n = Math.round(parseFloat(x));
+          return Math.min(255, Math.max(0, n)).toString(16).padStart(2,'0');
+        }).join('');
+      }
+
+      // Wire up VE controls
+      document.getElementById('ve-font-family')?.addEventListener('change', function() { veApply('fontFamily', 'font-family', this.value); });
+      document.getElementById('ve-font-size')?.addEventListener('change', function() { veApply('fontSize', 'font-size', this.value + 'px'); });
+      document.getElementById('ve-text-color')?.addEventListener('input', function() { veApply('color', 'color', this.value); });
+      document.getElementById('ve-bg-color')?.addEventListener('input', function() { veApply('backgroundColor', 'background-color', this.value); });
+      document.getElementById('ve-bold')?.addEventListener('click', function() {
+        this.classList.toggle('ve-active');
+        veApply('fontWeight', 'font-weight', this.classList.contains('ve-active') ? '700' : '400');
+      });
+      document.getElementById('ve-italic')?.addEventListener('click', function() {
+        this.classList.toggle('ve-active');
+        veApply('fontStyle', 'font-style', this.classList.contains('ve-active') ? 'italic' : 'normal');
+      });
+      ['left', 'center', 'right'].forEach(function(dir) {
+        document.getElementById('ve-align-' + dir)?.addEventListener('click', function() {
+          ['left','center','right'].forEach(d => document.getElementById('ve-align-'+d)?.classList.remove('ve-active'));
+          this.classList.add('ve-active');
+          veApply('textAlign', 'text-align', dir);
+        });
+      });
+
+      // ── Background edit mode ─────────────────────────────────────────
+      var bgMode = false;
+      var bgActiveSection = null;
+      var bgDebounce = null;
+
+      var bgImgMode = false;
+      var bgImgActiveSection = null;
+      var bgImgType = null;   // 'css' or 'img'
+      var bgImgWnId = null;   // wn-id of img element acting as bg
+
+      function deactivateBgModes() {
+        bgMode = false; bgImgMode = false;
+        bgActiveSection = null; bgImgActiveSection = null;
+        document.getElementById('ve-bg-toggle-btn')?.classList.remove('active');
+        document.getElementById('ve-bgimg-toggle-btn')?.classList.remove('active');
+        document.getElementById('ve-bg-picker')?.classList.remove('active');
+        document.getElementById('ve-bgimg-picker')?.classList.remove('active');
+        iframe?.contentWindow?.postMessage({ type: 'wn-bg-mode', active: false }, '*');
+      }
+
+      document.getElementById('ve-bg-toggle-btn')?.addEventListener('click', function() {
+        var wasActive = bgMode;
+        deactivateBgModes();
+        if (!wasActive) {
+          bgMode = true;
+          this.classList.add('active');
+          iframe?.contentWindow?.postMessage({ type: 'wn-bg-mode', active: true }, '*');
+          hideVeControls();
+        }
+      });
+
+      document.getElementById('ve-bgimg-toggle-btn')?.addEventListener('click', function() {
+        var wasActive = bgImgMode;
+        deactivateBgModes();
+        if (!wasActive) {
+          bgImgMode = true;
+          this.classList.add('active');
+          iframe?.contentWindow?.postMessage({ type: 'wn-bg-mode', active: true }, '*');
+          hideVeControls();
+        }
+      });
+
+      // Listen for section selection in bg mode
+      window.addEventListener('message', function(e) {
+        if (e.data?.type === 'wn-select-section') {
+          var name = e.data.sectionId.charAt(0).toUpperCase() + e.data.sectionId.slice(1);
+          activeSectionId = e.data.sectionId;
+          hideVeControls();
+          showDeleteBtn(_isEn ? 'Delete section: ' + name : 'Șterge secțiunea: ' + name);
+
+          if (bgMode) {
+            bgActiveSection = e.data.sectionId;
+            document.getElementById('ve-bg-picker')?.classList.add('active');
+            document.getElementById('ve-bgimg-picker')?.classList.remove('active');
+            document.getElementById('ve-bg-section-name').textContent = name;
+            document.getElementById('ve-section-bg-color').value = rgbToHex(e.data.bgColor);
+          }
+
+          if (bgImgMode) {
+            bgImgActiveSection = e.data.sectionId;
+            bgImgType = e.data.bgImageType;  // 'css' or 'img'
+            bgImgWnId = e.data.bgImageWnId;  // wn-id of the img element (if type=img)
+            document.getElementById('ve-bgimg-picker')?.classList.add('active');
+            document.getElementById('ve-bg-picker')?.classList.remove('active');
+            document.getElementById('ve-bgimg-section-name').textContent = name;
+            // Show current bg image
+            var preview = document.getElementById('ve-bgimg-preview');
+            var noneText = document.getElementById('ve-bgimg-none');
+            var bgImg = e.data.bgImage || '';
+            if (bgImg && bgImg !== 'none') {
+              // Extract URL from css value like url("...") or use raw src
+              var urlMatch = bgImg.match(/url\\(["']?([^"')]+)["']?\\)/);
+              var imgUrl = urlMatch ? urlMatch[1] : bgImg;
+              preview.style.backgroundImage = 'url(' + imgUrl + ')';
+              noneText.style.display = 'none';
+            } else {
+              preview.style.backgroundImage = '';
+              noneText.style.display = '';
+            }
+          }
+        }
+      });
+
+      document.getElementById('ve-section-bg-color')?.addEventListener('input', function() {
+        if (!bgActiveSection) return;
+        var value = this.value;
+        iframe?.contentWindow?.postMessage({ type: 'wn-update-style', sectionId: bgActiveSection, prop: 'backgroundColor', value: value }, '*');
+        clearTimeout(bgDebounce);
+        bgDebounce = setTimeout(function() {
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId: bgActiveSection, prop: 'background-color', value: value }),
+          }).catch(function(){});
+        }, 500);
+      });
+
+      // "Schimbă imaginea" for bg-image mode
+      document.getElementById('ve-bgimg-change')?.addEventListener('click', function() {
+        if (!bgImgActiveSection) return;
+        if (bgImgType === 'img' && bgImgWnId) {
+          // It's an <img> element acting as background — edit its src
+          openImageDialog(bgImgWnId, '');
+        } else if (bgImgType === 'css' && bgImgWnId) {
+          // CSS background-image on a child element with wn-id
+          openImageDialog('__bgcss__' + bgImgWnId, '');
+        } else {
+          // CSS background-image directly on section
+          openImageDialog('__section__' + bgImgActiveSection, '');
+        }
+      });
+
+      // ── Delete element / section ──────────────────────────────────────
+      document.getElementById('ve-delete-btn')?.addEventListener('click', function() {
+        var confirmMsg = _isEn ? 'Are you sure you want to delete this element?' : 'Sigur vrei să ștergi acest element?';
+        if (!confirm(confirmMsg)) return;
+
+        if (activeElement?.wnId) {
+          // Delete element by wn-id
+          iframe?.contentWindow?.postMessage({ type: 'wn-delete', wnId: activeElement.wnId }, '*');
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: activeElement.wnId, prop: 'delete' }),
+          }).catch(function(){});
+          activeElement = null;
+          hideVeControls();
+        } else if (activeSectionId) {
+          // Delete entire section
+          iframe?.contentWindow?.postMessage({ type: 'wn-delete-section', sectionId: activeSectionId }, '*');
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId: activeSectionId, prop: 'delete' }),
+          }).catch(function(){});
+          activeSectionId = null;
+          deactivateBgModes();
+          hideVeControls();
+        }
+      });
+
+      // Section delete buttons (in bg-color and bg-image pickers)
+      function deleteActiveSection() {
+        var sid = activeSectionId || bgActiveSection || bgImgActiveSection;
+        if (!sid) return;
+        var confirmMsg = _isEn ? 'Are you sure you want to delete this section?' : 'Sigur vrei să ștergi această secțiune?';
+        if (!confirm(confirmMsg)) return;
+        iframe?.contentWindow?.postMessage({ type: 'wn-delete-section', sectionId: sid }, '*');
+        fetch('/api/projects/' + projectId + '/edit-content', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sectionId: sid, prop: 'delete' }),
+        }).catch(function(){});
+        activeSectionId = null;
+        deactivateBgModes();
+        hideVeControls();
+      }
+      document.getElementById('ve-section-delete-btn')?.addEventListener('click', deleteActiveSection);
+      document.getElementById('ve-section-delete-btn2')?.addEventListener('click', deleteActiveSection);
+
+      // ── Image upload dialog ──────────────────────────────────────────
+      var imgDialogWnId = null;
+      var imgDialogUrl = '';
+      var imgOverlay = document.getElementById('img-dialog-overlay');
+      var imgThumb = document.getElementById('img-dialog-thumb');
+      var imgDropText = document.getElementById('img-drop-text');
+      var imgFileInput = document.getElementById('img-dialog-file');
+      var imgUrlInput = document.getElementById('img-dialog-url');
+      var imgSaveBtn = document.getElementById('img-dialog-save');
+      var imgUploadingEl = document.getElementById('img-dialog-uploading');
+      var imgDropZone = document.getElementById('img-dialog-drop');
+
+      function openImageDialog(wnId, currentSrc) {
+        imgDialogWnId = wnId;
+        imgDialogUrl = '';
+        imgThumb.style.display = currentSrc ? 'block' : 'none';
+        imgThumb.src = currentSrc || '';
+        imgDropText.style.display = currentSrc ? 'none' : '';
+        imgUrlInput.value = '';
+        imgSaveBtn.disabled = true;
+        imgUploadingEl.style.display = 'none';
+        imgOverlay.classList.add('active');
+      }
+
+      function closeImageDialog() {
+        imgOverlay.classList.remove('active');
+        imgDialogWnId = null;
+        imgFileInput.value = '';
+      }
+
+      function setImagePreview(url) {
+        imgDialogUrl = url;
+        imgThumb.src = url;
+        imgThumb.style.display = 'block';
+        imgDropText.style.display = 'none';
+        imgSaveBtn.disabled = false;
+      }
+
+      async function uploadImageFile(file) {
+        imgUploadingEl.style.display = '';
+        imgSaveBtn.disabled = true;
+        try {
+          // Step 1: Get signed upload URL from server
+          var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, contentType: file.type }),
+          });
+          var signData = await signRes.json();
+          if (!signData.signedUrl) { alert(signData.error || 'Upload failed'); imgUploadingEl.style.display = 'none'; return; }
+
+          // Step 2: Upload directly to Supabase Storage from browser
+          var upRes = await fetch(signData.signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type },
+            body: file,
+          });
+          if (!upRes.ok) { alert('Upload failed: ' + upRes.statusText); imgUploadingEl.style.display = 'none'; return; }
+
+          setImagePreview(signData.publicUrl);
+        } catch (e) {
+          alert('Upload failed');
+        }
+        imgUploadingEl.style.display = 'none';
+      }
+
+      // Click drop zone → open file picker
+      imgDropZone?.addEventListener('click', function() { imgFileInput?.click(); });
+
+      // File selected
+      imgFileInput?.addEventListener('change', function() {
+        if (this.files?.[0]) uploadImageFile(this.files[0]);
+      });
+
+      // Drag & drop
+      imgDropZone?.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
+      imgDropZone?.addEventListener('dragleave', function() { this.classList.remove('dragover'); });
+      imgDropZone?.addEventListener('drop', function(e) {
+        e.preventDefault(); this.classList.remove('dragover');
+        var file = e.dataTransfer?.files?.[0];
+        if (file && file.type.startsWith('image/')) uploadImageFile(file);
+      });
+
+      // URL input
+      imgUrlInput?.addEventListener('input', function() {
+        var val = this.value.trim();
+        if (val && (val.startsWith('http://') || val.startsWith('https://'))) {
+          setImagePreview(val);
+        } else {
+          imgSaveBtn.disabled = !imgDialogUrl;
+        }
+      });
+
+      // Cancel
+      document.getElementById('img-dialog-cancel')?.addEventListener('click', closeImageDialog);
+      imgOverlay?.addEventListener('click', function(e) { if (e.target === this) closeImageDialog(); });
+
+      // Save
+      imgSaveBtn?.addEventListener('click', function() {
+        if (!imgDialogWnId || !imgDialogUrl) return;
+
+        // CSS background-image on a child element (identified by wn-id)
+        if (imgDialogWnId.startsWith('__bgcss__')) {
+          var wnId = imgDialogWnId.replace('__bgcss__', '');
+          var bgValue = 'url(' + imgDialogUrl + ')';
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', wnId: wnId, prop: 'backgroundImage', value: bgValue }, '*');
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', wnId: wnId, prop: 'backgroundSize', value: 'cover' }, '*');
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', wnId: wnId, prop: 'backgroundPosition', value: 'center' }, '*');
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: wnId, prop: 'background-image', value: bgValue }),
+          }).catch(function(){});
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: wnId, prop: 'background-size', value: 'cover' }),
+          }).catch(function(){});
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wnId: wnId, prop: 'background-position', value: 'center' }),
+          }).catch(function(){});
+          var preview = document.getElementById('ve-bgimg-preview');
+          if (preview) { preview.style.backgroundImage = bgValue; document.getElementById('ve-bgimg-none').style.display = 'none'; }
+          closeImageDialog();
+          return;
+        }
+
+        // Section background-image mode (directly on section tag)
+        if (imgDialogWnId.startsWith('__section__')) {
+          var secId = imgDialogWnId.replace('__section__', '');
+          var bgValue = 'url(' + imgDialogUrl + ')';
+          // Update iframe live
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', sectionId: secId, prop: 'backgroundImage', value: bgValue }, '*');
+          // Also ensure cover + center
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', sectionId: secId, prop: 'backgroundSize', value: 'cover' }, '*');
+          iframe?.contentWindow?.postMessage({ type: 'wn-update-style', sectionId: secId, prop: 'backgroundPosition', value: 'center' }, '*');
+          // Save to DB
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId: secId, prop: 'background-image', value: bgValue }),
+          }).catch(function(){});
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId: secId, prop: 'background-size', value: 'cover' }),
+          }).catch(function(){});
+          fetch('/api/projects/' + projectId + '/edit-content', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId: secId, prop: 'background-position', value: 'center' }),
+          }).catch(function(){});
+          // Update preview in sidebar
+          var preview = document.getElementById('ve-bgimg-preview');
+          if (preview) { preview.style.backgroundImage = bgValue; document.getElementById('ve-bgimg-none').style.display = 'none'; }
+          closeImageDialog();
+          return;
+        }
+
+        // Normal image element
+        iframe?.contentWindow?.postMessage({ type: 'wn-update-image', wnId: imgDialogWnId, value: imgDialogUrl }, '*');
+        fetch('/api/projects/' + projectId + '/edit-content', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wnId: imgDialogWnId, prop: 'src', value: imgDialogUrl }),
+        }).catch(function(){});
+        closeImageDialog();
+      });
+
+      // If server already extracted section IDs, populate immediately (no iframe polling needed)
+      let _sectionsPollDone = false;
+      if (hasPreview && serverSectionIds && serverSectionIds.length > 0) {
+        _sectionsPollDone = true;
+        populateSections(serverSectionIds);
+      }
+
+      // Poll contentDocument directly — reliable regardless of load event timing
+      const _sectionsPoll = setInterval(() => {
+        if (_sectionsPollDone) return;
+        try {
+          const doc = iframe?.contentDocument;
+          if (!doc || doc.readyState !== 'complete') return;
+          const nodes = doc.querySelectorAll('[data-section]');
+          if (!nodes.length) return;
+          const ids = [];
+          nodes.forEach(n => { if (n.dataset.section && n.dataset.section !== 'full') ids.push(n.dataset.section); });
+          if (!ids.length) return;
+          _sectionsPollDone = true;
+          clearInterval(_sectionsPoll);
+          populateSections(ids);
+          // Also send request-sections so iframe registers listener for future refreshes
+          iframe?.contentWindow?.postMessage({ type: 'request-sections' }, '*');
+        } catch {}
+      }, 300);
+      // Give up after 30s — clear spinner and show fallback message
+      setTimeout(() => {
+        if (_sectionsPollDone) return;
+        _sectionsPollDone = true;
+        clearInterval(_sectionsPoll);
+        const sl = document.getElementById('section-list');
+        if (sl && sl.querySelector('.sections-loading')) {
+          sl.innerHTML = '<div style="color:rgba(255,255,255,0.3);font-size:12px;padding:8px 12px">No sections found.<br>Try re-generating.</div>';
+        }
+      }, 30000);
+
+      function selectSection(sectionId) {
+        activeSectionId = sectionId;
+        activeElement = null;
+        chatHistory = [];
+
+        // Update sidebar
+        document.querySelectorAll('.section-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.sectionId === sectionId);
+        });
+
+        // Enable input
+        const input = document.getElementById('edit-input');
+        const send = document.getElementById('edit-send');
+        if (input) { input.disabled = false; input.placeholder = `Edit ${sectionId}...`; input.focus(); }
+        if (send) send.disabled = false;
+
+        // Clear messages
+        const msgs = document.getElementById('edit-messages');
+        // Section context is shown via active highlight in section list — no message needed
+
+        // Tell iframe to highlight
+        iframe?.contentWindow?.postMessage({ type: 'set-active', sectionId }, '*');
+      }
+
+      function selectElement(data) {
+        // Legacy handler — only update section context, don't overwrite activeElement
+        // (wn-select handler sets activeElement with wnId which veApply needs)
+        activeSectionId = data.sectionId;
+      }
+
+      function clearElement() {
+        activeElement = null;
+        // Don't clear activeSectionId — keep section context
+      }
+
+      // Tip popup toggle
+      (function() {
+        var btn = document.getElementById('edit-tip-toggle');
+        var popup = document.getElementById('edit-tip-popup');
+        if (btn && popup) {
+          btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var open = popup.classList.toggle('show');
+            btn.classList.toggle('active', open);
+          });
+          document.addEventListener('click', function() {
+            popup.classList.remove('show');
+            btn.classList.remove('active');
+          });
+        }
+      })();
+
+      // Send edit message
+      document.getElementById('edit-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        const input = document.getElementById('edit-input');
+        const msg = input?.value?.trim();
+        if (!msg) return;
+
+        input.value = '';
+        addEditMessage('user', msg);
+
+        // Disable while processing
+        input.disabled = true;
+        document.getElementById('edit-send').disabled = true;
+        addEditMessage('system', 'Thinking...');
+
+        try {
+          let res, data;
+
+          const removePlaceholder = () => {
+            const msgs = document.getElementById('edit-messages');
+            const last = msgs?.lastElementChild;
+            if (last?.classList?.contains('system') && last.textContent === 'Thinking...') last.remove();
+          };
+
+          // Helper: show quota-exceeded message
+          const showLimitError = (d) => {
+            const isRo = _lang !== 'en';
+            const msg = isRo
+              ? `Ai atins limita de editări a planului tău (${d.used}/${d.limit + (d.extra||0)}). Cumpără un pachet extra sau fă upgrade.`
+              : `Edit limit reached (${d.used}/${d.limit + (d.extra||0)}). Buy an extra pack or upgrade your plan.`;
+            addEditMessage('system', msg);
+            if (buyBtn) buyBtn.style.display = 'inline';
+            if (quotaLabel) { quotaLabel.textContent = isRo ? '0 editări rămase' : '0 edits left'; quotaLabel.className = 'quota-label empty'; }
+          };
+
+          // Helper: full-page iterate (used as primary or fallback)
+          const runIterate = async (message) => {
+            res = await fetch(`/api/projects/${projectId}/iterate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message }),
+            });
+            data = await res.json();
+            removePlaceholder();
+            if (data.error === 'edit_limit_reached') { showLimitError(data); return; }
+            if (data.reply) addEditMessage('assistant', data.reply);
+            if (data.newHtml) iframe.src = `${previewUrl}?edit&t=${Date.now()}`;
+            await loadQuota();
+          };
+
+          if (activeElement) {
+            // Element-level edit
+            res = await fetch(`/api/projects/${projectId}/edit-element`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sectionId: activeSectionId,
+                selector: activeElement.selector,
+                outerHTML: activeElement.outerHTML,
+                instruction: msg,
+              }),
+            });
+            data = await res.json();
+            removePlaceholder();
+
+            if (data.error === 'edit_limit_reached') {
+              showLimitError(data);
+            } else if (!res.ok && activeSectionId) {
+              // Fallback: route to section edit instead of full-site iterate
+              res = await fetch(`/api/projects/${projectId}/edit-section`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sectionId: activeSectionId, instruction: msg }),
+              });
+              data = await res.json();
+              removePlaceholder();
+              if (!res.ok) {
+                addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');
+              } else {
+                addEditMessage('assistant', 'Done.');
+                if (data.sectionHtml) iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: data.sectionId || activeSectionId, html: data.sectionHtml }, '*');
+                if (data.css) iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
+                activeElement = null;
+                await loadQuota();
+              }
+            } else if (!res.ok) {
+              removePlaceholder();
+              addEditMessage('system', data.error || 'Edit failed. Select a section and try again.');
+            } else {
+              addEditMessage('assistant', 'Done.');
+              if (data.sectionHtml) {
+                iframe?.contentWindow?.postMessage({
+                  type: 'update-section', sectionId: data.sectionId, html: data.sectionHtml
+                }, '*');
+              }
+              if (data.css) {
+                iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
+              }
+              activeElement = null;
+              await loadQuota();
+            }
+          } else if (activeSectionId) {
+            // Section-level edit
+            res = await fetch(`/api/projects/${projectId}/edit-section`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sectionId: activeSectionId, instruction: msg }),
+            });
+            data = await res.json();
+            removePlaceholder();
+            if (data.error === 'edit_limit_reached') {
+              showLimitError(data);
+            } else if (!res.ok) {
+              addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');
+            } else {
+              addEditMessage('assistant', 'Done.');
+              if (data.sectionHtml) {
+                iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: data.sectionId || activeSectionId, html: data.sectionHtml }, '*');
+              }
+              if (data.css) {
+                iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
+              }
+              await loadQuota();
+            }
+          } else {
+            // No section selected — tell user to select one
+            removePlaceholder();
+            addEditMessage('system', _lang !== 'en' ? 'Selectează o secțiune din stânga sau apasă ✦ pentru a edita tot site-ul.' : 'Select a section from the left or press ✦ to edit the whole site.');
+          }
+        } catch {
+          addEditMessage('system', 'Error. Try again.');
+        }
+
+        input.disabled = false;
+        document.getElementById('edit-send').disabled = false;
+        input.focus();
+      });
+
+      // ✦ Global edit button (4 credits)
+      document.getElementById('edit-global')?.addEventListener('click', async () => {
+        const input = document.getElementById('edit-input');
+        const msg = input?.value?.trim();
+        if (!msg) { addEditMessage('system', _lang !== 'en' ? 'Scrie o instrucțiune mai întâi.' : 'Write an instruction first.'); return; }
+
+        const isRo = _lang !== 'en';
+        if (!confirm(isRo ? 'Editarea întregului site consumă 4 credite. Continui?' : 'Editing the entire site costs 4 credits. Continue?')) return;
+
+        input.value = '';
+        addEditMessage('user', '✦ ' + msg);
+        input.disabled = true;
+        document.getElementById('edit-send').disabled = true;
+        document.getElementById('edit-global').disabled = true;
+        addEditMessage('system', isRo ? 'Se editează tot site-ul…' : 'Editing entire site…');
+
+        try {
+          await runIterate(msg);
+        } catch {
+          addEditMessage('system', 'Error. Try again.');
+        }
+
+        input.disabled = false;
+        document.getElementById('edit-send').disabled = false;
+        document.getElementById('edit-global').disabled = false;
+        input.focus();
+      });
+
+      // Suggestion buttons
+      document.querySelectorAll('.edit-suggestion').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const input = document.getElementById('edit-input');
+          const form = document.getElementById('edit-form');
+          if (input && !input.disabled && form) {
+            input.value = btn.dataset.msg;
+            form.requestSubmit();
+          }
+        });
+      });
+
+      function addEditMessage(role, text) {
+        const msgs = document.getElementById('edit-messages');
+        if (!msgs) return;
+        const div = document.createElement('div');
+        div.className = `edit-msg ${role}`;
+        div.textContent = text;
+        msgs.appendChild(div);
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+  </script>
+</body>
+</html>

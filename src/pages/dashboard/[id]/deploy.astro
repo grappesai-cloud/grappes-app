@@ -1,0 +1,439 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+import { db } from '../../../lib/db';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const project = await db.projects.findById(id!);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+
+// Must have generated files to deploy
+if (!['generated', 'deploying', 'live', 'failed'].includes(project.status)) {
+  return Astro.redirect(`/dashboard/${id}`);
+}
+
+const latestDeploy = await db.deployments.findLatest(id!);
+
+const isDeploying = project.status === 'deploying';
+const isLive = project.status === 'live';
+const isFailed = project.status === 'failed';
+const canDeploy = ['generated', 'failed'].includes(project.status);
+---
+
+<Dashboard title={`Deploy — ${project.name}`} projectId={project.id}>
+  <div class="deploy-page">
+
+    <div class="page-header">
+      <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
+      <h1 data-en="Deploy">Publicare</h1>
+      <p class="subtitle">{project.name}</p>
+    </div>
+
+    {/* Live site banner */}
+    {isLive && project.preview_url && (
+      <div class="live-banner">
+        <div class="live-dot"></div>
+        <span data-en="Live at">Live la</span>
+        <a href={project.preview_url} target="_blank" rel="noopener" class="live-url">
+          {project.preview_url}
+        </a>
+        <a href={project.preview_url} target="_blank" rel="noopener" class="live-open" data-en="Open ↗">
+          Deschide ↗
+        </a>
+      </div>
+    )}
+
+    {/* Deploy pipeline card */}
+    <div class="deploy-card">
+      <div class="pipeline">
+
+        {/* Step: GitHub */}
+        <div class={`pipeline-step ${project.github_url ? 'done' : canDeploy ? 'pending' : 'inactive'}`}>
+          <div class="step-icon">
+            {project.github_url ? '✓' : '1'}
+          </div>
+          <div class="step-body">
+            <div class="step-title" data-en="Push to GitHub">Trimite pe GitHub</div>
+            {project.github_url ? (
+              <a href={project.github_url} target="_blank" rel="noopener" class="step-link">
+                {project.github_url} ↗
+              </a>
+            ) : (
+              <div class="step-desc" data-en="Creates a public repo and commits all generated files">Creează un repo public și trimite toate fișierele generate</div>
+            )}
+          </div>
+        </div>
+
+        <div class="connector"></div>
+
+        {/* Step: Vercel */}
+        <div class={`pipeline-step ${project.vercel_project_id ? 'done' : canDeploy ? 'pending' : 'inactive'}`}>
+          <div class="step-icon">
+            {project.vercel_project_id ? '✓' : '2'}
+          </div>
+          <div class="step-body">
+            <div class="step-title" data-en="Create Vercel Project">Creează proiect Vercel</div>
+            <div class="step-desc">
+              {project.vercel_project_id
+                ? `Project ID: ${project.vercel_project_id}`
+                : <span data-en="Links your GitHub repo to Vercel for automatic deployments">Leagă repo-ul GitHub de Vercel pentru publicări automate</span>}
+            </div>
+          </div>
+        </div>
+
+        <div class="connector"></div>
+
+        {/* Step: Deploy */}
+        <div class={`pipeline-step ${isLive ? 'done' : isDeploying ? 'active' : isFailed ? 'failed' : 'pending'}`}>
+          <div class="step-icon" id="deploy-icon">
+            {isLive ? '✓' : isFailed ? '✕' : isDeploying ? '◌' : '3'}
+          </div>
+          <div class="step-body">
+            <div class="step-title"
+              data-en={isLive ? 'Deployed & Live' : isDeploying ? 'Building…' : isFailed ? 'Build Failed' : 'Deploy to Vercel'}>
+              {isLive ? 'Publicat & Live' : isDeploying ? 'Se construiește…' : isFailed ? 'Construire eșuată' : 'Publică pe Vercel'}
+            </div>
+            {latestDeploy?.preview_url && (
+              <a href={latestDeploy.preview_url} target="_blank" rel="noopener" class="step-link">
+                {latestDeploy.preview_url} ↗
+              </a>
+            )}
+            {isFailed && latestDeploy?.error_message && (
+              <div class="step-error">{latestDeploy.error_message}</div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Deploy button */}
+      <div class="deploy-actions">
+        {canDeploy && (
+          <button id="deploy-btn" class="btn-deploy"
+            data-en={isFailed ? 'Retry Deploy →' : 'Deploy to Vercel →'}>
+            {isFailed ? 'Reîncearcă publicarea →' : 'Publică pe Vercel →'}
+          </button>
+        )}
+
+        {isDeploying && (
+          <div class="deploying-indicator">
+            <div class="spinner"></div>
+            <span data-en="Deploying… usually takes 30–90 seconds">Se publică… durează de obicei 30–90 secunde</span>
+          </div>
+        )}
+
+        {isLive && (
+          <div class="success-actions">
+            <a href={project.preview_url!} target="_blank" rel="noopener" class="btn-view" data-en="View Live Site ↗">
+              Vezi site live ↗
+            </a>
+            <button id="redeploy-btn" class="btn-redeploy" data-en="Redeploy">Redesfășoară</button>
+          </div>
+        )}
+
+        <div id="deploy-error" class="deploy-error" hidden></div>
+      </div>
+    </div>
+
+    {/* Deploy history */}
+    {latestDeploy && (
+      <div class="history-card">
+        <h2 data-en="Latest Deployment">Ultima publicare</h2>
+        <div class="history-row">
+          <span class={`status-dot status-${latestDeploy.status}`}></span>
+          <span class="history-status">{latestDeploy.status}</span>
+          {latestDeploy.preview_url && (
+            <a href={latestDeploy.preview_url} target="_blank" rel="noopener" class="history-url">
+              {latestDeploy.preview_url}
+            </a>
+          )}
+          <span class="history-time">
+            {new Date(latestDeploy.created_at).toLocaleString()}
+          </span>
+        </div>
+        {latestDeploy.vercel_deploy_id && (
+          <div class="history-meta">Vercel deploy ID: <code>{latestDeploy.vercel_deploy_id.slice(0, 12)}</code></div>
+        )}
+      </div>
+    )}
+
+  </div>
+</Dashboard>
+
+<script define:vars={{ projectId: id, canDeploy, isDeploying, isLive }}>
+  function setDeploying() {
+    const btn = document.getElementById('deploy-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = _isEn ? 'Deploying…' : 'Se publică…';
+    }
+    const indicator = document.querySelector('.deploying-indicator');
+    if (indicator) indicator.hidden = false;
+  }
+
+  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+
+  async function startDeploy() {
+    const btn = document.getElementById('deploy-btn') || document.getElementById('redeploy-btn');
+    const errEl = document.getElementById('deploy-error');
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> ' + (_isEn ? 'Pushing to GitHub…' : 'Se trimite pe GitHub…');
+    if (errEl) errEl.hidden = true;
+
+    try {
+      const res = await fetch(`/api/deploy/${projectId}`, { method: 'POST' });
+      const data = await res.json();
+
+      if (res.ok) {
+        // Reload to show deploying state + start polling
+        window.location.reload();
+      } else {
+        if (errEl) {
+          errEl.textContent = data.error || (_isEn ? 'Deploy failed. Please try again.' : 'Publicarea a eșuat. Încearcă din nou.');
+          errEl.hidden = false;
+        }
+        btn.disabled = false;
+        btn.textContent = _isEn ? 'Retry Deploy →' : 'Reîncearcă publicarea →';
+      }
+    } catch {
+      if (errEl) {
+        errEl.textContent = _isEn ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+        errEl.hidden = false;
+      }
+      btn.disabled = false;
+      btn.textContent = _isEn ? 'Deploy to Vercel →' : 'Publică pe Vercel →';
+    }
+  }
+
+  document.getElementById('deploy-btn')?.addEventListener('click', startDeploy);
+  document.getElementById('redeploy-btn')?.addEventListener('click', startDeploy);
+
+  // Poll while deploying
+  if (isDeploying) {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/deploy/${projectId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (data.projectStatus !== 'deploying') {
+          clearInterval(interval);
+          window.location.reload();
+        }
+      } catch {}
+    }, 5000);
+  }
+</script>
+
+<style>
+  .deploy-page { display: flex; flex-direction: column; gap: 2rem; }
+
+  /* Header */
+  .page-header { margin-bottom: 0.5rem; }
+  .back-link {
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    font-size: 0.875rem;
+    display: inline-block;
+    margin-bottom: 1rem;
+    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .back-link:hover { color: #ffffff; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+  .subtitle { color: rgba(255, 255, 255, 0.5); margin-top: 0.25rem; font-size: 1rem; }
+
+  /* Live banner */
+  .live-banner {
+    background: rgba(56,161,105,0.08);
+    border: 1px solid rgba(56,161,105,0.2);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .live-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle 2px, rgba(56,161,105,0.5) 100%, transparent 100%),
+      radial-gradient(circle 1.5px, rgba(0,255,151,0.4) 100%, transparent 100%),
+      radial-gradient(circle 2px, rgba(56,161,105,0.4) 100%, transparent 100%),
+      radial-gradient(circle 1.5px, rgba(56,161,105,0.3) 100%, transparent 100%);
+    background-position: 15% 30%, 45% 60%, 75% 25%, 90% 70%;
+    background-size: 3px 3px, 3px 3px, 3px 3px, 3px 3px;
+    background-repeat: no-repeat;
+    animation: sparkle 1.5s ease-out forwards;
+  }
+  @keyframes sparkle {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    70% { opacity: 0.6; transform: translateY(-6px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-12px) scale(0.5); }
+  }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #38a169; animation: pulse 2s infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+  .live-url { color: #38a169; text-decoration: none; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .live-open { color: #38a169; text-decoration: none; font-size: 0.8125rem; flex-shrink: 0; }
+
+  /* Deploy card */
+  .deploy-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 24px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* Pipeline */
+  .pipeline { display: flex; flex-direction: column; gap: 0; }
+  .connector {
+    width: 2px; height: 2rem; margin-left: 17px;
+    background: rgba(0,0,0,0.08);
+    transform-origin: top;
+    animation: connectorDraw 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .connector:nth-of-type(1) { animation-delay: 0.2s; }
+  .connector:nth-of-type(2) { animation-delay: 0.5s; }
+  @keyframes connectorDraw {
+    from { transform: scaleY(0); }
+    to { transform: scaleY(1); }
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.03);
+    border: 2px solid rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+  .pipeline-step.done .step-icon { background: rgba(56,161,105,0.1); border-color: #38a169; color: #38a169; animation: stepPop 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes stepPop {
+    0% { transform: scale(0.8); }
+    60% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  .pipeline-step.active .step-icon { background: rgba(0,255,151,0.12); border-color: #00ff97; color: #00ff97; animation: spinBorder 1.2s linear infinite; }
+  .pipeline-step.failed .step-icon { background: rgba(229,62,62,0.1); border-color: #e53e3e; color: #e53e3e; }
+  @keyframes spinBorder { to { border-top-color: transparent; } }
+
+  .step-body { padding-top: 0.375rem; }
+  .step-title { font-size: 0.9375rem; font-weight: 500; color: #ffffff; }
+  .pipeline-step.inactive .step-title { color: rgba(255, 255, 255, 0.3); }
+  .step-desc { color: rgba(255, 255, 255, 0.5); font-size: 0.8125rem; margin-top: 0.2rem; }
+  .step-link { color: #00ff97; font-size: 0.8125rem; text-decoration: none; margin-top: 0.2rem; display: block; }
+  .step-link:hover { text-decoration: underline; }
+  .step-error { color: #e53e3e; font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  /* Actions */
+  .deploy-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .btn-deploy {
+    background: #00ff97;
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 12px 28px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-deploy:hover:not(:disabled) {
+    background: #00e088;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+  }
+  .btn-deploy:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-view { background: #38a169; color: #fff; border-radius: 16px; padding: 12px 24px; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .btn-redeploy { background: rgba(255,255,255,0.04); color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0,0,0,0.06); border-radius: 16px; padding: 12px 20px; font-size: 0.875rem; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .btn-redeploy:hover { color: #ffffff; background: rgba(255,255,255,0.7); }
+  .success-actions { display: flex; gap: 0.75rem; align-items: center; }
+
+  .deploying-indicator { display: flex; align-items: center; gap: 0.75rem; color: rgba(255, 255, 255, 0.5); font-size: 0.875rem; }
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(0,255,151,0.2); border-top-color: #00ff97; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.1); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+
+  .deploy-error { color: #e53e3e; font-size: 0.875rem; background: rgba(229,62,62,0.06); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(229,62,62,0.2); }
+
+  /* History */
+  .history-card { background: rgba(255,255,255,0.04); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.6); border-radius: 24px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8); }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 1rem;
+  }
+  .history-row { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.status-queued { background: #999; }
+  .status-dot.status-building { background: #00ff97; }
+  .status-dot.status-ready { background: #38a169; }
+  .status-dot.status-error { background: #e53e3e; }
+  .history-status { color: rgba(255, 255, 255, 0.5); font-weight: 500; text-transform: capitalize; }
+  .history-url { color: #00ff97; text-decoration: none; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
+  .history-time { color: rgba(255, 255, 255, 0.3); font-size: 0.8rem; flex-shrink: 0; }
+  .history-meta { margin-top: 0.5rem; color: rgba(255, 255, 255, 0.5); font-size: 0.8125rem; }
+  code { font-family: monospace; color: #ffffff; }
+
+  /* Pipeline steps staggered fade-in */
+  .pipeline-step {
+    animation: stepFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .pipeline-step:nth-child(1) { animation-delay: 0s; }
+  .pipeline-step:nth-child(3) { animation-delay: 0.15s; }
+  .pipeline-step:nth-child(5) { animation-delay: 0.3s; }
+  @keyframes stepFadeIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .connector, .pipeline-step, .pipeline-step.done .step-icon, .live-banner::after {
+      animation: none;
+    }
+    .connector { transform: scaleY(1); }
+    .pipeline-step { opacity: 1; transform: none; }
+    .pipeline-step.done .step-icon { transform: scale(1); }
+    .btn-deploy:hover:not(:disabled) { transform: none; }
+  }
+</style>

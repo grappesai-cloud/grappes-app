@@ -1,0 +1,482 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+import { db } from '../../../lib/db';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const project = await db.projects.findById(id!);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+
+const brief = await db.briefs.findByProjectId(id!);
+
+const canGenerate = project.status === 'brief_ready';
+const isGenerating = project.status === 'generating';
+const isGenerated = ['generated', 'deploying', 'live'].includes(project.status);
+const isOnboarding = project.status === 'onboarding';
+
+// Parsed brief sections for display
+const d = brief?.data ?? {};
+const business = d.business ?? {};
+const content = d.content ?? {};
+const branding = d.branding ?? {};
+const contact = d.contact ?? {};
+const social = d.social ?? {};
+const features = d.features ?? {};
+const media = d.media ?? {};
+const preferences = d.preferences ?? {};
+const meta = d.meta ?? {};
+---
+
+<Dashboard title={`Brief — ${project.name}`} projectId={project.id}>
+  <div class="brief-page">
+
+    <div class="page-header">
+      <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
+      <div class="header-row">
+        <div>
+          <h1 data-en="Website Brief">Brief website</h1>
+          <p class="subtitle">{project.name}</p>
+        </div>
+        {brief && (
+          <div class="completeness-badge">
+            <span class="pct">{Math.round(brief.completeness * 100)}%</span>
+            <span class="pct-label" data-en="complete">complet</span>
+          </div>
+        )}
+      </div>
+      {brief && (
+        <div class="progress-bar-wrap">
+          <div class="progress-bar">
+            <div class="progress-fill" style={`width: ${brief.completeness * 100}%`}></div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    {isOnboarding && (
+      <div class="notice warning">
+        <span data-en="Brief not yet confirmed.">Brief neconfirmat încă.</span>{' '}
+        <a href={`/dashboard/${id}/onboarding`} data-en="Complete the onboarding chat →">Completează chat-ul de onboarding →</a>
+      </div>
+    )}
+
+
+    {isGenerating && (
+      <div class="notice info generating-notice">
+        <div class="spinner"></div>
+        <span data-en="Generating your website with AI… this takes about 30–60 seconds.">Se generează site-ul cu AI… durează aproximativ 30–60 secunde.</span>
+      </div>
+    )}
+
+    {isGenerated && (
+      <div class="notice success">
+        <span data-en="Site files generated successfully.">Fișierele site-ului au fost generate cu succes.</span>{' '}
+        <a href={`/dashboard/${id}`} data-en="View project →">Vezi proiect →</a>
+      </div>
+    )}
+
+    {!brief || Object.keys(d).length === 0 ? (
+      <div class="empty-brief">
+        <p data-en="No brief data collected yet.">Niciun brief colectat încă.</p>
+        <a href={`/dashboard/${id}/onboarding`} class="btn-primary" data-en="Start onboarding →">Începe onboarding →</a>
+      </div>
+    ) : (
+      <div class="brief-sections">
+
+        {/* Business */}
+        {(business.name || business.industry || business.description || business.tagline) && (
+          <div class="brief-card">
+            <h2 data-en="Business">Afacere</h2>
+            <dl>
+              {business.name && <><dt data-en="Name">Nume</dt><dd>{business.name}</dd></>}
+              {business.industry && <><dt data-en="Industry">Industrie</dt><dd>{business.industry}</dd></>}
+              {business.tagline && <><dt>Tagline</dt><dd>{business.tagline}</dd></>}
+              {business.description && <><dt data-en="Description">Descriere</dt><dd>{business.description}</dd></>}
+            </dl>
+          </div>
+        )}
+
+        {/* Content */}
+        {(content.headline || content.about || content.pages || content.services) && (
+          <div class="brief-card">
+            <h2 data-en="Content">Conținut</h2>
+            <dl>
+              {content.headline && <><dt data-en="Headline">Titlu</dt><dd>{content.headline}</dd></>}
+              {content.tagline && <><dt>Tagline</dt><dd>{content.tagline}</dd></>}
+              {content.about && <><dt data-en="About">Despre</dt><dd>{content.about}</dd></>}
+              {content.pages?.length > 0 && (
+                <>
+                  <dt data-en="Pages">Pagini</dt>
+                  <dd class="chips-cell">
+                    {(content.pages as string[]).map(p => <span class="chip">{p}</span>)}
+                  </dd>
+                </>
+              )}
+              {content.services?.length > 0 && (
+                <>
+                  <dt data-en="Services">Servicii</dt>
+                  <dd class="chips-cell">
+                    {(content.services as string[]).map(s => <span class="chip">{s}</span>)}
+                  </dd>
+                </>
+              )}
+            </dl>
+          </div>
+        )}
+
+        {/* Branding */}
+        {(branding.style || branding.colors || branding.fonts) && (
+          <div class="brief-card">
+            <h2>Branding</h2>
+            <dl>
+              {branding.style && <><dt data-en="Style">Stil</dt><dd class="capitalize">{branding.style}</dd></>}
+              {branding.colors?.primary && (
+                <>
+                  <dt data-en="Primary">Primar</dt>
+                  <dd>
+                    <span class="color-swatch" style={`background:${branding.colors.primary}`}></span>
+                    {branding.colors.primary}
+                  </dd>
+                </>
+              )}
+              {branding.colors?.secondary && (
+                <>
+                  <dt data-en="Secondary">Secundar</dt>
+                  <dd>
+                    <span class="color-swatch" style={`background:${branding.colors.secondary}`}></span>
+                    {branding.colors.secondary}
+                  </dd>
+                </>
+              )}
+              {branding.colors?.accent && (
+                <>
+                  <dt>Accent</dt>
+                  <dd>
+                    <span class="color-swatch" style={`background:${branding.colors.accent}`}></span>
+                    {branding.colors.accent}
+                  </dd>
+                </>
+              )}
+              {branding.fonts?.heading && <><dt data-en="Heading font">Font titluri</dt><dd>{branding.fonts.heading}</dd></>}
+              {branding.fonts?.body && <><dt data-en="Body font">Font text</dt><dd>{branding.fonts.body}</dd></>}
+            </dl>
+          </div>
+        )}
+
+        {/* Media */}
+        {(media.has_logo !== undefined || media.hero_style) && (
+          <div class="brief-card">
+            <h2>Media</h2>
+            <dl>
+              {media.has_logo !== undefined && (
+                <><dt data-en="Has logo">Are logo</dt><dd data-en={media.has_logo ? 'Yes' : 'No'}>{media.has_logo ? 'Da' : 'Nu'}</dd></>
+              )}
+              {media.hero_style && <><dt data-en="Hero style">Stil hero</dt><dd class="capitalize">{media.hero_style}</dd></>}
+            </dl>
+          </div>
+        )}
+
+        {/* Features */}
+        {Object.keys(features).length > 0 && (
+          <div class="brief-card">
+            <h2 data-en="Features">Funcții</h2>
+            <dl>
+              {Object.entries(features).map(([k, v]) => (
+                <>
+                  <dt class="capitalize">{k.replace(/_/g, ' ')}</dt>
+                  <dd>{typeof v === 'boolean' ? (v ? '✓ Da' : '✗ Nu') : String(v)}</dd>
+                </>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* Contact & Social */}
+        {(contact.email || contact.phone || contact.address || Object.keys(social).length > 0) && (
+          <div class="brief-card">
+            <h2>Contact & Social</h2>
+            <dl>
+              {contact.email && <><dt>Email</dt><dd>{contact.email}</dd></>}
+              {contact.phone && <><dt data-en="Phone">Telefon</dt><dd>{contact.phone}</dd></>}
+              {contact.address && <><dt data-en="Address">Adresă</dt><dd>{contact.address}</dd></>}
+              {Object.entries(social).filter(([,v]) => v).map(([k, v]) => (
+                <><dt class="capitalize">{k}</dt><dd>{String(v)}</dd></>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {/* SEO */}
+        {(meta.title || meta.description || preferences.animations) && (
+          <div class="brief-card">
+            <h2 data-en="SEO & Preferences">SEO & Preferințe</h2>
+            <dl>
+              {meta.title && <><dt data-en="Meta title">Meta titlu</dt><dd>{meta.title}</dd></>}
+              {meta.description && <><dt data-en="Meta description">Meta descriere</dt><dd>{meta.description}</dd></>}
+              {preferences.animations && <><dt data-en="Animations">Animații</dt><dd class="capitalize">{preferences.animations}</dd></>}
+            </dl>
+          </div>
+        )}
+
+      </div>
+    )}
+
+    {/* CTA */}
+    <div class="actions">
+      <a href={`/dashboard/${id}/onboarding`} class="btn-secondary" data-en="← Edit in Chat">
+        ← Editează în Chat
+      </a>
+
+      {canGenerate && (
+        <button id="generate-btn" class="btn-primary" data-en="Generate Website →">
+          Generează site →
+        </button>
+      )}
+
+      {isGenerating && (
+        <button class="btn-primary" disabled>
+          <span class="btn-spinner"></span>
+          <span data-en="Generating…">Se generează…</span>
+        </button>
+      )}
+
+      {isGenerated && (
+        <a href={`/dashboard/${id}`} class="btn-success" data-en="View Project →">
+          Vezi proiect →
+        </a>
+      )}
+
+      <div id="gen-error" class="gen-error" hidden></div>
+    </div>
+
+  </div>
+</Dashboard>
+
+<script define:vars={{ projectId: id, canGenerate, isGenerating }}>
+  // Poll generation status when stuck in 'generating' state (page was loaded mid-generation)
+  if (isGenerating) {
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/launch`);
+        const data = await res.json();
+        if (data.status === 'generated' || data.status === 'failed') {
+          clearInterval(poll);
+          window.location.href = `/dashboard/${projectId}`;
+        }
+      } catch {}
+    }, 5000);
+  }
+
+  if (canGenerate) {
+    const btn = document.getElementById('generate-btn');
+    const errEl = document.getElementById('gen-error');
+    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+
+    btn?.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="btn-spinner"></span> ' + (_isEn ? 'Generating…' : 'Se generează…');
+      errEl.hidden = true;
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok && (data.status === 'generated' || data.started)) {
+          window.location.href = `/dashboard/${projectId}`;
+        } else {
+          errEl.textContent = data.error || (_isEn ? 'Generation failed. Please try again.' : 'Generarea a eșuat. Încearcă din nou.');
+          errEl.hidden = false;
+          btn.disabled = false;
+          btn.textContent = _isEn ? 'Generate Website →' : 'Generează site →';
+        }
+      } catch {
+        errEl.textContent = _isEn ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+        errEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = _isEn ? 'Generate Website →' : 'Generează site →';
+      }
+    });
+  }
+</script>
+
+<style>
+  .brief-page { display: flex; flex-direction: column; gap: 2rem; }
+
+  /* Header */
+  .page-header { display: flex; flex-direction: column; gap: 1rem; }
+  .back-link {
+    color: rgba(255, 255, 255, 0.5);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .back-link:hover { color: #ffffff; }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+  .subtitle { color: rgba(255, 255, 255, 0.5); margin-top: 0.25rem; font-size: 1rem; }
+  .completeness-badge { text-align: right; flex-shrink: 0; }
+  .pct { display: block; font-size: 2rem; font-weight: 700; color: #00ff97; line-height: 1; }
+  .pct-label { font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); }
+  .progress-bar { height: 3px; background: rgba(0,0,0,0.06); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+  /* Notices */
+  .notice {
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .notice a { color: inherit; font-weight: 500; }
+  .notice.warning { background: rgba(234,179,8,0.08); border: 1px solid rgba(234,179,8,0.2); color: #b45309; }
+  .notice.info { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #2563eb; }
+  .notice.success { background: rgba(56,161,105,0.08); border: 1px solid rgba(56,161,105,0.2); color: #38a169; }
+  .generating-notice { font-style: italic; }
+
+  /* Brief cards */
+  @keyframes briefCardFadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .brief-sections { display: flex; flex-direction: column; gap: 1.25rem; }
+  .brief-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    animation: briefCardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .brief-card:nth-child(1) { animation-delay: 0s; }
+  .brief-card:nth-child(2) { animation-delay: 0.06s; }
+  .brief-card:nth-child(3) { animation-delay: 0.12s; }
+  .brief-card:nth-child(4) { animation-delay: 0.18s; }
+  .brief-card:nth-child(5) { animation-delay: 0.24s; }
+  .brief-card:nth-child(6) { animation-delay: 0.30s; }
+  .brief-card:nth-child(7) { animation-delay: 0.36s; }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 1rem;
+  }
+  dl { display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem 1rem; }
+  dt { color: rgba(255, 255, 255, 0.5); font-size: 0.875rem; font-weight: 500; }
+  dd { color: #ffffff; margin: 0; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .capitalize { text-transform: capitalize; }
+  .color-swatch {
+    width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.9);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    cursor: help;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .color-swatch:hover { transform: scale(1.3); }
+  .chips-cell { gap: 0.375rem; }
+  .chip { background: rgba(0,0,0,0.04); color: #ffffff; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 6px; }
+
+  /* Empty */
+  .empty-brief { background: rgba(255,255,255,0.04); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.6); border-radius: 24px; padding: 4rem 2rem; text-align: center; color: rgba(255, 255, 255, 0.5); display: flex; flex-direction: column; align-items: center; gap: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.06); }
+
+  /* Actions */
+  .actions { display: flex; align-items: center; gap: 1rem; padding-top: 1rem; flex-wrap: wrap; }
+  .btn-primary {
+    background: #00ff97;
+    color: #ffffff;
+    border: none;
+    border-radius: 16px;
+    padding: 12px 24px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #00e088;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary {
+    background: rgba(255,255,255,0.04);
+    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px;
+    padding: 12px 20px;
+    font-size: 0.875rem;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-secondary:hover { color: #ffffff; background: rgba(255,255,255,0.7); }
+  .btn-success {
+    background: rgba(56,161,105,0.1);
+    color: #38a169;
+    border: 1px solid rgba(56,161,105,0.2);
+    border-radius: 16px;
+    padding: 12px 24px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Spinner */
+  .spinner, .btn-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,0,0,0.1);
+    border-top-color: #00ff97;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  .spinner { border-top-color: #3b82f6; border-color: rgba(59,130,246,0.2); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Error */
+  .gen-error { color: #e53e3e; font-size: 0.875rem; background: rgba(229,62,62,0.06); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid rgba(229,62,62,0.2); }
+
+  /* Generate button glow */
+  #generate-btn {
+    position: relative;
+    z-index: 0;
+    overflow: visible;
+  }
+  #generate-btn::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 18px;
+    background: conic-gradient(from 0deg, #00ff97, #d4c854, #00ff97);
+    animation: rotateBorder 3s linear infinite;
+    z-index: -1;
+    opacity: 0.4;
+    filter: blur(4px);
+  }
+  @keyframes rotateBorder {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brief-card { animation: none; opacity: 1; transform: none; }
+    #generate-btn::before { animation: none; }
+    .btn-primary:hover:not(:disabled) { transform: none; }
+  }
+</style>

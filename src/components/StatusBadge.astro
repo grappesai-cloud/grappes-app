@@ -1,0 +1,136 @@
+---
+interface Props {
+  status: string;
+}
+
+const { status } = Astro.props;
+
+const LABELS: Record<string, string> = {
+  onboarding: 'Onboarding',
+  brief_ready: 'Brief gata',
+  generating: 'Generare',
+  generated: 'Generat',
+  deploying: 'Publicare',
+  live: 'Live',
+  failed: 'Eșuat',
+  archived: 'Arhivat',
+  // Deployment statuses
+  queued: 'În coadă',
+  building: 'Construire',
+  ready: 'Gata',
+  error: 'Eroare',
+  canceled: 'Anulat',
+};
+
+const EN_LABELS: Record<string, string> = {
+  onboarding: 'Onboarding',
+  brief_ready: 'Brief Ready',
+  generating: 'Generating',
+  generated: 'Generated',
+  deploying: 'Deploying',
+  live: 'Live',
+  failed: 'Failed',
+  archived: 'Archived',
+  queued: 'Queued',
+  building: 'Building',
+  ready: 'Ready',
+  error: 'Error',
+  canceled: 'Canceled',
+};
+
+const COLORS: Record<string, string> = {
+  onboarding: '#6366f1',
+  brief_ready: '#8b5cf6',
+  generating: '#00ff97',
+  generated: '#0891b2',
+  deploying: '#3b82f6',
+  live: '#38a169',
+  failed: '#e53e3e',
+  archived: '#999999',
+  queued: '#6366f1',
+  building: '#00ff97',
+  ready: '#38a169',
+  error: '#e53e3e',
+  canceled: '#999999',
+};
+
+const color = COLORS[status] ?? '#6b7280';
+const label = LABELS[status] ?? status;
+---
+
+<span class={`badge ${['generating', 'deploying'].includes(status) ? 'badge-shimmer' : ''}`} style={`--c: ${color}`}>
+  {['live', 'ready', 'building', 'generating', 'deploying'].includes(status) && (
+    <span class="dot" aria-hidden="true"></span>
+  )}
+  <span data-en={EN_LABELS[status] ?? status}>{label}</span>
+</span>
+
+<style>
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background: color-mix(in srgb, var(--c) 10%, transparent);
+    color: var(--c);
+    border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
+    white-space: nowrap;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  /* Pulse animation for active states */
+  :global(.badge:has(.dot)) .dot {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Shimmer animation for generating/deploying states */
+  .badge-shimmer {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg, rgba(0,255,151,0.12), rgba(0,255,151,0.06), rgba(0,255,151,0.12));
+    background-size: 200% 100%;
+    animation: badgeFlow 2s ease infinite;
+    border-color: rgba(0,255,151,0.25);
+  }
+
+  @keyframes badgeFlow {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+
+  .badge-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    animation: badgeShimmer 2s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes badgeShimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .badge-shimmer { animation: none; }
+    .badge-shimmer::after { animation: none; }
+    .dot { animation: none !important; }
+  }
+</style>

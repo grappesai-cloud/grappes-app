@@ -1,0 +1,131 @@
+---
+interface Props {
+  title?: string;
+  projectId?: string;
+}
+
+const { title = 'Dashboard', projectId } = Astro.props;
+const user = Astro.locals.user;
+
+if (!user) {
+  return Astro.redirect('/sign-in');
+}
+
+const currentPath = new URL(Astro.request.url).pathname;
+const inProject = !!projectId;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} — Grappes</title>
+    <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        background: #0a0a0a;
+        color: #fff;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+      a { color: inherit; text-decoration: none; }
+      button { font-family: inherit; cursor: pointer; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      h1, h2, h3 { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; letter-spacing: -0.04em; color: #fff; }
+
+      .status-live { color: #9BD4D7; }
+      .status-generating { color: #f6c547; }
+      .status-deploying { color: #3b82f6; }
+      .status-failed { color: #ff6b6b; }
+      /* Mobile nav toggle */
+      .mobile-menu-btn { display: none; background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 6px 10px; font-size: 18px; }
+
+      @media (max-width: 768px) {
+        main { padding: 80px 16px 80px !important; }
+        header > div { padding: 0 16px !important; }
+        .mobile-menu-btn { display: block; }
+        .dash-nav { display: none !important; position: fixed; top: 60px; left: 0; right: 0; background: rgba(10,10,10,0.97); backdrop-filter: blur(40px); flex-direction: column !important; padding: 16px; gap: 4px !important; border-bottom: 1px solid rgba(255,255,255,0.08); z-index: 99; }
+        .dash-nav.open { display: flex !important; }
+        .dash-nav a { width: 100%; text-align: center; }
+        .dash-right { gap: 8px !important; }
+        .dash-right .referral-link { display: none; }
+      }
+
+      @media (max-width: 480px) {
+        main { padding: 70px 12px 60px !important; }
+        header > div { padding: 0 12px !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header style="position:sticky;top:0;z-index:100;padding:18px 0;background:rgba(10,10,10,0.85);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="max-width:1650px;margin:0 auto;padding:0 40px;display:flex;align-items:center;justify-content:space-between;">
+        <a href="/dashboard" style="display:block;">
+          <img src="/logo.png" alt="Grappes" style="height:38px;display:block;" />
+        </a>
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">☰</button>
+        <nav class="dash-nav" id="dash-nav" style="display:flex;align-items:center;gap:8px;">
+          {inProject && (
+            <a href={`/dashboard/${projectId}`}
+              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath === `/dashboard/${projectId}` ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
+              <span>Overview</span>
+            </a>
+          )}
+          {inProject && (
+            <a href={`/dashboard/${projectId}/onboarding`}
+              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/onboarding') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
+              <span>Onboarding</span>
+            </a>
+          )}
+          {inProject && (
+            <a href={`/dashboard/${projectId}/brief`}
+              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/brief') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
+              <span>Brief</span>
+            </a>
+          )}
+          {inProject && (
+            <a href={`/dashboard/${projectId}/deploy`}
+              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/deploy') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
+              <span>Deploy</span>
+            </a>
+          )}
+        </nav>
+        <div class="dash-right" style="display:flex;align-items:center;gap:14px;">
+          {!inProject && (
+            <a href="/dashboard/referrals" class="referral-link"
+              style={`font-size:14px;font-weight:600;padding:7px 16px;border-radius:30px;transition:all 0.3s;${currentPath === '/dashboard/referrals' ? 'color:#0a0a0a;background:#9BD4D7;' : 'color:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.15);'}`}>
+              <span>Referrals</span>
+            </a>
+          )}
+          <form method="POST" action="/api/auth/signout" style="margin:0;">
+            <button type="submit" style="background:none;border:1px solid rgba(255,255,255,0.25);border-radius:30px;color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;padding:7px 18px;"><span>Sign out</span></button>
+          </form>
+          <a href="/dashboard/account" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#9BD4D7,#00a4af);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0a0a0a;text-transform:uppercase;text-decoration:none;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+            {user.email?.[0] ?? '?'}
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <script>
+      document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
+        var nav = document.getElementById('dash-nav');
+        if (nav) nav.classList.toggle('open');
+      });
+    </script>
+
+    <!-- Page content -->
+    <main style="max-width:1200px;margin:0 auto;padding:100px 40px 120px;">
+      <slot />
+    </main>
+  </body>
+</html>

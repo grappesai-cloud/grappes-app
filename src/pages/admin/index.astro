@@ -1,0 +1,575 @@
+---
+import { createAdminClient } from '../../lib/supabase';
+import { checkRateLimit } from '../../lib/rate-limit';
+import { timingSafeEqual, randomBytes, createHmac } from 'node:crypto';
+
+const ADMIN_SECRET = import.meta.env.ADMIN_SECRET ?? '';
+const COOKIE_NAME  = 'admin_session';
+
+// Signed session token: HMAC(random_nonce, ADMIN_SECRET) — prevents forgery
+function createSessionToken(): string {
+  const nonce = randomBytes(32).toString('hex');
+  const sig = createHmac('sha256', ADMIN_SECRET).update(nonce).digest('hex');
+  return `${nonce}.${sig}`;
+}
+
+function verifySessionToken(token: string): boolean {
+  if (!ADMIN_SECRET || !token) return false;
+  const dotIdx = token.indexOf('.');
+  if (dotIdx === -1) return false;
+  const nonce = token.slice(0, dotIdx);
+  const sig = token.slice(dotIdx + 1);
+  if (!nonce || !sig) return false;
+  const expected = createHmac('sha256', ADMIN_SECRET).update(nonce).digest('hex');
+  if (sig.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
+// ── Handle POST (login) ────────────────────────────────────────────────────
+if (Astro.request.method === 'POST') {
+  const ip = Astro.clientAddress ?? Astro.request.headers.get('x-forwarded-for') ?? 'unknown';
+  if (!checkRateLimit(`admin-login:${ip}`, 5, 60_000)) {
+    return new Response('Too many login attempts. Try again in a minute.', { status: 429 });
+  }
+
+  const formData = await Astro.request.formData();
+  const secret   = (formData.get('secret') as string | null) ?? '';
+
+  const secretOk = ADMIN_SECRET !== '' && secret.length === ADMIN_SECRET.length &&
+    timingSafeEqual(Buffer.from(secret), Buffer.from(ADMIN_SECRET));
+  if (secretOk) {
+    Astro.cookies.set(COOKIE_NAME, createSessionToken(), {
+      httpOnly:  true,
+      sameSite:  'strict',
+      maxAge:    3600,
+      path:      '/',
+    });
+    return Astro.redirect('/admin');
+  } else {
+    // Fall through to show login with error
+  }
+}
+
+// ── Auth gate ─────────────────────────────────────────────────────────────
+const isAuthed = verifySessionToken(Astro.cookies.get(COOKIE_NAME)?.value ?? '');
+
+// ── Fetch dashboard data (only if authed) ─────────────────────────────────
+let stats = { totalUsers: 0, activeSites: 0, freeDeploymentsLive: 0, expiredSites: 0, failedProjects: 0, pendingPayouts: 0 };
+let pendingPayouts: any[] = [];
+let recentUsers: any[]    = [];
+let allProjects: any[]    = [];
+let failedProjects: any[] = [];
+
+if (isAuthed) {
+  const client = createAdminClient();
+
+  const [
+    { count: totalUsers },
+    { count: activeSites },
+    { count: freeDeploymentsLive },
+    { count: expiredSites },
+    { count: failedCount },
+    { count: pendingPayoutsCount },
+    { data: payoutsData },
+    { data: usersData },
+    { data: projectsData },
+    { data: failedData },
+  ] = await Promise.all([
+    client.from('users').select('*', { count: 'exact', head: true }),
+    client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'active'),
+    client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'live').eq('billing_status', 'free'),
+    client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'expired'),
+    client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
+    client.from('referral_payouts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    client.from('referral_payouts')
+      .select('id, amount, requested_at, created_at, referrer_id, users(email)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false }),
+    client.from('users')
+      .select('id, email, created_at, plan, referral_balance')
+      .order('created_at', { ascending: false })
+      .limit(30),
+    client.from('projects')
+      .select('id, name, status, billing_status, billing_type, expires_at, preview_url, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50),
+    client.from('projects')
+      .select('id, name, user_id, created_at')
+      .eq('status', 'failed')
+      .order('created_at', { ascending: false }),
+  ]);
+
+  stats = {
+    totalUsers:          totalUsers          ?? 0,
+    activeSites:         activeSites         ?? 0,
+    freeDeploymentsLive: freeDeploymentsLive ?? 0,
+    expiredSites:        expiredSites        ?? 0,
+    failedProjects:      failedCount         ?? 0,
+    pendingPayouts:      pendingPayoutsCount ?? 0,
+  };
+
+  pendingPayouts = (payoutsData ?? []) as any[];
+  recentUsers    = (usersData   ?? []) as any[];
+  allProjects    = (projectsData ?? []) as any[];
+  failedProjects = (failedData  ?? []) as any[];
+}
+
+function billingColor(status: string): string {
+  if (status === 'active')  return '#00ff97';
+  if (status === 'free')    return '#60a5fa';
+  if (status === 'expired') return '#f87171';
+  return '#888';
+}
+
+function fmt(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grappes Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #00020f;
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    h1 {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      margin-bottom: 8px;
+    }
+    h1 span { color: #00ff97; }
+
+    .subtitle {
+      color: rgba(255,255,255,0.4);
+      font-size: 14px;
+      margin-bottom: 48px;
+    }
+
+    /* ── Login form ─────────────────────────────────────────────────── */
+    .login-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+    }
+    .login-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 48px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .login-card h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .login-card p { color: rgba(255,255,255,0.45); font-size: 14px; margin-bottom: 32px; }
+    .login-card input[type="password"] {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .login-card input[type="password"]:focus { border-color: #00ff97; }
+    .login-card button {
+      width: 100%;
+      background: #00ff97;
+      color: #00020f;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .login-card button:hover { opacity: 0.85; }
+
+    /* ── Stats row ──────────────────────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 24px 20px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 10px;
+    }
+    .stat-value {
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .stat-value.green   { color: #00ff97; }
+    .stat-value.blue    { color: #60a5fa; }
+    .stat-value.red     { color: #f87171; }
+    .stat-value.orange  { color: #fb923c; }
+    .stat-value.yellow  { color: #facc15; }
+    .stat-value.default { color: #fff; }
+
+    /* ── Section ────────────────────────────────────────────────────── */
+    .section { margin-bottom: 48px; }
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    tbody td {
+      padding: 12px 14px;
+      color: rgba(255,255,255,0.8);
+      vertical-align: middle;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-green   { background: rgba(0,255,151,0.12); color: #00ff97; border: 1px solid rgba(0,255,151,0.25); }
+    .badge-blue    { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
+    .badge-red     { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .badge-orange  { background: rgba(251,146,60,0.12); color: #fb923c; border: 1px solid rgba(251,146,60,0.25); }
+    .badge-gray    { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1); }
+
+    .needs-attention {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: rgba(251,146,60,0.12);
+      color: #fb923c;
+      border: 1px solid rgba(251,146,60,0.3);
+    }
+
+    /* ── Mark Paid button ───────────────────────────────────────────── */
+    .btn-mark-paid {
+      background: rgba(0,255,151,0.1);
+      color: #00ff97;
+      border: 1px solid rgba(0,255,151,0.3);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .btn-mark-paid:hover { background: rgba(0,255,151,0.2); }
+    .btn-mark-paid:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .empty-row td {
+      padding: 24px 14px;
+      color: rgba(255,255,255,0.3);
+      font-style: italic;
+    }
+
+    a.preview-link {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    a.preview-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+{!isAuthed ? (
+  <!-- ── LOGIN FORM ──────────────────────────────────────────────────── -->
+  <div class="login-wrap">
+    <div class="login-card">
+      <h2>Admin Access</h2>
+      <p>Enter your admin secret to continue.</p>
+      <form method="POST">
+        <input type="password" name="secret" placeholder="Admin secret" autofocus required />
+        <button type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+) : (
+  <!-- ── DASHBOARD ───────────────────────────────────────────────────── -->
+  <div class="container">
+    <h1>Grappes <span>Admin</span></h1>
+    <p class="subtitle">Last loaded: {new Date().toUTCString()}</p>
+
+    <!-- Stats row -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value default">{stats.totalUsers}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Sites</div>
+        <div class="stat-value green">{stats.activeSites}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Free Live</div>
+        <div class="stat-value blue">{stats.freeDeploymentsLive}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Expired Sites</div>
+        <div class="stat-value red">{stats.expiredSites}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Failed Projects</div>
+        <div class="stat-value orange">{stats.failedProjects}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Payouts</div>
+        <div class="stat-value yellow">{stats.pendingPayouts}</div>
+      </div>
+    </div>
+
+    <!-- Pending Referral Payouts -->
+    <div class="section">
+      <div class="section-title">Pending Referral Payouts ({pendingPayouts.length})</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer Email</th>
+              <th>Amount</th>
+              <th>Requested At</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingPayouts.length === 0 ? (
+              <tr class="empty-row"><td colspan="4">No pending payouts.</td></tr>
+            ) : pendingPayouts.map((p: any) => (
+              <tr>
+                <td>{(p.users as any)?.email ?? p.referrer_id}</td>
+                <td><strong style="color:#00ff97;">{Number(p.amount).toFixed(2)}€</strong></td>
+                <td>{fmt(p.requested_at ?? p.created_at)}</td>
+                <td>
+                  <button
+                    class="btn-mark-paid"
+                    data-payout-id={p.id}
+                    onclick={`markPaid(this, '${p.id}')`}
+                  >
+                    Mark Paid
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Users -->
+    <div class="section">
+      <div class="section-title">Recent Users (last 30)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Referral Balance</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentUsers.length === 0 ? (
+              <tr class="empty-row"><td colspan="4">No users found.</td></tr>
+            ) : recentUsers.map((u: any) => (
+              <tr>
+                <td>{u.email}</td>
+                <td>
+                  <span class={`badge ${u.plan === 'agency' ? 'badge-orange' : u.plan === 'pro' ? 'badge-blue' : u.plan === 'starter' ? 'badge-green' : 'badge-gray'}`}>
+                    {u.plan ?? 'free'}
+                  </span>
+                </td>
+                <td>{u.referral_balance != null ? `${Number(u.referral_balance).toFixed(2)}€` : '—'}</td>
+                <td>{fmt(u.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- All Projects -->
+    <div class="section">
+      <div class="section-title">All Projects (latest 50)</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Billing Status</th>
+              <th>Billing Type</th>
+              <th>Expires At</th>
+              <th>Preview</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allProjects.length === 0 ? (
+              <tr class="empty-row"><td colspan="6">No projects found.</td></tr>
+            ) : allProjects.map((p: any) => (
+              <tr>
+                <td style="font-weight:600;">{p.name ?? '—'}</td>
+                <td>
+                  <span class={`badge ${p.status === 'live' ? 'badge-green' : p.status === 'failed' ? 'badge-red' : 'badge-gray'}`}>
+                    {p.status ?? '—'}
+                  </span>
+                </td>
+                <td>
+                  <span class={`badge ${p.billing_status === 'active' ? 'badge-green' : p.billing_status === 'free' ? 'badge-blue' : p.billing_status === 'expired' ? 'badge-red' : 'badge-gray'}`}
+                    style={`color:${billingColor(p.billing_status ?? '')};`}>
+                    {p.billing_status ?? '—'}
+                  </span>
+                </td>
+                <td>{p.billing_type ?? '—'}</td>
+                <td>{fmt(p.expires_at)}</td>
+                <td>
+                  {p.preview_url ? (
+                    <a class="preview-link" href={p.preview_url} target="_blank" rel="noopener noreferrer">↗ View</a>
+                  ) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Failed Projects -->
+    <div class="section">
+      <div class="section-title">Failed Projects ({failedProjects.length})</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>User ID</th>
+              <th>Created At</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {failedProjects.length === 0 ? (
+              <tr class="empty-row"><td colspan="4">No failed projects.</td></tr>
+            ) : failedProjects.map((p: any) => (
+              <tr>
+                <td style="font-weight:600;">{p.name ?? '—'}</td>
+                <td style="font-size:11px;color:rgba(255,255,255,0.5);font-family:monospace;">{p.user_id}</td>
+                <td>{fmt(p.created_at)}</td>
+                <td><span class="needs-attention">Needs Attention</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
+
+<script>
+  async function markPaid(btn, payoutId) {
+    if (!confirm('Mark this payout as paid?')) return;
+    btn.disabled = true;
+    btn.textContent = 'Processing…';
+    try {
+      const res = await fetch('/api/admin/referral/mark-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        btn.closest('tr').style.opacity = '0.4';
+        btn.textContent = 'Paid ✓';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Mark Paid';
+        alert('Error: ' + (data.error ?? 'Unknown'));
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Mark Paid';
+      alert('Network error');
+    }
+  }
+</script>
+
+</body>
+</html>

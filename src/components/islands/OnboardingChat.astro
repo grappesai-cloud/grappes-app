@@ -1,0 +1,1212 @@
+---
+interface Props {
+  projectId: string;
+  initialMessages?: { role: 'user' | 'assistant'; content: string; timestamp: string }[];
+  initialCompleteness?: number;
+  initialPhase?: string;
+}
+
+const {
+  projectId,
+  initialMessages = [],
+  initialCompleteness = 0,
+  initialPhase = 'discovery',
+} = Astro.props;
+
+const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'review'];
+---
+
+<div class="chat-wrapper">
+  <!-- Peeping eyes sit outside overflow:hidden container -->
+  <div class="chat-eyes" aria-hidden="true">
+    <!-- Left eye -->
+    <div class="chat-unit">
+      <div class="chat-brow"></div>
+      <div class="chat-eye"><div class="chat-iris"><div class="chat-pupil"></div></div></div>
+    </div>
+    <!-- Right eye -->
+    <div class="chat-unit">
+      <div class="chat-brow chat-brow-r"></div>
+      <div class="chat-eye"><div class="chat-iris"><div class="chat-pupil"></div></div></div>
+    </div>
+  </div>
+<div class="chat-container" id="onboarding-chat">
+  <!-- Progress -->
+  <div class="progress-section">
+    <div class="progress-header">
+<span class="progress-value" id="completeness-value">{Math.round(initialCompleteness * 100)}%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style={`width: ${initialCompleteness * 100}%`}></div>
+    </div>
+    <div class="phases">
+      {PHASES.map((p, i) => (
+        <span
+          class={`phase-chip ${p === initialPhase ? 'active' : ''} ${i < PHASES.indexOf(initialPhase) ? 'done' : ''}`}
+          data-phase={p}
+        >
+          {p.charAt(0).toUpperCase() + p.slice(1)}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    {initialMessages.length === 0 && (
+      <div class="empty-state" id="empty-state">
+        <div class="spinner"></div>
+        <p data-en="Starting your onboarding session…">Se inițializează sesiunea de onboarding…</p>
+      </div>
+    )}
+    {initialMessages.map((msg) => (
+      <div class={`message ${msg.role === 'user' ? 'user-msg' : 'assistant-msg'}`}>
+        <span class="msg-label">{msg.role === 'user' ? 'Tu' : 'Grappes'}</span>
+        <div class="bubble">{msg.content}</div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <!-- Type picker — appears above input when attach button is clicked -->
+    <div class="type-picker" id="type-picker" hidden>
+      <span class="type-picker-label" data-en="What are you uploading?">Ce încarci?</span>
+      <div class="type-options">
+        <button class="type-opt" data-type="logo">🖼 Logo</button>
+        <button class="type-opt" data-type="hero" data-en="🌄 Hero Image">🌄 Imagine hero</button>
+        <button class="type-opt" data-type="og">🔗 OG / Social</button>
+        <button class="type-opt" data-type="section" data-en="📷 Other Photo">📷 Altă fotografie</button>
+      </div>
+    </div>
+
+    <!-- Staged image previews (ChatGPT-style) -->
+    <div class="staged-strip" id="staged-strip" hidden></div>
+
+    <form class="input-form" id="chat-form">
+      <!-- Hidden file input — multiple, up to 5 -->
+      <input type="file" id="quick-file-input" accept=".svg,.png,.webp,.jpg,.jpeg,.gif,.heic" multiple hidden />
+
+      <button type="button" id="attach-btn" class="attach-btn" title="Upload image / logo" aria-label="Upload image or logo">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <textarea id="chat-input" placeholder="Scrie răspunsul tău…" data-en-ph="Type your answer…" class="chat-input" autocomplete="off" rows="1"></textarea>
+      <button type="submit" id="send-btn" class="send-btn" data-en="Send">Trimite</button>
+    </form>
+  </div>
+</div><!-- end chat-container -->
+</div><!-- end chat-wrapper -->
+
+<script>
+  // Apply i18n for Astro pages
+  (function(){
+    var lang=(localStorage.getItem('i18nextLng')||'ro').split('-')[0];
+    if(lang!=='en') return;
+    document.querySelectorAll('[data-en]').forEach(function(el){el.textContent=el.getAttribute('data-en');});
+    document.querySelectorAll('[data-en-ph]').forEach(function(el){el.setAttribute('placeholder',el.getAttribute('data-en-ph'));});
+  })();
+</script>
+<script define:vars={{ projectId, initialCompleteness, initialPhase, PHASES, hasMessages: initialMessages.length > 0 }}>
+  // Translate phase names to Romanian
+  var phaseRo = { discovery:'Descoperire', content:'Conținut', branding:'Branding', media:'Media', preferences:'Preferințe', review:'Revizuire' };
+  var lang = (localStorage.getItem('i18nextLng')||'ro').split('-')[0];
+  if (lang !== 'en') {
+    document.querySelectorAll('.phase-chip').forEach(function(chip) {
+      var p = chip.getAttribute('data-phase');
+      if (phaseRo[p]) chip.textContent = phaseRo[p];
+    });
+  }
+  const form = document.getElementById('chat-form');
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const messagesEl = document.getElementById('messages');
+  const progressFill = document.getElementById('progress-fill');
+  const completenessValue = document.getElementById('completeness-value');
+  // Declared here so setInputEnabled can reference them before the attach section runs
+  const attachBtn = document.getElementById('attach-btn');
+  const typePicker = document.getElementById('type-picker');
+  const quickFileInput = document.getElementById('quick-file-input');
+
+  let completeness = initialCompleteness;
+  let phase = initialPhase;
+  let loading = false;
+
+  // ── Auto-resize textarea ────────────────────────────────────────────────
+  function autoResize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+  }
+  input.addEventListener('input', autoResize);
+
+  // Enter = submit, Shift+Enter = new line
+  input.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  });
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function appendMessage(role, content) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${role === 'user' ? 'user-msg' : 'assistant-msg'}`;
+    var label = document.createElement('span');
+    label.className = 'msg-label';
+    label.textContent = role === 'user' ? 'Tu' : 'Grappes';
+    wrapper.appendChild(label);
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = content;
+    wrapper.appendChild(bubble);
+    messagesEl.appendChild(wrapper);
+    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return wrapper;
+  }
+
+  function updateProgress(newCompleteness, newPhase) {
+    completeness = newCompleteness;
+    phase = newPhase;
+    progressFill.style.width = `${completeness * 100}%`;
+    completenessValue.textContent = `${Math.round(completeness * 100)}%`;
+    document.querySelectorAll('.phase-chip').forEach((chip, i) => {
+      chip.className = 'phase-chip';
+      if (chip.dataset.phase === phase) chip.classList.add('active');
+      else if (i < PHASES.indexOf(phase)) chip.classList.add('done');
+    });
+  }
+
+  // Use user's selected language from localStorage, fallback to browser language
+  const browserLang = (localStorage.getItem('i18nextLng') || navigator.language || 'ro').split('-')[0];
+
+  async function callAPI(body, timeoutMs = 180000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(`/api/onboarding/${projectId}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, browserLang }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      // Session expired → reload to login
+      if (res.status === 401) { window.location.href = '/'; throw new Error('Unauthorized'); }
+      let data;
+      try { data = await res.json(); } catch { data = { error: 'Invalid server response' }; }
+      return { res, data };
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out. Please try again.');
+      throw err;
+    }
+  }
+
+  function setInputEnabled(enabled) {
+    loading = !enabled;
+    sendBtn.disabled = !enabled;
+    input.disabled = !enabled;
+    if (attachBtn) attachBtn.disabled = !enabled;
+  }
+
+  function showThinking() {
+    const el = document.createElement('div');
+    el.className = 'message assistant-msg thinking-msg';
+    el.innerHTML = '<span class="msg-label">Grappes</span><div class="bubble thinking-bubble">Thinking…</div>';
+    messagesEl.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    return el;
+  }
+
+  function showReviewCTA() {
+    const existing = document.querySelector('.review-cta');
+    if (existing) return;
+    const cta = document.createElement('div');
+    cta.className = 'review-cta';
+    cta.innerHTML = `<span>Your brief looks great!</span><a href="/dashboard/${projectId}/brief" class="review-btn">Review Brief →</a>`;
+    messagesEl.appendChild(cta);
+    cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function showLaunchCTA() {
+    const existing = document.querySelector('.launch-cta');
+    if (existing) return;
+    const cta = document.createElement('div');
+    cta.className = 'launch-cta';
+    cta.innerHTML = `
+      <span>Brieful tău e complet!</span>
+      <div class="launch-cta-btns">
+        <a href="/dashboard/${projectId}/brief" class="btn-outline-sm">Review Brief</a>
+        <button class="btn-launch-sm" id="chat-launch-btn">Lansează Website →</button>
+      </div>`;
+    messagesEl.appendChild(cta);
+    cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('chat-launch-btn')?.addEventListener('click', () => {
+      window.location.href = `/dashboard/${projectId}?launch=1`;
+    });
+  }
+
+  // ── Handle Haiku response ─────────────────────────────────────────────────
+
+  function handleApiResponse(data, thinkingEl) {
+    if (thinkingEl) thinkingEl.remove();
+
+    if (data.reply) {
+      const msgEl = appendMessage('assistant', data.reply);
+      updateProgress(data.completeness ?? completeness, data.phase ?? phase);
+
+      // Render upload widget if present
+      if (data.uiAction) {
+        const widget = buildWidget(data.uiAction);
+        if (widget) {
+          msgEl.appendChild(widget);
+          msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+
+      if (data.isComplete) {
+        // Brief confirmed by AI — confirm THEN redirect (must persist before navigation)
+        (async () => {
+          try {
+            await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
+          } catch (e) {
+            console.warn('Brief confirmation failed:', e);
+          }
+          window.location.href = `/dashboard/${projectId}/brief`;
+        })();
+      } else if (data.isReviewReady && completeness >= 0.85) {
+        showLaunchCTA();
+      } else if (data.isReviewReady) {
+        showReviewCTA();
+      }
+    }
+
+    setInputEnabled(true);
+    input.focus();
+  }
+
+  // ── Media widget builder ───────────────────────────────────────────────────
+
+  const WIDGET_LABELS = {
+    logo:    { title: 'Logo',              hint: 'SVG, PNG, WEBP — max 2 MB',  accept: '.svg,.png,.webp,.jpg,.jpeg' },
+    hero:    { title: 'Hero Image',        hint: 'JPG, PNG, WEBP — max 10 MB', accept: '.jpg,.jpeg,.png,.webp' },
+    section: { title: 'Section Image',     hint: 'JPG, PNG, WEBP — max 5 MB',  accept: '.jpg,.jpeg,.png,.webp' },
+    menu:    { title: 'Menu Photo',        hint: 'JPG, PNG — poză cu meniul — max 10 MB', accept: '.jpg,.jpeg,.png,.webp' },
+    enhance: { title: 'Enhance Photos',    hint: 'JPG, PNG — pozele tale, le facem profesionale', accept: '.jpg,.jpeg,.png,.webp' },
+    ai_generate: { title: 'AI Generate',   hint: 'Se generează automat din brieful tău', accept: '' },
+    og:      { title: 'OG / Social Image', hint: 'JPG, PNG — 1200×630 — max 2 MB', accept: '.jpg,.jpeg,.png,.webp' },
+    favicon: { title: 'Favicon',           hint: 'SVG or PNG — max 512 KB',    accept: '.svg,.png,.ico' },
+  };
+
+  function buildWidget(uiAction) {
+    const container = document.createElement('div');
+    container.className = 'media-widget';
+
+    if (uiAction.type === 'upload' && uiAction.variant === 'ai_generate') {
+      // AI Generate — no upload, just a generate button
+      container.dataset.variant = 'ai_generate';
+      container.dataset.sectionId = uiAction.sectionId || '';
+      const sectionType = uiAction.sectionId || 'hero';
+
+      container.innerHTML = `
+        <div class="dz-zone ai-generate-zone">
+          <div class="dz-body">
+            <div class="dz-icon">✦</div>
+            <div class="dz-label">Generare AI</div>
+            <div class="dz-hint">Generăm o imagine profesională din brieful tău</div>
+          </div>
+          <div class="dz-success" hidden>
+            <span class="dz-ok">✓</span>
+            <span class="dz-ok-label">Generat!</span>
+          </div>
+        </div>
+        <div class="dz-footer">
+          <button class="ai-gen-btn dz-skip-btn" type="button" style="background: rgba(255,255,255,0.06); color: var(--text-primary, #fff);">Generează cu AI ✦</button>
+        </div>`;
+
+      const genBtn = container.querySelector('.ai-gen-btn');
+      const dzBody = container.querySelector('.dz-body');
+      const dzSuccess = container.querySelector('.dz-success');
+
+      genBtn.addEventListener('click', async () => {
+        genBtn.disabled = true;
+        genBtn.textContent = 'Se generează...';
+        dzBody.innerHTML = '<div class="dz-icon" style="animation: pulse 1.5s infinite">✦</div><div class="dz-label">Generare în curs...</div><div class="dz-hint">Poate dura 10-20 secunde</div>';
+
+        try {
+          const res = await fetch(`/api/assets/${projectId}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: uiAction.sectionId ? 'section' : 'hero', section: sectionType, sectionId: uiAction.sectionId, variant: uiAction.sectionTitle || '' }),
+          });
+          const genData = await res.json();
+
+          if (!res.ok) throw new Error(genData.error || 'Generation failed');
+
+          dzBody.hidden = true;
+          dzSuccess.hidden = false;
+          if (genData.publicUrl) {
+            const img = document.createElement('img');
+            img.src = genData.publicUrl;
+            img.style.cssText = 'max-width:100%;max-height:140px;object-fit:contain;border-radius:6px;margin-top:0.5rem;';
+            dzSuccess.appendChild(img);
+          }
+
+          setInputEnabled(false);
+          const thinking = showThinking();
+          const { res: apiRes, data: apiData } = await callAPI({
+            action: 'ai_generated',
+            type: uiAction.sectionId ? 'section' : 'hero',
+            assetId: genData.asset?.id,
+            sectionId: uiAction.sectionId,
+            sectionTitle: uiAction.sectionTitle,
+          });
+          handleApiResponse(apiRes.ok ? apiData : { reply: apiData.error || 'Something went wrong.' }, thinking);
+        } catch (err) {
+          dzBody.innerHTML = `<div class="dz-icon">✗</div><div class="dz-label">Eroare</div><div class="dz-hint">${escapeHtml(String(err.message || 'Unknown error'))}</div>`;
+          dzBody.hidden = false;
+          dzSuccess.hidden = true;
+          genBtn.disabled = false;
+          genBtn.textContent = 'Încearcă din nou ✦';
+          setInputEnabled(true);
+        }
+      });
+
+    } else if (uiAction.type === 'upload' && uiAction.variant === 'enhance') {
+      // Enhance mode — upload zone that sends to /enhance endpoint
+      const info = WIDGET_LABELS.enhance;
+      container.dataset.variant = 'enhance';
+      container.dataset.sectionId = uiAction.sectionId || '';
+      container.dataset.sectionTitle = uiAction.sectionTitle || '';
+
+      container.innerHTML = `
+        <div class="dz-zone" tabindex="0" role="button" aria-label="Upload photo for enhancement">
+          <input type="file" class="dz-input" accept="${info.accept}" hidden />
+          <div class="dz-body">
+            <div class="dz-icon">↑✦</div>
+            <div class="dz-label">${info.title}</div>
+            <div class="dz-hint">${info.hint}</div>
+          </div>
+          <div class="dz-success" hidden>
+            <span class="dz-ok">✓</span>
+            <span class="dz-ok-label">Enhanced!</span>
+          </div>
+        </div>
+        <div class="dz-footer">
+          <button class="dz-skip-btn" type="button">Skip →</button>
+        </div>`;
+
+      wireEnhanceZone(container, uiAction);
+
+    } else if (uiAction.type === 'upload') {
+      const variant = uiAction.variant || 'section';
+      const info = WIDGET_LABELS[variant] || WIDGET_LABELS.section;
+      const label = uiAction.sectionTitle ? uiAction.sectionTitle : info.title;
+
+      container.dataset.variant = variant;
+      container.dataset.sectionId = uiAction.sectionId || '';
+      container.dataset.sectionTitle = uiAction.sectionTitle || '';
+
+      container.innerHTML = `
+        <div class="dz-zone" tabindex="0" role="button" aria-label="Upload ${label}">
+          <input type="file" class="dz-input" accept="${info.accept}" hidden />
+          <div class="dz-body">
+            <div class="dz-icon">↑</div>
+            <div class="dz-label">${label}</div>
+            <div class="dz-hint">${info.hint}</div>
+          </div>
+          <div class="dz-success" hidden>
+            <span class="dz-ok">✓</span>
+            <span class="dz-ok-label">Uploaded!</span>
+          </div>
+        </div>
+        <div class="dz-footer">
+          <button class="dz-skip-btn" type="button">Skip →</button>
+        </div>`;
+
+      wireUploadZone(container, uiAction);
+
+    } else if (uiAction.type === 'choice') {
+      container.innerHTML = `
+        <div class="dz-choices">
+          ${(uiAction.options || []).map(opt =>
+            `<button class="dz-choice-btn" type="button">${opt}</button>`
+          ).join('')}
+        </div>`;
+
+      container.querySelectorAll('.dz-choice-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          container.querySelectorAll('.dz-choice-btn').forEach(b => b.disabled = true);
+          btn.classList.add('selected');
+          setInputEnabled(false);
+          const thinking = showThinking();
+          try {
+            const { res, data } = await callAPI({
+              action: 'media_choice',
+              type: uiAction.variant || 'hero',
+              choice: btn.textContent,
+            });
+            handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+          } catch (err) {
+            thinking.remove();
+            appendMessage('assistant', err.message?.includes('timed out') ? 'Request timed out — please try again.' : 'Connection error. Please try again.');
+            container.querySelectorAll('.dz-choice-btn').forEach(b => b.disabled = false);
+            btn.classList.remove('selected');
+            setInputEnabled(true);
+          }
+        });
+      });
+    }
+
+    return container;
+  }
+
+  function wireUploadZone(container, uiAction) {
+    const zone = container.querySelector('.dz-zone');
+    const fileInput = container.querySelector('.dz-input');
+    const skipBtn = container.querySelector('.dz-skip-btn');
+    const dzBody = container.querySelector('.dz-body');
+    const dzSuccess = container.querySelector('.dz-success');
+
+    zone.addEventListener('click', () => { if (!zone.dataset.uploaded) fileInput.click(); });
+    zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const file = e.dataTransfer?.files[0];
+      if (file) doUpload(file, container, uiAction, dzBody, dzSuccess);
+    });
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) doUpload(file, container, uiAction, dzBody, dzSuccess);
+    });
+    skipBtn.addEventListener('click', async () => {
+      skipBtn.disabled = true;
+      skipBtn.textContent = 'Skipping…';
+      setInputEnabled(false);
+      const thinking = showThinking();
+      try {
+        const { res, data } = await callAPI({
+          action: 'media_skipped',
+          type: uiAction.variant || 'section',
+          sectionId: uiAction.sectionId,
+          sectionTitle: uiAction.sectionTitle,
+        });
+        handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+      } catch (err) {
+        thinking.remove();
+        appendMessage('assistant', err.message?.includes('timed out') ? 'Request timed out — please try again.' : 'Connection error. Please try again.');
+        setInputEnabled(true);
+        skipBtn.disabled = false;
+        skipBtn.textContent = 'Skip →';
+      }
+    });
+  }
+
+  function wireEnhanceZone(container, uiAction) {
+    const zone = container.querySelector('.dz-zone');
+    const fileInput = container.querySelector('.dz-input');
+    const dzBody = container.querySelector('.dz-body');
+    const dzSuccess = container.querySelector('.dz-success');
+    const skipBtn = container.querySelector('.dz-skip-btn');
+
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const file = e.dataTransfer?.files[0];
+      if (file) doEnhance(file, container, uiAction, dzBody, dzSuccess);
+    });
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) doEnhance(file, container, uiAction, dzBody, dzSuccess);
+    });
+    skipBtn?.addEventListener('click', async () => {
+      skipBtn.disabled = true;
+      setInputEnabled(false);
+      const thinking = showThinking();
+      try {
+        const { res, data } = await callAPI({ action: 'media_skipped', type: uiAction.sectionId ? 'section' : 'hero' });
+        handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+      } catch (err) {
+        thinking?.remove();
+        appendMessage('assistant', 'A apărut o eroare. Te rog să încerci din nou.');
+        setInputEnabled(true);
+      }
+    });
+  }
+
+  async function doEnhance(file, container, uiAction, dzBody, dzSuccess) {
+    const zone = container.querySelector('.dz-zone');
+    if (zone.dataset.uploaded) return;
+    if (file.size > 10 * 1024 * 1024) {
+      dzBody.innerHTML = '<div class="dz-icon">✗</div><div class="dz-label">File too large</div><div class="dz-hint">Maximum 10 MB</div>';
+      return;
+    }
+    zone.dataset.uploaded = '1';
+
+    dzBody.innerHTML = '<div class="dz-icon" style="animation: pulse 1.5s infinite">✦</div><div class="dz-label">Se îmbunătățește...</div><div class="dz-hint">AI-ul procesează fotografia ta</div>';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', uiAction.sectionId ? 'section' : 'hero');
+      formData.append('sectionId', uiAction.sectionId || '');
+      formData.append('sectionTitle', uiAction.sectionTitle || '');
+
+      const res = await fetch(`/api/assets/${projectId}/enhance`, { method: 'POST', body: formData });
+      const enhData = await res.json();
+
+      if (!res.ok) throw new Error(enhData.error || 'Enhancement failed');
+
+      dzBody.hidden = true;
+      dzSuccess.hidden = false;
+      if (enhData.publicUrl) {
+        const img = document.createElement('img');
+        img.src = enhData.publicUrl;
+        img.style.cssText = 'max-width:100%;max-height:140px;object-fit:contain;border-radius:6px;margin-top:0.5rem;';
+        dzSuccess.appendChild(img);
+      }
+
+      setInputEnabled(false);
+      const thinking = showThinking();
+      const { res: apiRes, data: apiData } = await callAPI({
+        action: 'enhance_uploaded',
+        type: uiAction.sectionId ? 'section' : 'hero',
+        assetId: enhData.asset?.id,
+        sectionId: uiAction.sectionId,
+        sectionTitle: uiAction.sectionTitle,
+      });
+      handleApiResponse(apiRes.ok ? apiData : { reply: apiData.error || 'Something went wrong.' }, thinking);
+    } catch (err) {
+      dzBody.innerHTML = `<div class="dz-icon">✗</div><div class="dz-label">Eroare</div><div class="dz-hint">${escapeHtml(String(err.message || 'Unknown error'))}</div>`;
+      dzBody.hidden = false;
+      dzSuccess.hidden = true;
+      zone.dataset.uploaded = '';
+      setInputEnabled(true);
+    }
+  }
+
+  async function doUpload(file, container, uiAction, dzBody, dzSuccess) {
+    const zone = container.querySelector('.dz-zone');
+    if (zone.dataset.uploaded) return;
+    if (file.size > 10 * 1024 * 1024) {
+      dzBody.innerHTML = '<div class="dz-icon">✗</div><div class="dz-label">File too large</div><div class="dz-hint">Maximum 10 MB</div>';
+      return;
+    }
+    zone.dataset.uploaded = '1';
+
+    // Show progress
+    dzBody.querySelector('.dz-icon').textContent = '⏳';
+    dzBody.querySelector('.dz-label').textContent = 'Uploading…';
+    dzBody.querySelector('.dz-hint').textContent = file.name;
+    container.querySelector('.dz-skip-btn').disabled = true;
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('type', uiAction.variant || 'section');
+    if (uiAction.sectionId) fd.append('sectionId', uiAction.sectionId);
+    if (uiAction.sectionTitle) fd.append('sectionTitle', uiAction.sectionTitle);
+
+    try {
+      const uploadRes = await fetch(`/api/assets/${projectId}/upload`, { method: 'POST', body: fd });
+      const uploadData = await uploadRes.json();
+
+      if (!uploadRes.ok) {
+        dzBody.querySelector('.dz-icon').textContent = '✕';
+        dzBody.querySelector('.dz-label').textContent = uploadData.error || 'Upload failed';
+        dzBody.querySelector('.dz-hint').textContent = 'Click to retry';
+        delete zone.dataset.uploaded;
+        container.querySelector('.dz-skip-btn').disabled = false;
+        return;
+      }
+
+      // Show success
+      dzBody.hidden = true;
+      dzSuccess.hidden = false;
+      zone.classList.add('uploaded');
+
+      // Show thumbnail if image
+      if (uploadData.asset?.public_url) {
+        const img = document.createElement('img');
+        img.src = uploadData.asset.public_url;
+        img.style.cssText = 'max-width:120px;max-height:80px;object-fit:cover;border-radius:4px;border:1px solid rgba(56,161,105,0.2);';
+        img.alt = 'Uploaded';
+        dzSuccess.appendChild(img);
+      }
+
+      setInputEnabled(false);
+      const thinking = showThinking();
+      const isMenu = uiAction.variant === 'menu';
+      const { res, data } = await callAPI({
+        action: isMenu ? 'menu_uploaded' : 'media_uploaded',
+        type: uiAction.variant || 'section',
+        assetId: uploadData.asset?.id,
+        assetUrl: isMenu ? uploadData.asset?.public_url : undefined,
+        sectionId: uiAction.sectionId,
+        sectionTitle: uiAction.sectionTitle,
+      });
+      handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+
+    } catch {
+      dzBody.querySelector('.dz-icon').textContent = '✕';
+      dzBody.querySelector('.dz-label').textContent = 'Network error';
+      dzBody.querySelector('.dz-hint').textContent = 'Click to retry';
+      delete zone.dataset.uploaded;
+      container.querySelector('.dz-skip-btn').disabled = false;
+    }
+  }
+
+  // ── Auto-init ──────────────────────────────────────────────────────────────
+
+  if (!hasMessages) {
+    setInputEnabled(false);
+    setTimeout(() => initSession(0), 200);
+  }
+
+  async function initSession(attempt) {
+    try {
+      const { res, data } = await callAPI({ init: true });
+      document.getElementById('empty-state')?.remove();
+      if (res.ok) {
+        handleApiResponse(data, null);
+      } else if (res.status === 503 && attempt < 1) {
+        // AI overloaded — retry once after 3s
+        const emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.querySelector('p').textContent = 'AI is busy, retrying…';
+        setTimeout(() => initSession(1), 3000);
+      } else {
+        document.getElementById('empty-state')?.remove();
+        appendMessage('assistant', data.reply || 'Could not start session. Please refresh the page.');
+        setInputEnabled(true);
+      }
+    } catch (err) {
+      document.getElementById('empty-state')?.remove();
+      const msg = err.message?.includes('timed out')
+        ? 'The request timed out. Please refresh the page.'
+        : 'Connection error. Please refresh the page.';
+      appendMessage('assistant', msg);
+      setInputEnabled(true);
+    }
+  }
+
+  // ── Quick attach (paperclip button) ───────────────────────────────────────
+
+  let pendingUploadType = null;
+
+  // Toggle type picker
+  attachBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !typePicker.hidden;
+    typePicker.hidden = isOpen;
+    attachBtn.classList.toggle('active', !isOpen);
+  });
+
+  // Close when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!typePicker.hidden && !typePicker.contains(e.target) && e.target !== attachBtn) {
+      typePicker.hidden = true;
+      attachBtn.classList.remove('active');
+    }
+  });
+
+  // Type button clicked → open file picker
+  typePicker.querySelectorAll('.type-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingUploadType = btn.dataset.type;
+      typePicker.hidden = true;
+      attachBtn.classList.remove('active');
+      quickFileInput.click();
+    });
+  });
+
+  // ── Staged files (ChatGPT-style) ──────────────────────────────────────────
+  const MAX_STAGED = 5;
+  let stagedFiles = []; // [{file, type, previewUrl}]
+  const stagedStrip = document.getElementById('staged-strip');
+
+  function renderStagedStrip() {
+    stagedStrip.hidden = stagedFiles.length === 0;
+    stagedStrip.innerHTML = '';
+    stagedFiles.forEach((item, idx) => {
+      const card = document.createElement('div');
+      card.className = 'staged-card';
+      card.style.cssText = 'position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,0.1);flex-shrink:0;';
+      card.innerHTML = `
+        <img src="${item.previewUrl}" alt="${item.file.name}" class="staged-thumb" style="width:100%;height:100%;object-fit:cover;display:block;" />
+        <span class="staged-type">${item.type}</span>
+        <button type="button" class="staged-remove" data-idx="${idx}" aria-label="Remove">×</button>`;
+      stagedStrip.appendChild(card);
+    });
+    stagedStrip.querySelectorAll('.staged-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        URL.revokeObjectURL(stagedFiles[i].previewUrl);
+        stagedFiles.splice(i, 1);
+        renderStagedStrip();
+      });
+    });
+  }
+
+  // File selected → stage (don't upload yet)
+  quickFileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files || []);
+    quickFileInput.value = '';
+    if (!files.length || !pendingUploadType) return;
+
+    const type = pendingUploadType;
+    pendingUploadType = null;
+
+    const remaining = MAX_STAGED - stagedFiles.length;
+    files.slice(0, remaining).forEach(file => {
+      stagedFiles.push({ file, type, previewUrl: URL.createObjectURL(file) });
+    });
+    renderStagedStrip();
+    input.focus();
+  });
+
+  // ── Form submit ────────────────────────────────────────────────────────────
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    const hasFiles = stagedFiles.length > 0;
+    if (!text && !hasFiles) return;
+    if (loading) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    setInputEnabled(false);
+
+    // ── Case 1: staged images to upload ──────────────────────────────────────
+    if (hasFiles) {
+      const filesToUpload = [...stagedFiles];
+      stagedFiles = [];
+      renderStagedStrip();
+
+      // Show user bubble with thumbnails + message
+      const wrapper = document.createElement('div');
+      wrapper.className = 'message user-msg';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble upload-bubble';
+
+      const thumbsHtml = filesToUpload.map(f =>
+        `<img src="${f.previewUrl}" class="ub-thumb" style="width:72px;height:56px;object-fit:cover;border-radius:4px;border:1px solid rgba(0,0,0,0.06);" alt="${escapeHtml(f.file.name)}" />`
+      ).join('');
+      bubble.innerHTML = `
+        <div class="ub-thumbs-row">${thumbsHtml}</div>
+        ${text ? `<div class="ub-text">${escapeHtml(text)}</div>` : ''}
+        <div class="ub-status">Se încarcă...</div>`;
+      wrapper.appendChild(bubble);
+      messagesEl.appendChild(wrapper);
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Upload all in parallel
+      const results = await Promise.all(filesToUpload.map(async ({ file, type }) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('type', type);
+        try {
+          const res = await fetch(`/api/assets/${projectId}/upload`, { method: 'POST', body: fd });
+          const d = await res.json();
+          return res.ok ? { ok: true, asset: d.asset, type } : { ok: false, error: d.error };
+        } catch {
+          return { ok: false, error: 'Network error' };
+        }
+      }));
+
+      // Clean up object URLs
+      filesToUpload.forEach(f => URL.revokeObjectURL(f.previewUrl));
+
+      const succeeded = results.filter(r => r.ok);
+      const failed = results.filter(r => !r.ok);
+
+      if (succeeded.length === 0) {
+        bubble.querySelector('.ub-status').textContent = `Upload eșuat: ${failed[0]?.error || 'eroare'}`;
+        setInputEnabled(true);
+        return;
+      }
+
+      bubble.querySelector('.ub-status').textContent =
+        failed.length > 0
+          ? `${succeeded.length} încărcate, ${failed.length} eșuate`
+          : `${succeeded.length} ${succeeded.length === 1 ? 'imagine încărcată' : 'imagini încărcate'}`;
+
+      // Notify Haiku with all uploaded assets + user's context
+      const thinking = showThinking();
+      const { res, data } = await callAPI({
+        action: 'media_uploaded',
+        uploads: succeeded.map(r => ({ type: r.type, assetId: r.asset?.id })),
+        // keep single-upload fields for backwards compat with backend
+        type: succeeded[succeeded.length - 1].type,
+        assetId: succeeded[succeeded.length - 1].asset?.id,
+        userContext: text || undefined,
+      });
+      handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+      return;
+    }
+
+    // ── Case 2: text only ─────────────────────────────────────────────────────
+    appendMessage('user', text);
+    const thinking = showThinking();
+
+    try {
+      const { res, data } = await callAPI({ message: text });
+      if (res.ok) {
+        handleApiResponse(data, thinking);
+      } else if (res.status === 503) {
+        thinking.remove();
+        appendMessage('assistant', 'AI is momentarily busy — please resend your message in a few seconds.');
+        setInputEnabled(true);
+        input.value = text;
+      } else {
+        thinking.remove();
+        appendMessage('assistant', data.reply || data.error || 'Something went wrong. Please try again.');
+        setInputEnabled(true);
+      }
+    } catch (err) {
+      thinking.remove();
+      const msg = err.message?.includes('timed out')
+        ? 'The request timed out — please try again.'
+        : 'Connection error. Please try again.';
+      appendMessage('assistant', msg);
+      setInputEnabled(true);
+      if (!err.message?.includes('timed out')) input.value = text;
+    }
+  });
+
+  // ── Auto-launch trigger (from brief page redirect) ─────────────────────────
+  if (new URLSearchParams(window.location.search).get('launch') === '1') {
+    window.history.replaceState({}, '', window.location.pathname);
+    (async () => {
+      try {
+        const launchRes = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
+        if (launchRes.ok) {
+          window.location.href = `/dashboard/${projectId}`;
+        } else {
+          const errData = await launchRes.json().catch(() => ({}));
+          appendMessage('assistant', errData.error || 'Launch failed. Please try again from the project page.');
+        }
+      } catch (e) {
+        appendMessage('assistant', 'Network error during launch. Please try again.');
+      }
+    })();
+  }
+
+  // ── Chat eyes mouse tracking ────────────────────────────────────────────────
+  (function() {
+    var _idleTimer;
+    document.addEventListener('mousemove', function(e) {
+      clearTimeout(_idleTimer);
+      document.querySelectorAll('.chat-iris').forEach(function(iris) {
+        var eye = iris.closest('.chat-eye');
+        if (!eye) return;
+        var r = eye.getBoundingClientRect();
+        var cx = r.left + r.width / 2;
+        var cy = r.top + r.height / 2;
+        var dx = e.clientX - cx;
+        var dy = e.clientY - cy;
+        var ang = Math.atan2(dy, dx);
+        var ratio = Math.min(Math.hypot(dx, dy) / 260, 1);
+        var ix = (Math.cos(ang) * 7 * ratio).toFixed(2);
+        var iy = (Math.sin(ang) * 7 * ratio).toFixed(2);
+        iris.style.animationName = 'none';
+        iris.style.transform = 'translate(calc(-50% + ' + ix + 'px), calc(-30% + ' + iy + 'px))';
+      });
+      _idleTimer = setTimeout(function() {
+        document.querySelectorAll('.chat-iris').forEach(function(iris) {
+          iris.style.animationName = '';
+          iris.style.transform = '';
+        });
+      }, 2500);
+    });
+  })();
+</script>
+
+<style is:global>
+  .chat-wrapper {
+    max-width: 720px; margin: 0 auto; width: 100%;
+    position: relative;
+  }
+  .chat-container {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 11rem);
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  /* Progress */
+  .progress-section { padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+  .progress-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8125rem; }
+  .progress-label { color: rgba(255, 255, 255, 0.6); }
+  .progress-value { color: #ffffff; font-weight: 600; }
+  .progress-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-bottom: 0.75rem; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.4s; }
+  .phases { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .phase-chip { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.08); color: rgba(255, 255, 255, 0.4); border: 1px solid transparent; }
+  .phase-chip.active { background: rgba(0,255,151,0.12); color: #00a4af; border-color: rgba(0,255,151,0.25); }
+  .phase-chip.done { background: rgba(56,161,105,0.08); color: #38a169; }
+
+  /* Messages */
+  .messages { flex: 1; overflow-y: auto; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; background: rgba(10,10,20,0.5); }
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.3); text-align: center; padding: 2rem; gap: 0.75rem; font-size: 0.875rem; }
+  .spinner { width: 20px; height: 20px; border: 2px solid rgba(0,255,151,0.2); border-top-color: #00ff97; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .message { display: flex; flex-direction: column; max-width: 75%; }
+  .msg-label { display: none; }
+  .user-msg { align-self: flex-end; }
+  .assistant-msg { align-self: flex-start; }
+
+  .bubble { padding: 0.6rem 0.9rem; border-radius: 18px; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .user-msg .bubble {
+    background: #00c853;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .assistant-msg .bubble {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.95);
+    border-bottom-left-radius: 4px;
+  }
+  .thinking-bubble { color: rgba(255, 255, 255, 0.35); font-style: italic; background: rgba(255,255,255,0.06) !important; }
+
+  /* Review/Launch CTAs */
+  .review-cta, .launch-cta {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.875rem 1.25rem;
+    background: rgba(0,255,151,0.08); border: 1px solid rgba(0,255,151,0.2);
+    border-radius: 8px; font-size: 0.875rem; color: #ffffff; gap: 1rem; flex-wrap: wrap;
+  }
+  .launch-cta-btns { display: flex; gap: 0.5rem; align-items: center; }
+  .review-btn, .btn-outline-sm {
+    color: #ffffff; padding: 0.4rem 1rem; border-radius: 6px;
+    text-decoration: none; font-size: 0.8125rem; font-weight: 500;
+    border: 1px solid rgba(0,255,151,0.3);
+  }
+  .btn-launch-sm {
+    background: #00ff97; color: #ffffff; border: none; border-radius: 6px;
+    padding: 0.4rem 1rem; font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+  }
+  .btn-launch-sm:hover { background: #00e088; }
+
+  /* ── Media widget ─────────────────────────────────────────────────────── */
+  .media-widget { margin-top: 0.5rem; width: 100%; max-width: 340px; }
+
+  .dz-zone {
+    border: 1.5px dashed rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s;
+    background: rgba(255,255,255,0.05);
+    position: relative;
+    overflow: hidden;
+    min-height: 90px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dz-zone:hover, .dz-zone.drag-over { border-color: #00ff97; background: rgba(0,255,151,0.06); }
+  .dz-zone.uploaded { border-color: #38a169; background: rgba(56,161,105,0.05); cursor: default; }
+
+  .dz-body { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+  .dz-icon { font-size: 1.25rem; color: #00ff97; }
+  .dz-label { font-size: 0.8125rem; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
+  .dz-hint { font-size: 0.7rem; color: rgba(255, 255, 255, 0.3); }
+
+  .dz-success { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; }
+  .dz-ok { font-size: 1.5rem; color: #38a169; }
+  .dz-ok-label { font-size: 0.75rem; color: #38a169; }
+  .dz-thumb { max-width: 120px; max-height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(56,161,105,0.2); }
+
+  .dz-footer { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+  .dz-skip-btn {
+    font-size: 0.75rem; color: rgba(255, 255, 255, 0.3); background: none; border: none; cursor: pointer; padding: 0.2rem 0;
+    text-decoration: underline; text-underline-offset: 2px;
+  }
+  .dz-skip-btn:hover { color: rgba(255, 255, 255, 0.5); }
+  .dz-skip-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Choice widget */
+  .dz-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+  .dz-choice-btn {
+    font-size: 0.8rem; color: rgba(255,255,255,0.65); background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px;
+    padding: 0.4rem 0.875rem; cursor: pointer; transition: all 0.15s;
+  }
+  .dz-choice-btn:hover { color: #ffffff; border-color: rgba(0,255,151,0.4); }
+  .dz-choice-btn.selected { background: rgba(0,255,151,0.12); color: #ffffff; border-color: rgba(0,255,151,0.4); }
+  .dz-choice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Input area wrapper */
+  .input-area { position: relative; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15,15,25,0.5); }
+
+  /* Type picker popup */
+  .type-picker {
+    position: absolute; bottom: calc(100% + 4px); left: 1rem;
+    background: rgba(25,25,40,0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; padding: 0.625rem 0.75rem; z-index: 20;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3); min-width: 240px;
+  }
+  .type-picker-label { font-size: 0.7rem; color: rgba(255,255,255,0.45); display: block; margin-bottom: 0.45rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .type-options { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .type-opt {
+    font-size: 0.8rem; color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+    padding: 0.35rem 0.7rem; cursor: pointer; transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .type-opt:hover { color: #ffffff; background: rgba(255,255,255,0.15); border-color: rgba(0,255,151,0.3); }
+
+  /* Input */
+  .input-form { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; align-items: flex-end; }
+  .chat-input { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 0.6rem 0.875rem; color: rgba(255,255,255,0.9); font-size: 0.9rem; outline: none; resize: none; overflow-y: auto; max-height: 150px; line-height: 1.4; font-family: inherit; }
+  .chat-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.15); }
+  .chat-input:disabled { opacity: 0.5; }
+  .chat-input::placeholder { color: rgba(255,255,255,0.3); }
+  .send-btn { background: #00ff97; color: #00020f; border: none; border-radius: 12px; padding: 0.6rem 1.25rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn:not(:disabled):hover { background: #00e088; }
+
+  /* Attach / paperclip button */
+  .attach-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.4);
+    border-radius: 8px; padding: 0.5rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .attach-btn:hover, .attach-btn.active {
+    color: #00ff97; border-color: rgba(0,255,151,0.4);
+    background: rgba(0,255,151,0.08);
+  }
+
+  /* Staged strip (ChatGPT-style image preview above input) */
+  .staged-strip { display: flex; gap: 0.5rem; flex-wrap: wrap; padding: 0.5rem 1rem 0; }
+  .staged-card { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); flex-shrink: 0; }
+  .staged-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .staged-type { position: absolute; bottom: 0; left: 0; right: 0; font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(0,0,0,0.55); color: #fff; text-align: center; padding: 0.1rem 0; }
+  .staged-remove { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; border: none; cursor: pointer; font-size: 0.75rem; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .staged-remove:hover { background: #e53e3e; }
+
+  /* Upload bubble */
+  .upload-bubble { background: rgba(0,255,151,0.1) !important; max-width: 320px; }
+  .upload-success { background: rgba(56,161,105,0.08) !important; }
+  .ub-thumbs-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+  .ub-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .ub-icon { font-size: 0.9rem; }
+  .ub-name { font-size: 0.8rem; color: #1a1a2e; word-break: break-all; flex: 1; }
+  .ub-type-tag { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: #00a4af; background: rgba(0,255,151,0.12); border-radius: 4px; padding: 0.1rem 0.4rem; }
+  .ub-thumb { width: 72px; height: 56px; object-fit: cover; border-radius: 4px; border: 1px solid rgba(0,0,0,0.06); }
+  .ub-text { font-size: 0.85rem; color: #1a1a2e; margin-top: 0.2rem; }
+  .ub-status { font-size: 0.75rem; color: #666; margin-top: 0.25rem; }
+
+  /* ── Chat peeping eyes & hand ───────────────────────────── */
+  .chat-eyes {
+    position: absolute; top: 0; right: 20px; transform: translateY(-50%);
+    display: flex; gap: 7px; pointer-events: none; z-index: 10;
+  }
+  /* Eye unit */
+  .chat-unit {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  /* Eyebrow */
+  .chat-brow {
+    width: 30px; height: 4px;
+    background: linear-gradient(90deg, #1a2240 0%, #263160 100%);
+    border-radius: 4px 4px 2px 2px;
+    transform: rotate(-5deg);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .chat-brow-r { transform: rotate(5deg); }
+  /* Eye globe */
+  .chat-eye {
+    width: 44px; height: 44px;
+    background: radial-gradient(circle at 40% 33%, #f5fffa, #dff5eb 62%, #c5e8d8);
+    border-radius: 50%;
+    border: 2px solid rgba(0,255,151,0.4);
+    box-shadow:
+      0 5px 20px rgba(0,0,0,0.6),
+      0 0 0 1px rgba(0,255,151,0.18),
+      inset 0 -5px 10px rgba(0,0,0,0.15),
+      inset 0 3px 6px rgba(255,255,255,0.5);
+    position: relative; overflow: hidden;
+  }
+  /* Upper eyelid */
+  .chat-eye::before {
+    content: ''; position: absolute; top: -1px; left: -1px; right: -1px;
+    height: 62%;
+    background: linear-gradient(to bottom, #101828 55%, rgba(16,24,40,0) 100%);
+    border-radius: 50% 50% 0 0 / 72% 72% 0 0;
+    transform: scaleY(0); transform-origin: top center;
+    animation: chat-blink 4.2s ease-in-out infinite; z-index: 4;
+  }
+  .chat-unit:last-child .chat-eye::before { animation-delay: 0.09s; }
+  /* Lower lash shadow */
+  .chat-eye::after {
+    content: ''; position: absolute; bottom: -1px; left: -1px; right: -1px;
+    height: 16%;
+    background: linear-gradient(to top, #101828, rgba(16,24,40,0));
+    border-radius: 0 0 50% 50% / 0 0 75% 75%; z-index: 4;
+  }
+  /* Iris */
+  .chat-iris {
+    width: 28px; height: 28px;
+    background:
+      radial-gradient(circle at 37% 33%, rgba(200,255,225,0.9) 0%, transparent 28%),
+      radial-gradient(circle at 37% 33%, #00ff97 0%, #00c870 30%, #006e3a 65%, #003320 100%);
+    border-radius: 50%; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -30%);
+    animation: chat-wander 7s ease-in-out infinite; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 1.5px rgba(0,0,0,0.3), inset 0 2px 5px rgba(255,255,255,0.18);
+  }
+  .chat-unit:last-child .chat-iris { animation-delay: -3.1s; }
+  /* Pupil */
+  .chat-pupil {
+    width: 13px; height: 13px;
+    background: radial-gradient(circle at 38% 36%, #1c2248, #040c1a);
+    border-radius: 50%; position: relative; flex-shrink: 0;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.7);
+  }
+  /* Catchlight 1 */
+  .chat-pupil::before {
+    content: ''; width: 4px; height: 4px;
+    background: rgba(255,255,255,0.93); border-radius: 50%;
+    position: absolute; top: 1.5px; right: 1.5px;
+  }
+  /* Catchlight 2 */
+  .chat-pupil::after {
+    content: ''; width: 2px; height: 2px;
+    background: rgba(255,255,255,0.55); border-radius: 50%;
+    position: absolute; bottom: 2px; left: 2.5px;
+  }
+  @keyframes chat-blink {
+    0%, 84% { transform: scaleY(0); }
+    88%      { transform: scaleY(1); }
+    93%      { transform: scaleY(1); }
+    97%, 100%{ transform: scaleY(0); }
+  }
+  @keyframes chat-wander {
+    0%, 50%  { transform: translate(-50%, -30%); }
+    57%      { transform: translate(-22%, -52%); }
+    63%      { transform: translate(-78%, -52%); }
+    69%      { transform: translate(-50%, -8%); }
+    76%, 100%{ transform: translate(-50%, -30%); }
+  }
+</style>

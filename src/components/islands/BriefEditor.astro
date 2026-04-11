@@ -1,0 +1,152 @@
+---
+// TODO: Full inline editing — coming in Step 2
+// For now: shows brief data + confirm button
+
+interface Props {
+  projectId: string;
+  brief: {
+    data: Record<string, any>;
+    completeness: number;
+    confirmed: boolean;
+  };
+}
+
+const { projectId, brief } = Astro.props;
+
+const business = brief.data?.business ?? {};
+const branding = brief.data?.branding ?? {};
+const sections = brief.data?.content?.sections ?? [];
+---
+
+<div class="brief-editor">
+  <div class="header">
+    <div>
+      <h2>Brief Summary</h2>
+      <p class="subtitle">Review your brief before generating the site.</p>
+    </div>
+    <div class="completeness">
+      <span class="completeness-value">{Math.round(brief.completeness * 100)}%</span>
+      <span class="completeness-label">complete</span>
+    </div>
+  </div>
+
+  {business.name && (
+    <div class="section">
+      <h3>Business</h3>
+      <dl>
+        {business.name && <><dt>Name</dt><dd>{business.name}</dd></>}
+        {business.industry && <><dt>Industry</dt><dd>{business.industry}</dd></>}
+        {business.description && <><dt>Description</dt><dd>{business.description}</dd></>}
+        {business.usp && <><dt>USP</dt><dd>{business.usp}</dd></>}
+      </dl>
+    </div>
+  )}
+
+  {brief.data?.content?.heroHeadline && (
+    <div class="section">
+      <h3>Content</h3>
+      <dl>
+        <dt>Hero Headline</dt><dd>{brief.data.content.heroHeadline}</dd>
+        {brief.data.content.heroSubtext && <><dt>Hero Subtext</dt><dd>{brief.data.content.heroSubtext}</dd></>}
+        {brief.data.content.heroCTA?.text && <><dt>CTA</dt><dd>{brief.data.content.heroCTA.text}</dd></>}
+      </dl>
+      {sections.length > 0 && (
+        <div class="sections-list">
+          <span class="sections-label">Sections ({sections.length}):</span>
+          {sections.map((s: any, i: number) => (
+            <span class="section-chip">{s.type || s.headline || `Section ${i + 1}`}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )}
+
+  {(branding.personality || branding.style) && (
+    <div class="section">
+      <h3>Branding</h3>
+      <dl>
+        {branding.personality && <><dt>Personality</dt><dd>{branding.personality}</dd></>}
+        {branding.style && <><dt>Style</dt><dd>{branding.style}</dd></>}
+        {branding.colors?.primary && (
+          <>
+            <dt>Primary color</dt>
+            <dd>
+              <span class="color-swatch" style={`background: ${branding.colors.primary}`}></span>
+              {branding.colors.primary}
+            </dd>
+          </>
+        )}
+        {branding.fonts?.heading && <><dt>Heading font</dt><dd>{branding.fonts.heading}</dd></>}
+      </dl>
+    </div>
+  )}
+
+  <div id="error-msg" class="error" hidden></div>
+
+  <div class="actions">
+    <a href={`/dashboard/${projectId}/onboarding`} class="edit-btn">← Edit in Chat</a>
+    <button
+      id="confirm-btn"
+      disabled={brief.confirmed}
+      class={brief.confirmed ? 'confirmed-btn' : 'confirm-btn'}
+    >
+      {brief.confirmed ? '✓ Confirmed' : 'Confirm & Generate Site →'}
+    </button>
+  </div>
+</div>
+
+<script define:vars={{ projectId, alreadyConfirmed: brief.confirmed }}>
+  const btn = document.getElementById('confirm-btn');
+  const errorMsg = document.getElementById('error-msg');
+
+  if (!alreadyConfirmed && btn) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Confirming…';
+      errorMsg.hidden = true;
+
+      try {
+        const res = await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
+        if (res.ok) {
+          window.location.href = `/dashboard/${projectId}`;
+        } else {
+          const data = await res.json();
+          errorMsg.textContent = data.error || 'Failed to confirm brief.';
+          errorMsg.hidden = false;
+          btn.disabled = false;
+          btn.textContent = 'Confirm & Generate Site →';
+        }
+      } catch {
+        errorMsg.textContent = 'Network error. Please try again.';
+        errorMsg.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'Confirm & Generate Site →';
+      }
+    });
+  }
+</script>
+
+<style>
+  .brief-editor { display: flex; flex-direction: column; gap: 1.5rem; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; }
+  h2 { font-size: 1.25rem; font-weight: 700; color: #e8e8e8; margin: 0; }
+  .subtitle { color: #666; font-size: 0.875rem; margin-top: 0.25rem; }
+  .completeness { text-align: right; }
+  .completeness-value { display: block; font-size: 1.75rem; font-weight: 700; color: #7c3aed; line-height: 1; }
+  .completeness-label { font-size: 0.75rem; color: rgba(255, 255, 255, 0.4); }
+  .section { background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 8px; padding: 1.25rem; }
+  h3 { font-size: 0.8125rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.875rem; }
+  dl { display: grid; grid-template-columns: 140px 1fr; gap: 0.4rem 1rem; font-size: 0.875rem; }
+  dt { color: rgba(255, 255, 255, 0.4); font-weight: 500; }
+  dd { color: #ccc; margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+  .color-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1); }
+  .sections-list { margin-top: 0.875rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .sections-label { font-size: 0.8rem; color: rgba(255, 255, 255, 0.4); }
+  .section-chip { font-size: 0.75rem; padding: 0.2rem 0.6rem; background: #1e1e1e; border-radius: 4px; color: #888; }
+  .error { color: #f87171; font-size: 0.875rem; background: rgba(239,68,68,0.08); padding: 0.6rem 0.875rem; border-radius: 6px; border: 1px solid rgba(239,68,68,0.2); }
+  .actions { display: flex; gap: 1rem; justify-content: flex-end; align-items: center; }
+  .edit-btn { color: #666; text-decoration: none; font-size: 0.875rem; }
+  .confirm-btn { background: #7c3aed; color: #fff; border: none; border-radius: 6px; padding: 0.7rem 1.5rem; font-size: 0.9rem; font-weight: 500; cursor: pointer; }
+  .confirm-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .confirmed-btn { background: rgba(34,197,94,0.1); color: #22c55e; border: 1px solid rgba(34,197,94,0.2); border-radius: 6px; padding: 0.7rem 1.5rem; font-size: 0.9rem; font-weight: 500; cursor: default; }
+</style>

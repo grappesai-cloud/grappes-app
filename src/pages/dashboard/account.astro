@@ -1,0 +1,378 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { db } from '../../lib/db';
+import { getEditQuota } from '../../lib/edit-quota';
+
+const authUser = Astro.locals.user!;
+const dbUser = await db.users.findById(authUser.id);
+const projects = dbUser ? await db.projects.findByUser(dbUser.id) : [];
+const quota = await getEditQuota(authUser.id);
+
+const totalCount = dbUser ? await db.projects.countByUser(dbUser.id) : 0;
+const totalEditsAvailable = quota.limit + quota.extra;
+const totalEditsUsed = quota.used;
+const totalRemaining = Math.max(0, totalEditsAvailable - totalEditsUsed);
+const quotaDisplay = quota.limit > 0
+  ? `${quota.used} / ${quota.limit}${quota.extra > 0 ? ` + ${quota.extra} extra` : ''}`
+  : `${totalRemaining} ${quota.extra > 0 ? 'extra' : ''} disponibile`.trim();
+
+const hasMultipage         = !!dbUser?.multipage_addon;
+const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
+---
+
+<Dashboard title="Cont">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link" data-en="← Dashboard">← Panou</a>
+    <h1 data-en="Account">Cont</h1>
+  </div>
+
+  <div class="sections">
+
+    <!-- Profile -->
+    <section class="card">
+      <h2 data-en="Profile">Profil</h2>
+      <div class="field-row">
+        <span class="field-label" data-en="Email">Email</span>
+        <span class="field-value" data-user-email={authUser.email}>{authUser.email}</span>
+      </div>
+      <div class="divider"></div>
+      <p class="help" data-en="To change your password, we'll send a reset link to your email.">Pentru a schimba parola, îți trimitem un link de resetare pe email.</p>
+      <button id="reset-btn" class="btn-secondary" data-en="Send reset email">Trimite email de resetare</button>
+      <div id="reset-msg" class="reset-msg" hidden></div>
+    </section>
+
+    <!-- Language -->
+    <section class="card">
+      <h2 data-en="Language">Limbă</h2>
+      <div class="lang-toggle">
+        <button class="lang-btn" id="lang-ro" data-lang="ro">🇷🇴 Română</button>
+        <button class="lang-btn" id="lang-en" data-lang="en">🇬🇧 English</button>
+      </div>
+    </section>
+
+    <!-- Usage -->
+    <section class="card">
+      <h2 data-en="Usage">Utilizare</h2>
+      <div class="field-row">
+        <span class="field-label" data-en="Total projects">Proiecte totale</span>
+        <span class="field-value">{totalCount}</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label" data-en="AI edits this month">Editări AI luna aceasta</span>
+        <span class="field-value">{quotaDisplay}</span>
+      </div>
+      <div class="divider"></div>
+      <button id="buy-edits-btn" class="btn-secondary" data-en="Buy 10 extra edits — €5">Cumpără 10 editări extra — 5€</button>
+      <div id="edits-msg" class="reset-msg" hidden></div>
+    </section>
+
+    <!-- Multipage Add-on -->
+    <section class="card">
+      <h2 data-en="Multipage Add-on">Add-on Multi-pagini</h2>
+      {hasMultipage ? (
+        <div class="addon-active">
+          <span class="badge-active" data-en="Active" >Activ</span>
+          {isMultipageLifetime
+            ? <span class="addon-type" data-en="Lifetime — never expires">Lifetime — nu expiră niciodată</span>
+            : <span class="addon-type" data-en="Subscription — renews automatically">Abonament — se reînnoiește automat</span>
+          }
+        </div>
+        <p class="help" data-en="You can generate unlimited pages per site." >Poți genera pagini nelimitate per site.</p>
+      ) : (
+        <>
+          <p class="help" data-en="Unlock multi-page websites. Choose your plan below.">Deblochează website-uri multi-pagini. Alege planul de mai jos.</p>
+          <div class="addon-plans">
+            <button class="btn-addon" id="addon-month-btn" data-interval="month">
+              <span class="addon-plan-name" data-en="Monthly">Lunar</span>
+              <span class="addon-plan-price">€9 / <span data-en="mo">lună</span></span>
+            </button>
+            <button class="btn-addon" id="addon-year-btn" data-interval="year">
+              <span class="addon-plan-name" data-en="Annual">Anual</span>
+              <span class="addon-plan-price">€49 / <span data-en="yr">an</span></span>
+            </button>
+            <button class="btn-addon btn-addon-lifetime" id="addon-lifetime-btn" data-interval="lifetime">
+              <span class="addon-plan-name" data-en="Lifetime">Lifetime</span>
+              <span class="addon-plan-price">€499</span>
+            </button>
+          </div>
+          <div id="addon-msg" class="reset-msg" hidden></div>
+        </>
+      )}
+    </section>
+
+    <!-- Support -->
+    <section class="card">
+      <h2 data-en="Support">Suport</h2>
+      <p class="help" data-en="Need help? Chat with us directly on WhatsApp.">Ai nevoie de ajutor? Scrie-ne direct pe WhatsApp.</p>
+      <a href="https://wa.me/40770279935" target="_blank" rel="noopener" class="btn-whatsapp">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        <span data-en="Chat on WhatsApp">Scrie pe WhatsApp</span>
+      </a>
+    </section>
+
+    <!-- Danger zone -->
+    <section class="card danger-zone">
+      <h2 data-en="Danger Zone">Zonă periculoasă</h2>
+      <p class="help" data-en="Permanently delete your account and all associated data. This action cannot be undone.">Șterge permanent contul tău și toate datele asociate. Această acțiune nu poate fi anulată.</p>
+      <button id="delete-account-btn" class="btn-danger" data-en="Delete my account">Șterge contul meu</button>
+      <p id="delete-msg" class="reset-msg" hidden></p>
+    </section>
+
+  </div>
+</Dashboard>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+  const supabase = createClient(
+    import.meta.env.PUBLIC_SUPABASE_URL,
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+  );
+
+  // ── Stripe checkout helper ────────────────────────────────────────────────
+  async function redirectToCheckout(endpoint: string, body: object, btnEl: HTMLButtonElement, msgEl: HTMLElement, loadingText: string) {
+    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const originalHtml = btnEl.innerHTML; // preserve inner HTML (spans, etc.)
+    btnEl.disabled = true;
+    btnEl.textContent = loadingText;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        msgEl.hidden = false;
+        msgEl.className = 'reset-msg error';
+        msgEl.textContent = data.error || (_isEn ? 'Something went wrong.' : 'Ceva n-a mers.');
+        btnEl.disabled = false;
+        btnEl.innerHTML = originalHtml;
+      }
+    } catch {
+      msgEl.hidden = false;
+      msgEl.className = 'reset-msg error';
+      msgEl.textContent = _isEn ? 'Network error. Try again.' : 'Eroare de rețea. Încearcă din nou.';
+      btnEl.disabled = false;
+      btnEl.innerHTML = originalHtml;
+    }
+  }
+
+  // Multipage add-on buttons
+  ['month', 'year', 'lifetime'].forEach(interval => {
+    document.getElementById(`addon-${interval}-btn`)?.addEventListener('click', () => {
+      const btn = document.getElementById(`addon-${interval}-btn`) as HTMLButtonElement;
+      const msg = document.getElementById('addon-msg')!;
+      const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+      redirectToCheckout('/api/billing/multipage-addon', { interval }, btn, msg,
+        _isEn ? 'Redirecting…' : 'Se redirecționează…'
+      );
+    });
+  });
+
+  // Buy extra edits
+  document.getElementById('buy-edits-btn')?.addEventListener('click', () => {
+    const btn = document.getElementById('buy-edits-btn') as HTMLButtonElement;
+    const msg = document.getElementById('edits-msg')!;
+    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    redirectToCheckout('/api/billing/buy-edits', {}, btn, msg,
+      _isEn ? 'Redirecting…' : 'Se redirecționează…'
+    );
+  });
+
+  // Password reset
+  document.getElementById('reset-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('reset-btn') as HTMLButtonElement;
+    const msg = document.getElementById('reset-msg')!;
+    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    btn.disabled = true;
+    btn.textContent = _isEn ? 'Sending…' : 'Se trimite…';
+
+    const email = document.querySelector<HTMLElement>('[data-user-email]')?.dataset.userEmail ?? '';
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    msg.hidden = false;
+    if (error) {
+      msg.className = 'reset-msg error';
+      msg.textContent = _isEn ? 'Error sending email. Please try again.' : 'Eroare la trimitere. Încearcă din nou.';
+    } else {
+      msg.className = 'reset-msg success';
+      msg.textContent = _isEn ? 'Email sent! Check your inbox.' : 'Email trimis! Verifică inbox-ul.';
+    }
+    btn.disabled = false;
+    btn.textContent = _isEn ? 'Send reset email' : 'Trimite email de resetare';
+  });
+
+  // Language toggle
+  const currentLang = (localStorage.getItem('i18nextLng')||'ro').split('-')[0];
+  document.getElementById(`lang-${currentLang}`)?.classList.add('active');
+
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = (btn as HTMLElement).dataset.lang!;
+      localStorage.setItem('i18nextLng', lang);
+      window.location.reload();
+    });
+  });
+
+  // Delete account
+  document.getElementById('delete-account-btn')?.addEventListener('click', async () => {
+    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const msg1 = _isEn
+      ? 'Are you sure? This will permanently delete your account, all projects, and all data. This cannot be undone.'
+      : 'Ești sigur? Aceasta va șterge permanent contul, toate proiectele și toate datele. Nu se poate anula.';
+    if (!confirm(msg1)) return;
+    const msg2 = _isEn
+      ? 'Type DELETE to confirm:'
+      : 'Scrie DELETE pentru confirmare:';
+    const confirmation = prompt(msg2);
+    if (confirmation !== 'DELETE') return;
+
+    const btn = document.getElementById('delete-account-btn') as HTMLButtonElement;
+    const msgEl = document.getElementById('delete-msg')!;
+    btn.disabled = true;
+    btn.textContent = _isEn ? 'Deleting…' : 'Se șterge…';
+
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/sign-in';
+      } else {
+        msgEl.hidden = false;
+        msgEl.className = 'reset-msg error';
+        msgEl.textContent = data.error || (_isEn ? 'Deletion failed.' : 'Ștergerea a eșuat.');
+        btn.disabled = false;
+        btn.textContent = _isEn ? 'Delete my account' : 'Șterge contul meu';
+      }
+    } catch {
+      msgEl.hidden = false;
+      msgEl.className = 'reset-msg error';
+      msgEl.textContent = _isEn ? 'Network error.' : 'Eroare de rețea.';
+      btn.disabled = false;
+      btn.textContent = _isEn ? 'Delete my account' : 'Șterge contul meu';
+    }
+  });
+</script>
+
+<style>
+  .page-header { margin-bottom: 2.5rem; }
+  .back-link {
+    color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.875rem;
+    display: inline-block; margin-bottom: 1rem;
+    transition: color 0.2s;
+  }
+  .back-link:hover { color: #fff; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 700; letter-spacing: -0.03em; color: #fff;
+  }
+
+  .sections { display: flex; flex-direction: column; gap: 1.5rem; max-width: 560px; }
+
+  .card {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 1.75rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.9375rem; font-weight: 600; color: #fff; margin: 0;
+  }
+  .field-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .field-label { font-size: 0.875rem; color: rgba(255,255,255,0.5); }
+  .field-value { font-size: 0.875rem; color: #fff; font-weight: 500; }
+  .divider { height: 1px; background: rgba(255,255,255,0.06); }
+  .help { font-size: 0.875rem; color: rgba(255,255,255,0.45); margin: 0; line-height: 1.6; }
+
+  .btn-secondary {
+    background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
+    padding: 10px 20px; font-size: 0.875rem; font-weight: 500;
+    cursor: pointer; align-self: flex-start;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .reset-msg { font-size: 0.875rem; padding: 0.75rem 1rem; border-radius: 12px; }
+  .reset-msg.success { background: rgba(56,161,105,0.08); border: 1px solid rgba(56,161,105,0.2); color: #38a169; }
+  .reset-msg.error { background: rgba(229,62,62,0.06); border: 1px solid rgba(229,62,62,0.2); color: #e53e3e; }
+
+  /* Language toggle */
+  .lang-toggle { display: flex; gap: 0.5rem; }
+  .lang-btn {
+    flex: 1; padding: 10px; border-radius: 12px; font-size: 0.875rem; font-weight: 500;
+    background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .lang-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .lang-btn.active {
+    background: rgba(0,255,151,0.1); color: #00ff97;
+    border-color: rgba(0,255,151,0.3);
+  }
+
+  /* Multipage add-on */
+  .addon-active { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .badge-active {
+    display: inline-flex; align-items: center;
+    background: rgba(0,255,151,0.12); color: #00ff97;
+    border: 1px solid rgba(0,255,151,0.25);
+    border-radius: 8px; padding: 3px 10px;
+    font-size: 0.8rem; font-weight: 600;
+  }
+  .addon-type { font-size: 0.8375rem; color: rgba(255,255,255,0.45); }
+
+  .addon-plans { display: flex; gap: 0.625rem; flex-wrap: wrap; }
+  .btn-addon {
+    display: flex; flex-direction: column; align-items: flex-start;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px; padding: 12px 18px;
+    cursor: pointer; transition: all 0.2s; flex: 1; min-width: 90px;
+  }
+  .btn-addon:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+  .btn-addon:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-addon-lifetime {
+    background: rgba(0,255,151,0.06);
+    border-color: rgba(0,255,151,0.2);
+  }
+  .btn-addon-lifetime:hover { background: rgba(0,255,151,0.12); border-color: rgba(0,255,151,0.35); }
+  .addon-plan-name { font-size: 0.75rem; color: rgba(255,255,255,0.5); font-weight: 500; }
+  .addon-plan-price { font-size: 1rem; color: #fff; font-weight: 700; margin-top: 2px; }
+  .btn-addon-lifetime .addon-plan-name { color: rgba(0,255,151,0.7); }
+  .btn-addon-lifetime .addon-plan-price { color: #00ff97; }
+
+  /* WhatsApp button */
+  .btn-whatsapp {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #25d366; color: #fff;
+    border-radius: 14px; padding: 11px 20px;
+    font-size: 0.9rem; font-weight: 600; text-decoration: none;
+    align-self: flex-start;
+    transition: all 0.2s;
+  }
+  .btn-whatsapp:hover { background: #20c05c; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,211,102,0.3); }
+
+  /* Danger zone */
+  .danger-zone { border-color: rgba(239,68,68,0.2); }
+  .danger-zone h2 { color: #f87171; }
+  .btn-danger {
+    background: rgba(239,68,68,0.12); color: #f87171;
+    border: 1px solid rgba(239,68,68,0.3); border-radius: 12px;
+    padding: 10px 20px; font-size: 0.875rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; align-self: flex-start;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>

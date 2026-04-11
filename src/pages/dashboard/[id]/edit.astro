@@ -1,0 +1,892 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+import { db } from '../../../lib/db';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const project = await db.projects.findById(id!);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+
+const allowedStatuses = ['generated', 'live', 'deploying', 'failed'];
+if (!allowedStatuses.includes(project.status)) {
+  return Astro.redirect(`/dashboard/${id}`);
+}
+
+const previewUrl = `/preview/${project.id}`;
+const isLive = project.status === 'live';
+---
+
+<Dashboard title={`Edit — ${project.name}`} projectId={project.id}>
+  <div class="edit-layout">
+
+    <!-- Sidebar -->
+    <aside class="edit-sidebar">
+      <div class="sidebar-header">
+        <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back">← Înapoi</a>
+        <h1>{project.name}</h1>
+        <p class="sidebar-sub" data-en="Double-click any element to edit">Dublu-click pe orice element</p>
+      </div>
+
+      <!-- Sections list -->
+      <div class="sidebar-sections" id="sidebar-sections"></div>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-actions">
+        {isLive && project.preview_url && !project.preview_url.startsWith('/') && (
+          <a href={project.preview_url} target="_blank" rel="noopener" class="view-live-btn" data-en="View Live ↗">
+            Vezi Live ↗
+          </a>
+        )}
+        <button class="publish-btn" id="publish-btn">
+          <span id="publish-label" data-en={isLive ? 'Re-publish' : 'Publish to Web ✦'}>
+            {isLive ? 'Re-publicare' : 'Publică pe Web ✦'}
+          </span>
+          <span id="publish-spinner" class="spinner" style="display:none"></span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Preview -->
+    <div class="preview-col">
+      <div class="iframe-bar">
+        <span class="iframe-label" id="iframe-label" data-en="Preview">Previzualizare</span>
+        <div class="iframe-bar-right">
+          <span class="deploy-status" id="deploy-status"></span>
+          <button class="refresh-btn" id="refresh-btn" title="Reload preview">↺</button>
+        </div>
+      </div>
+      <div class="iframe-container">
+        <iframe id="preview-iframe" title="Site preview" src={`${previewUrl}?edit=1`}></iframe>
+      </div>
+    </div>
+
+    <!-- Floating toolbar (hidden until element selected) -->
+    <div id="wn-toolbar" class="wn-toolbar">
+      <!-- Text formatting group -->
+      <div class="toolbar-section tb-group" id="tb-text" style="display:none">
+        <select id="tb-font-family" class="tb-select" title="Font family"></select>
+        <input type="number" id="tb-font-size" class="tb-number" min="8" max="120" title="Font size (px)" />
+        <span class="tb-sep"></span>
+        <button id="tb-bold" class="tb-toggle" title="Bold">B</button>
+        <button id="tb-italic" class="tb-toggle tb-italic" title="Italic">I</button>
+        <span class="tb-sep"></span>
+        <button id="tb-align-left" class="tb-toggle" title="Align left">☰</button>
+        <button id="tb-align-center" class="tb-toggle" title="Align center">☰</button>
+        <button id="tb-align-right" class="tb-toggle" title="Align right">☰</button>
+      </div>
+      <!-- Colors group -->
+      <div class="toolbar-section tb-group" id="tb-colors" style="display:none">
+        <label>A</label>
+        <input type="color" id="tb-text-color" title="Text color" />
+        <span class="tb-sep"></span>
+        <label>⬛</label>
+        <input type="color" id="tb-bg-color" title="Background color" />
+      </div>
+      <!-- Container-only bg -->
+      <div class="toolbar-section tb-group" id="tb-bg-only" style="display:none">
+        <label data-en="Background">Fundal</label>
+        <input type="color" id="tb-bg-color-only" />
+      </div>
+      <div class="toolbar-hint" id="tb-hint" data-en="Double-click to edit text">Dublu-click pentru editare text</div>
+    </div>
+
+    <!-- Text edit dialog (centered) -->
+    <div id="text-dialog" class="image-dialog">
+      <div class="image-dialog-backdrop" id="text-dialog-backdrop"></div>
+      <div class="image-dialog-box">
+        <p class="image-dialog-title" id="text-dialog-title" data-en="Edit text">Editează textul</p>
+        <textarea id="text-dialog-input" class="text-dialog-input" rows="4"></textarea>
+        <div class="image-dialog-actions">
+          <button id="text-dialog-cancel" class="image-btn-cancel" data-en="Cancel">Anulează</button>
+          <button id="text-dialog-apply" class="image-btn-apply" data-en="Apply">Aplică</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image edit dialog (centered, prominent) -->
+    <div id="image-dialog" class="image-dialog">
+      <div class="image-dialog-backdrop" id="image-dialog-backdrop"></div>
+      <div class="image-dialog-box">
+        <p class="image-dialog-title" data-en="Change image">Schimbă imaginea</p>
+        <img id="image-dialog-preview" class="image-dialog-preview" src="" alt="preview" />
+        <div class="image-dialog-field">
+          <label data-en="Image URL">URL imagine</label>
+          <input type="text" id="tb-image-url" placeholder="https://..." />
+        </div>
+        <div class="image-dialog-or" data-en="or">sau</div>
+        <div class="image-dialog-field">
+          <label data-en="Upload from device">Încarcă de pe dispozitiv</label>
+          <input type="file" id="tb-image-file" accept="image/*" />
+        </div>
+        <div class="image-dialog-actions">
+          <button id="tb-image-cancel" class="image-btn-cancel" data-en="Cancel">Anulează</button>
+          <button id="tb-image-apply" class="image-btn-apply" data-en="Apply">Aplică</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</Dashboard>
+
+<script define:vars={{ projectId: id, previewUrl }}>
+  const iframe = document.getElementById('preview-iframe');
+  const toolbar = document.getElementById('wn-toolbar');
+  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+
+  let selectedWnId = null;
+  let selectedType = null;
+  let saveTimer = null;
+
+  // ── Listen for messages from iframe ──────────────────────────────────────
+  window.addEventListener('message', function(e) {
+    if (!e.data || !e.data.type) return;
+
+    // Element selected
+    if (e.data.type === 'wn-select') {
+      selectedWnId = e.data.wnId;
+      selectedType = e.data.elType;
+      showToolbar(e.data);
+    }
+
+    // Element deselected
+    if (e.data.type === 'wn-deselect') {
+      selectedWnId = null;
+      toolbar.classList.remove('visible');
+      hideImageDialog();
+      hideTextDialog();
+    }
+
+    // Text edit requested
+    if (e.data.type === 'wn-request-text') {
+      selectedWnId = e.data.wnId;
+      iframe.contentWindow.postMessage({ type: 'wn-text-dialog-ack' }, '*');
+      showTextDialog(e.data.text, e.data.tag);
+    }
+
+    // Edit committed from iframe (text change or style)
+    if (e.data.type === 'wn-edit') {
+      saveEdit(e.data.wnId, e.data.prop, e.data.value);
+    }
+
+    // Image picker requested
+    if (e.data.type === 'wn-request-image') {
+      selectedWnId = e.data.wnId;
+      selectedType = 'image';
+      // Ack immediately so iframe cancels prompt fallback
+      iframe.contentWindow.postMessage({ type: 'wn-image-dialog-ack' }, '*');
+      showImageDialog(e.data.currentSrc);
+    }
+
+    // Sections ready
+    if (e.data.type === 'sections-ready') {
+      renderSections(e.data.sectionIds);
+    }
+  });
+
+  function showToolbar(data) {
+    // Always hide toolbar first
+    toolbar.classList.remove('visible');
+
+    var tbText    = document.getElementById('tb-text');
+    var tbColors  = document.getElementById('tb-colors');
+    var tbBgOnly  = document.getElementById('tb-bg-only');
+    var tbHint    = document.getElementById('tb-hint');
+
+    tbText.style.display   = 'none';
+    tbColors.style.display = 'none';
+    tbBgOnly.style.display = 'none';
+    tbHint.style.display   = 'none';
+
+    if (data.elType === 'text') {
+      tbText.style.display   = 'flex';
+      tbColors.style.display = 'flex';
+      tbHint.style.display   = 'block';
+
+      // Populate font dropdown
+      var fontSel = document.getElementById('tb-font-family');
+      var currentFont = (data.fontFamily || '').split(',')[0].replace(/['"]/g, '').trim();
+      var fonts = data.fonts || [];
+      if (currentFont && fonts.indexOf(currentFont) === -1) fonts.unshift(currentFont);
+      fonts = ['sans-serif', 'serif', 'monospace'].concat(fonts);
+      fontSel.innerHTML = fonts.map(function(f) {
+        return '<option value="' + f + '"' + (f === currentFont ? ' selected' : '') + '>' + f + '</option>';
+      }).join('');
+
+      // Font size
+      document.getElementById('tb-font-size').value = data.fontSize || 16;
+
+      // Bold / Italic states
+      var isBold = parseInt(data.fontWeight) >= 600 || data.fontWeight === 'bold';
+      var isItalic = data.fontStyle === 'italic';
+      document.getElementById('tb-bold').classList.toggle('active', isBold);
+      document.getElementById('tb-italic').classList.toggle('active', isItalic);
+
+      // Alignment
+      var align = data.textAlign || 'left';
+      if (align === 'start') align = 'left';
+      if (align === 'end') align = 'right';
+      document.getElementById('tb-align-left').classList.toggle('active', align === 'left');
+      document.getElementById('tb-align-center').classList.toggle('active', align === 'center');
+      document.getElementById('tb-align-right').classList.toggle('active', align === 'right');
+
+      // Colors
+      document.getElementById('tb-text-color').value = rgbToHex(data.color);
+      document.getElementById('tb-bg-color').value = rgbToHex(data.bgColor);
+
+    } else if (data.elType === 'image') {
+      return; // dblclick opens dialog
+    } else {
+      tbBgOnly.style.display = 'flex';
+      document.getElementById('tb-bg-color-only').value = rgbToHex(data.bgColor);
+    }
+
+    toolbar.classList.add('visible');
+  }
+
+  function showImageDialog(currentSrc) {
+    var dialog = document.getElementById('image-dialog');
+    document.getElementById('tb-image-url').value = currentSrc || '';
+    document.getElementById('tb-image-file').value = '';
+    var preview = document.getElementById('image-dialog-preview');
+    preview.src = currentSrc || '';
+    preview.style.display = currentSrc ? 'block' : 'none';
+    dialog.classList.add('visible');
+    toolbar.classList.remove('visible');
+    document.getElementById('tb-image-url').focus();
+  }
+
+  function hideImageDialog() {
+    document.getElementById('image-dialog').classList.remove('visible');
+  }
+
+  function showTextDialog(text, tag) {
+    toolbar.classList.remove('visible');
+    var dialog = document.getElementById('text-dialog');
+    var input = document.getElementById('text-dialog-input');
+    input.value = text || '';
+    input.rows = text && text.length > 80 ? 6 : 3;
+    dialog.classList.add('visible');
+    input.focus();
+    input.select();
+  }
+
+  function hideTextDialog() {
+    document.getElementById('text-dialog').classList.remove('visible');
+  }
+
+  // Text dialog apply
+  document.getElementById('text-dialog-apply').addEventListener('click', function() {
+    var newText = document.getElementById('text-dialog-input').value;
+    if (selectedWnId && newText !== undefined) {
+      iframe.contentWindow.postMessage({ type: 'wn-update-text', wnId: selectedWnId, value: newText }, '*');
+      saveEdit(selectedWnId, 'innerHTML', newText);
+      hideTextDialog();
+    }
+  });
+
+  // Text dialog cancel
+  document.getElementById('text-dialog-cancel').addEventListener('click', hideTextDialog);
+  document.getElementById('text-dialog-backdrop').addEventListener('click', hideTextDialog);
+
+  // Text dialog Enter to apply (without shift)
+  document.getElementById('text-dialog-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('text-dialog-apply').click();
+    }
+    if (e.key === 'Escape') hideTextDialog();
+  });
+
+  // ── Toolbar controls ──────────────────────────────────────────────────────
+
+  function applyStyle(prop, cssProp, value) {
+    if (!selectedWnId) return;
+    iframe.contentWindow.postMessage({
+      type: 'wn-update-style', wnId: selectedWnId, prop: prop, value: value
+    }, '*');
+    debounceSave(selectedWnId, cssProp, value);
+  }
+
+  // Text color
+  document.getElementById('tb-text-color').addEventListener('input', function(e) {
+    applyStyle('color', 'color', e.target.value);
+  });
+
+  // Background color (text toolbar)
+  document.getElementById('tb-bg-color').addEventListener('input', function(e) {
+    applyStyle('backgroundColor', 'background-color', e.target.value);
+  });
+
+  // Background color (container-only toolbar)
+  document.getElementById('tb-bg-color-only').addEventListener('input', function(e) {
+    applyStyle('backgroundColor', 'background-color', e.target.value);
+  });
+
+  // Font family
+  document.getElementById('tb-font-family').addEventListener('change', function(e) {
+    applyStyle('fontFamily', 'font-family', e.target.value);
+  });
+
+  // Font size
+  document.getElementById('tb-font-size').addEventListener('change', function(e) {
+    applyStyle('fontSize', 'font-size', e.target.value + 'px');
+  });
+
+  // Bold toggle
+  document.getElementById('tb-bold').addEventListener('click', function() {
+    this.classList.toggle('active');
+    var val = this.classList.contains('active') ? '700' : '400';
+    applyStyle('fontWeight', 'font-weight', val);
+  });
+
+  // Italic toggle
+  document.getElementById('tb-italic').addEventListener('click', function() {
+    this.classList.toggle('active');
+    var val = this.classList.contains('active') ? 'italic' : 'normal';
+    applyStyle('fontStyle', 'font-style', val);
+  });
+
+  // Alignment buttons
+  ['left', 'center', 'right'].forEach(function(dir) {
+    document.getElementById('tb-align-' + dir).addEventListener('click', function() {
+      document.getElementById('tb-align-left').classList.remove('active');
+      document.getElementById('tb-align-center').classList.remove('active');
+      document.getElementById('tb-align-right').classList.remove('active');
+      this.classList.add('active');
+      applyStyle('textAlign', 'text-align', dir);
+    });
+  });
+
+  // Image apply (URL)
+  document.getElementById('tb-image-apply').addEventListener('click', function() {
+    var url = document.getElementById('tb-image-url').value.trim();
+    if (!url || !selectedWnId) return;
+    applyImage(selectedWnId, url);
+  });
+
+  // Image URL enter key
+  document.getElementById('tb-image-url').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('tb-image-apply').click();
+  });
+
+  // Image file upload — upload via asset pipeline (WebP conversion, Supabase storage)
+  document.getElementById('tb-image-file').addEventListener('change', async function(e) {
+    var file = e.target.files[0];
+    if (!file || !selectedWnId) return;
+    if (file.size > 10 * 1024 * 1024) { flashStatus('⚠ Max 10MB'); return; }
+
+    // Show local preview immediately
+    var localUrl = URL.createObjectURL(file);
+    document.getElementById('image-dialog-preview').src = localUrl;
+    document.getElementById('image-dialog-preview').style.display = 'block';
+    document.getElementById('tb-image-url').value = 'Uploading...';
+
+    try {
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'section');
+      var res = await fetch('/api/assets/' + projectId + '/upload', { method: 'POST', body: formData });
+      var data = await res.json();
+      if (!res.ok) { flashStatus('⚠ ' + (data.error || 'Upload failed')); return; }
+      var publicUrl = data.asset?.public_url || data.publicUrl;
+      if (publicUrl) {
+        document.getElementById('tb-image-url').value = publicUrl;
+        applyImage(selectedWnId, publicUrl);
+      } else {
+        flashStatus('⚠ Upload failed — no URL returned');
+      }
+    } catch (err) {
+      console.error('[image upload]', err);
+      flashStatus('⚠ Upload error');
+    } finally {
+      URL.revokeObjectURL(localUrl);
+    }
+  });
+
+  // Image cancel
+  document.getElementById('tb-image-cancel').addEventListener('click', hideImageDialog);
+  document.getElementById('image-dialog-backdrop').addEventListener('click', hideImageDialog);
+
+  function applyImage(wnId, url) {
+    iframe.contentWindow.postMessage({ type: 'wn-update-image', wnId: wnId, value: url }, '*');
+    saveEdit(wnId, 'src', url);
+    hideImageDialog();
+  }
+
+  // URL input preview
+  document.getElementById('tb-image-url').addEventListener('input', function() {
+    var url = this.value.trim();
+    var preview = document.getElementById('image-dialog-preview');
+    if (url && (url.startsWith('http') || url.startsWith('data:'))) {
+      preview.src = url;
+      preview.style.display = 'block';
+    }
+  });
+
+  // ── Save to server ────────────────────────────────────────────────────────
+
+  function debounceSave(wnId, prop, value) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function() { saveEdit(wnId, prop, value); }, 500);
+  }
+
+  async function saveEdit(wnId, prop, value) {
+    try {
+      var res = await fetch(`/api/projects/${projectId}/edit-content`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wnId: wnId, prop: prop, value: value }),
+      });
+      if (res.ok) {
+        flashStatus('✓');
+      } else {
+        var data = await res.json();
+        console.error('[save]', data.error);
+        flashStatus('⚠ ' + (data.error || 'Error'));
+      }
+    } catch (err) {
+      console.error('[save]', err);
+      flashStatus('⚠ Network error');
+    }
+  }
+
+  function flashStatus(msg) {
+    var el = document.getElementById('deploy-status');
+    el.textContent = msg;
+    el.className = msg.startsWith('✓') ? 'deploy-status deployed' : 'deploy-status warn';
+    setTimeout(function() { el.textContent = ''; el.className = 'deploy-status'; }, 2000);
+  }
+
+  // ── Sections sidebar ──────────────────────────────────────────────────────
+
+  function renderSections(ids) {
+    var container = document.getElementById('sidebar-sections');
+    container.innerHTML = ids.map(function(id) {
+      return '<button class="section-btn" data-section="' + id + '">' + id + '</button>';
+    }).join('');
+
+    container.querySelectorAll('.section-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        iframe.contentWindow.postMessage({ type: 'set-active', sectionId: btn.dataset.section }, '*');
+      });
+    });
+  }
+
+  // ── Publish ───────────────────────────────────────────────────────────────
+
+  document.getElementById('publish-btn').addEventListener('click', async function() {
+    var btn = document.getElementById('publish-btn');
+    if (btn.dataset.publishing) return;
+    btn.dataset.publishing = '1';
+
+    document.getElementById('publish-label').style.display = 'none';
+    document.getElementById('publish-spinner').style.display = 'inline-block';
+    var el = document.getElementById('deploy-status');
+    el.textContent = '↑ Publishing…'; el.className = 'deploy-status deploying';
+
+    try {
+      var res = await fetch(`/api/projects/${projectId}/publish`, { method: 'POST' });
+      var data = await res.json();
+      if (!res.ok) { el.textContent = '⚠ ' + (data.error || 'Failed'); el.className = 'deploy-status warn'; return; }
+
+      el.textContent = '↑ Building (~15s)…';
+      var poll = setInterval(async function() {
+        var sr = await fetch(`/api/projects/${projectId}/launch`);
+        var sd = await sr.json();
+        if (sd.status === 'live') {
+          clearInterval(poll);
+          el.textContent = '✓ Published!'; el.className = 'deploy-status deployed';
+          document.getElementById('publish-label').textContent = 'Re-publish';
+        } else if (sd.status === 'failed' || sd.status === 'generated') {
+          clearInterval(poll);
+          el.textContent = '⚠ Error'; el.className = 'deploy-status warn';
+        }
+      }, 5000);
+    } catch {
+      el.textContent = '⚠ Network error'; el.className = 'deploy-status warn';
+    } finally {
+      document.getElementById('publish-label').style.display = 'inline';
+      document.getElementById('publish-spinner').style.display = 'none';
+      delete btn.dataset.publishing;
+    }
+  });
+
+  // Refresh preview
+  document.getElementById('refresh-btn').addEventListener('click', function() {
+    iframe.src = `${previewUrl}?edit=1&t=${Date.now()}`;
+  });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function rgbToHex(rgb) {
+    if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)') return '';
+    if (rgb.startsWith('#')) return rgb;
+    // Handle rgb/rgba
+    var match = rgb.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (match) return '#' + [match[1], match[2], match[3]].map(function(x) { return parseInt(x).toString(16).padStart(2, '0'); }).join('');
+    // Handle hsl/hsla
+    var hsl = rgb.match(/hsla?\(\s*([\d.]+)\s*,?\s*([\d.]+)%?\s*,?\s*([\d.]+)%?/);
+    if (hsl) {
+      var h = parseFloat(hsl[1]) / 360, s = parseFloat(hsl[2]) / 100, l = parseFloat(hsl[3]) / 100;
+      var r, g, b;
+      if (s === 0) { r = g = b = l; } else {
+        var hue2rgb = function(p, q, t) { if (t < 0) t += 1; if (t > 1) t -= 1; if (t < 1/6) return p + (q-p)*6*t; if (t < 1/2) return q; if (t < 2/3) return p + (q-p)*(2/3-t)*6; return p; };
+        var q2 = l < 0.5 ? l * (1 + s) : l + s - l * s, p2 = 2 * l - q2;
+        r = hue2rgb(p2, q2, h + 1/3); g = hue2rgb(p2, q2, h); b = hue2rgb(p2, q2, h - 1/3);
+      }
+      return '#' + [r, g, b].map(function(x) { return Math.round(x * 255).toString(16).padStart(2, '0'); }).join('');
+    }
+    // Named colors, CSS vars, oklch — return empty instead of fake black
+    return '';
+  }
+</script>
+
+<style>
+  .edit-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    height: calc(100vh - 80px);
+    margin: -60px -40px -120px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Sidebar */
+  .edit-sidebar {
+    background: #0e0e10;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 1rem 0.875rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .back-link { color: #71717a; text-decoration: none; font-size: 0.75rem; display: block; margin-bottom: 0.4rem; transition: color 0.2s; }
+  .back-link:hover { color: #fafafa; }
+  .sidebar-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 0.875rem; font-weight: 600; color: #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.15rem; }
+  .sidebar-sub { font-size: 0.7rem; color: #52525b; }
+
+  .sidebar-sections {
+    padding: 0.5rem 0.625rem;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .section-btn {
+    background: transparent; border: none; color: #71717a;
+    font-size: 0.72rem; text-align: left; padding: 0.35rem 0.5rem;
+    border-radius: 6px; cursor: pointer; text-transform: capitalize;
+    transition: all 0.15s;
+  }
+  .section-btn:hover { background: rgba(255,255,255,0.06); color: #fafafa; }
+
+  .sidebar-spacer { flex: 1; }
+
+  .sidebar-actions {
+    padding: 0.625rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; flex-direction: column; gap: 0.375rem;
+  }
+  .view-live-btn {
+    display: block; padding: 0.45rem 0.75rem;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+    color: #71717a; text-decoration: none; font-size: 0.75rem; text-align: center;
+    transition: all 0.15s;
+  }
+  .view-live-btn:hover { color: #fafafa; }
+  .publish-btn {
+    width: 100%; padding: 0.55rem 0.75rem;
+    background: linear-gradient(135deg, #7c3aed, #3b82f6); border: none; border-radius: 8px;
+    color: #fff; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+    transition: all 0.2s;
+  }
+  .publish-btn:hover { box-shadow: 0 4px 16px -4px rgba(124,58,237,0.4); }
+
+  /* Preview column */
+  .preview-col { display: flex; flex-direction: column; overflow: hidden; background: #09090b; }
+
+  .iframe-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.375rem 0.875rem;
+    background: #0e0e10; border-bottom: 1px solid rgba(255,255,255,0.04); flex-shrink: 0;
+  }
+  .iframe-label { font-size: 0.75rem; color: #71717a; font-weight: 500; }
+  .iframe-bar-right { display: flex; align-items: center; gap: 0.75rem; }
+  .deploy-status { font-size: 0.72rem; color: #71717a; transition: all 0.2s; }
+  .deploy-status.deploying { color: #7c3aed; }
+  .deploy-status.deployed  { color: #22c55e; }
+  .deploy-status.warn      { color: #f59e0b; }
+  .refresh-btn {
+    background: transparent; border: none; color: #52525b; font-size: 0.875rem;
+    cursor: pointer; padding: 0.2rem 0.3rem; border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .refresh-btn:hover { color: #fafafa; }
+
+  .iframe-container { flex: 1; overflow: hidden; }
+  #preview-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+
+  /* Floating toolbar */
+  .wn-toolbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .wn-toolbar.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toolbar-section label {
+    color: #71717a;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .toolbar-section input[type="color"] {
+    width: 28px; height: 28px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
+  }
+  .toolbar-section input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .toolbar-section input[type="color"]::-webkit-color-swatch { border-radius: 4px; border: none; }
+
+  .toolbar-section input[type="text"] {
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fafafa;
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    width: 240px;
+    outline: none;
+  }
+  .toolbar-section input[type="text"]:focus { border-color: #7c3aed; }
+
+  .toolbar-section button {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .toolbar-hint {
+    color: #52525b;
+    font-size: 0.68rem;
+    font-style: italic;
+  }
+
+  /* Toolbar groups */
+  .tb-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tb-sep {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.1);
+    margin: 0 2px;
+  }
+  .tb-select {
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #fafafa;
+    font-size: 0.72rem;
+    padding: 4px 6px;
+    max-width: 130px;
+    cursor: pointer;
+    outline: none;
+  }
+  .tb-select:focus { border-color: #7c3aed; }
+  .tb-number {
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: #fafafa;
+    font-size: 0.72rem;
+    padding: 4px 6px;
+    width: 52px;
+    text-align: center;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  .tb-number::-webkit-inner-spin-button { opacity: 0.5; }
+  .tb-number:focus { border-color: #7c3aed; }
+  .tb-toggle {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    color: #71717a;
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: 30px; height: 30px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    padding: 0;
+  }
+  .tb-toggle:hover { border-color: rgba(255,255,255,0.2); color: #fafafa; }
+  .tb-toggle.active {
+    background: #7c3aed;
+    border-color: #7c3aed;
+    color: #fff;
+  }
+  .tb-toggle.tb-italic { font-style: italic; font-family: serif; }
+  #tb-align-left { font-size: 0.6rem; text-align: left; }
+  #tb-align-center { font-size: 0.6rem; }
+  #tb-align-right { font-size: 0.6rem; text-align: right; }
+
+  .tb-group label {
+    color: #71717a;
+    font-size: 0.75rem;
+    cursor: default;
+  }
+
+  .spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Image dialog */
+  .image-dialog {
+    position: fixed; inset: 0; z-index: 2000;
+    display: none; align-items: center; justify-content: center;
+  }
+  .image-dialog.visible { display: flex; }
+  .image-dialog-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.6);
+  }
+  .image-dialog-box {
+    position: relative; z-index: 1;
+    background: #18181b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 28px 32px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .image-dialog-title {
+    color: #fafafa;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .image-dialog-preview {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .image-dialog-field {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .image-dialog-field label {
+    color: #71717a;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .image-dialog-field input[type="text"] {
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fafafa;
+    font-size: 0.8rem;
+    padding: 10px 12px;
+    outline: none;
+    width: 100%;
+  }
+  .image-dialog-field input[type="text"]:focus { border-color: #7c3aed; }
+  .image-dialog-field input[type="file"] {
+    color: #a1a1aa;
+    font-size: 0.8rem;
+  }
+  .image-dialog-field input[type="file"]::file-selector-button {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 12px;
+  }
+  .image-dialog-or {
+    text-align: center;
+    color: #52525b;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .image-dialog-actions {
+    display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px;
+  }
+  .image-btn-cancel {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #a1a1aa;
+    padding: 8px 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .image-btn-apply {
+    background: #7c3aed;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    padding: 8px 24px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .image-btn-apply:hover { background: #6d28d9; }
+
+  .text-dialog-input {
+    width: 100%;
+    background: #09090b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fafafa;
+    font-size: 0.9rem;
+    padding: 12px;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+    line-height: 1.6;
+  }
+  .text-dialog-input:focus { border-color: #7c3aed; }
+</style>

@@ -1,0 +1,71 @@
+---
+// 404 — Page not found
+---
+
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 — Pagina nu a fost găsită</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function(){
+        var lang = (localStorage.getItem('i18nextLng')||'ro').split('-')[0];
+        if(lang!=='en') return;
+        document.addEventListener('DOMContentLoaded',function(){
+          document.querySelectorAll('[data-en]').forEach(function(el){el.textContent=el.getAttribute('data-en');});
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="code">404</div>
+      <h1 data-en="Page not found">Pagina nu a fost găsită</h1>
+      <p data-en="The page you're looking for doesn't exist or has been moved.">Pagina pe care o cauți nu există sau a fost mutată.</p>
+      <a href="/dashboard" class="btn" data-en="← Back to dashboard">← Înapoi la panou</a>
+    </div>
+
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        background: #00020f; color: #fff;
+        font-family: 'DM Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex; align-items: center; justify-content: center;
+        min-height: 100vh;
+      }
+      .wrapper {
+        text-align: center; padding: 40px 24px;
+      }
+      .code {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 120px; font-weight: 700; line-height: 1;
+        letter-spacing: -0.06em;
+        background: linear-gradient(135deg, #00ff97, #00a4af);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        margin-bottom: 24px;
+      }
+      h1 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 700; letter-spacing: -0.03em;
+        color: #fff; margin-bottom: 16px;
+      }
+      p {
+        font-size: 16px; color: rgba(255,255,255,0.5); line-height: 1.6;
+        max-width: 400px; margin: 0 auto 36px;
+      }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 14px 28px; background: #00ff97; color: #00020f;
+        font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700;
+        text-transform: uppercase; text-decoration: none; border-radius: 30px;
+        transition: 0.3s;
+      }
+      .btn:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,255,151,0.2); }
+    </style>
+  </body>
+</html>

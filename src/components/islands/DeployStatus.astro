@@ -1,0 +1,144 @@
+---
+// TODO: Connect Supabase Realtime subscription in Step 4
+// For now: polls every 5s when in active deployment state.
+
+interface Props {
+  projectId: string;
+  projectStatus: string;
+  initialDeployment?: {
+    id: string;
+    status: string;
+    preview_url?: string;
+    build_logs?: string[];
+    error_message?: string;
+    created_at: string;
+    completed_at?: string;
+  } | null;
+}
+
+const { projectId, projectStatus, initialDeployment = null } = Astro.props;
+
+const STATUS_STEPS = [
+  { key: 'generating', label: 'Generating files', description: 'Claude is writing your site code…' },
+  { key: 'generated', label: 'Files ready', description: 'Code generated successfully' },
+  { key: 'deploying', label: 'Deploying', description: 'Pushing to GitHub + Vercel…' },
+  { key: 'live', label: 'Live', description: 'Your site is live!' },
+];
+
+const isActive = ['generating', 'deploying', 'building'].includes(projectStatus);
+const shouldRender = isActive || projectStatus === 'failed' || projectStatus === 'live';
+---
+
+{shouldRender && (
+  <div class="deploy-status" id="deploy-status">
+    <div class="steps" id="steps-list">
+      {STATUS_STEPS.map((step, i) => {
+        const currentStepIdx = STATUS_STEPS.findIndex(s =>
+          projectStatus === s.key || (projectStatus === 'building' && s.key === 'deploying')
+        );
+        const done = i < currentStepIdx || projectStatus === 'live';
+        const current = i === currentStepIdx;
+        const failed = projectStatus === 'failed' && current;
+
+        return (
+          <div class={`step ${done ? 'done' : ''} ${current && !failed ? 'active' : ''} ${failed ? 'failed' : ''}`}>
+            <div class="step-icon">
+              {done ? '✓' : failed ? '✕' : current ? '●' : ''}
+            </div>
+            <div class="step-content">
+              <div class="step-label">{step.label}</div>
+              {current && (
+                <div class="step-desc">
+                  {failed ? (initialDeployment?.error_message || 'Build failed') : step.description}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    {initialDeployment?.build_logs && initialDeployment.build_logs.length > 0 && (
+      <div class="logs-section" id="logs-section">
+        <button id="logs-toggle" class="logs-toggle">▸ Build logs ({initialDeployment.build_logs.length} lines)</button>
+        <div id="logs-box" class="logs-box" hidden>
+          {initialDeployment.build_logs.map((line) => (
+            <div class="log-line">{line}</div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {projectStatus === 'live' && initialDeployment?.preview_url && (
+      <a href={initialDeployment.preview_url} target="_blank" rel="noopener" class="live-btn">
+        View Site ↗
+      </a>
+    )}
+
+    {projectStatus === 'failed' && (
+      <button id="retry-btn" class="retry-btn">Auto-fix & Retry</button>
+    )}
+  </div>
+)}
+
+<script define:vars={{ projectId, initialStatus: projectStatus, isActive }}>
+  let currentStatus = initialStatus;
+
+  // Toggle logs
+  const logsToggle = document.getElementById('logs-toggle');
+  const logsBox = document.getElementById('logs-box');
+  if (logsToggle && logsBox) {
+    logsToggle.addEventListener('click', () => {
+      const open = !logsBox.hidden;
+      logsBox.hidden = open;
+      logsToggle.textContent = logsToggle.textContent.replace(open ? '▾' : '▸', open ? '▸' : '▾');
+    });
+  }
+
+  // Retry
+  const retryBtn = document.getElementById('retry-btn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', async () => {
+      await fetch(`/api/deploy/${projectId}`, { method: 'POST' });
+      window.location.reload();
+    });
+  }
+
+  // Poll when active
+  if (isActive) {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentStatus = data.status;
+          if (!['generating', 'deploying', 'building'].includes(data.status)) {
+            clearInterval(interval);
+            window.location.reload();
+          }
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 5000);
+  }
+</script>
+
+<style>
+  .deploy-status { background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+  .steps { display: flex; flex-direction: column; gap: 1rem; }
+  .step { display: flex; align-items: flex-start; gap: 0.875rem; }
+  .step-icon { width: 28px; height: 28px; border-radius: 50%; background: #1e1e1e; border: 2px solid #2a2a2a; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #444; flex-shrink: 0; margin-top: 1px; }
+  .step.done .step-icon { background: #14532d; border-color: #22c55e; color: #22c55e; }
+  .step.active .step-icon { background: rgba(124,58,237,0.15); border-color: #7c3aed; color: #a78bfa; }
+  .step.failed .step-icon { background: rgba(239,68,68,0.1); border-color: #ef4444; color: #ef4444; }
+  .step-label { font-size: 0.875rem; font-weight: 500; color: rgba(255, 255, 255, 0.4); }
+  .step.active .step-label, .step.done .step-label { color: #e8e8e8; }
+  .step-desc { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
+  .logs-section { display: flex; flex-direction: column; gap: 0.5rem; }
+  .logs-toggle { background: none; border: none; color: rgba(255, 255, 255, 0.4); font-size: 0.8125rem; cursor: pointer; text-align: left; padding: 0; }
+  .logs-box { background: #0c0c0c; border-radius: 6px; padding: 0.875rem; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.75rem; color: #666; }
+  .log-line { line-height: 1.6; }
+  .live-btn { background: #22c55e; color: #fff; padding: 0.625rem 1.25rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; align-self: flex-start; }
+  .retry-btn { background: rgba(239,68,68,0.08); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 6px; padding: 0.625rem 1.25rem; font-size: 0.875rem; cursor: pointer; align-self: flex-start; }
+</style>

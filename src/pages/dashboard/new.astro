@@ -1,0 +1,238 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/sign-in');
+---
+
+<Dashboard title="New Project">
+  <div class="center-wrap">
+    <div class="page-header">
+      <a href="/dashboard" class="back-link" data-en="← Projects">← Proiecte</a>
+      <h1 data-en="New Project">Proiect nou</h1>
+      <p class="subtitle" data-en="Give your project a name to get started.">Dă un nume proiectului tău pentru a începe.</p>
+    </div>
+
+    <!-- Step 1: Name -->
+    <div id="step-name" class="form-card">
+      <form id="name-form">
+        <label for="project-name" data-en="Project name">Numele proiectului</label>
+        <input
+          id="project-name"
+          name="name"
+          type="text"
+          placeholder="e.g. Bella Cucina, Acme SaaS..."
+          autocomplete="off"
+          autofocus
+          required
+          maxlength="80"
+        />
+        <p class="field-hint" data-en="This is just a label for your dashboard — not the site title.">Acesta este doar un nume pentru panou — nu titlul site-ului.</p>
+        <div id="name-error" class="error-msg" hidden></div>
+        <button type="submit" id="name-btn">
+          <span id="name-label" data-en="Continue →">Continuă →</span>
+          <span id="name-loading" hidden data-en="Please wait…">Așteaptă…</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Step 2: Mode selection (hidden initially) -->
+    <div id="step-mode" class="form-card mode-card" hidden>
+      <p class="mode-heading" data-en="How do you want to fill the brief?">Cum vrei să completezi brief-ul?</p>
+      <div class="mode-grid">
+
+        <button class="mode-btn" id="mode-ai">
+          <span class="mode-icon">✦</span>
+          <span class="mode-title" data-en="Chat with AI">Chat cu AI</span>
+          <span class="mode-desc" data-en="Answer a few questions and the AI builds the brief for you automatically.">Răspunzi la câteva întrebări și AI-ul construiește brief-ul automat.</span>
+          <span class="mode-badge" data-en="Recommended">Recomandat</span>
+        </button>
+
+        <button class="mode-btn" id="mode-manual">
+          <span class="mode-icon">✏</span>
+          <span class="mode-title" data-en="Fill in manually">Completez eu</span>
+          <span class="mode-desc" data-en="Type the texts and choose settings yourself. Full control over every field.">Scrii textele și alegi setările tu. Control total asupra fiecărui câmp.</span>
+        </button>
+
+      </div>
+      <div id="mode-error" class="error-msg" hidden></div>
+    </div>
+
+  </div>
+</Dashboard>
+
+<script>
+  let projectName = '';
+  let createdProjectId: string | null = null;
+
+  const nameForm = document.getElementById('name-form') as HTMLFormElement;
+  const nameBtn = document.getElementById('name-btn') as HTMLButtonElement;
+  const nameLabel = document.getElementById('name-label')!;
+  const nameLoading = document.getElementById('name-loading')!;
+  const nameError = document.getElementById('name-error')!;
+  const stepName = document.getElementById('step-name')!;
+  const stepMode = document.getElementById('step-mode')!;
+  const modeError = document.getElementById('mode-error')!;
+
+  const _isEn = () => (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+
+  // Step 1: Validate name → show mode selection
+  nameForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const val = (nameForm.elements.namedItem('name') as HTMLInputElement).value.trim();
+    if (!val) return;
+    projectName = val;
+
+    // Animate transition
+    stepName.style.opacity = '0';
+    stepName.style.transform = 'translateY(-8px)';
+    setTimeout(() => {
+      stepName.hidden = true;
+      stepMode.hidden = false;
+      stepMode.style.opacity = '0';
+      stepMode.style.transform = 'translateY(8px)';
+      requestAnimationFrame(() => {
+        stepMode.style.transition = 'all 0.3s cubic-bezier(0.16,1,0.3,1)';
+        stepMode.style.opacity = '1';
+        stepMode.style.transform = 'translateY(0)';
+      });
+      // Update heading with project name
+      document.querySelector('h1')!.textContent = projectName;
+      document.querySelector('.subtitle')!.setAttribute('data-en', `Choose how to brief "${projectName}"`);
+      document.querySelector<HTMLElement>('.subtitle')!.textContent = `Cum vrei să faci brief-ul pentru „${projectName}"?`;
+    }, 200);
+  });
+
+  // Create project then redirect
+  async function createAndRedirect(mode: 'ai' | 'manual') {
+    const btn = mode === 'ai'
+      ? document.getElementById('mode-ai') as HTMLButtonElement
+      : document.getElementById('mode-manual') as HTMLButtonElement;
+
+    btn.disabled = true;
+    btn.querySelector('.mode-title')!.textContent = _isEn() ? 'Creating…' : 'Se creează…';
+    modeError.hidden = true;
+
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: projectName }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        modeError.textContent = data.error || (mode === 'ai'
+          ? (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.')
+          : (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.'));
+        modeError.hidden = false;
+        btn.disabled = false;
+        btn.querySelector('.mode-title')!.textContent = mode === 'ai'
+          ? (_isEn() ? 'Chat with AI' : 'Chat cu AI')
+          : (_isEn() ? 'Fill in manually' : 'Completez eu');
+        return;
+      }
+
+      const pid = data.project.id;
+      window.location.href = mode === 'ai'
+        ? `/dashboard/${pid}/onboarding`
+        : `/dashboard/${pid}/manual-brief`;
+
+    } catch {
+      modeError.textContent = _isEn() ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+      modeError.hidden = false;
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('mode-ai')!.addEventListener('click', () => createAndRedirect('ai'));
+  document.getElementById('mode-manual')!.addEventListener('click', () => createAndRedirect('manual'));
+</script>
+
+<style>
+  :global(body) { overflow: hidden; }
+  :global(main) { padding-top: 20px !important; }
+
+  .center-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 0; text-align: center;
+  }
+
+  .page-header { margin-bottom: 3rem; }
+  .back-link {
+    color: rgba(255, 255, 255, 0.5); text-decoration: none; font-size: 0.875rem;
+    display: block; margin-bottom: 1rem; transition: color 0.2s;
+  }
+  .back-link:hover { color: #ffffff; }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 700; letter-spacing: -0.03em; color: #ffffff;
+    transition: all 0.3s;
+  }
+  .subtitle { color: rgba(255, 255, 255, 0.5); margin-top: 8px; font-size: 1rem; }
+
+  .form-card {
+    background: rgba(255, 255, 255, 0.04); backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 24px; padding: 2.5rem; max-width: 480px; width: 100%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  }
+
+  /* Step 1 */
+  form { display: flex; flex-direction: column; gap: 0.75rem; }
+  label { font-size: 0.875rem; font-weight: 500; color: rgba(255,255,255,0.5); text-align: left; }
+  input {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 16px; color: #ffffff; font-size: 0.9375rem;
+    outline: none; transition: border-color 0.3s, box-shadow 0.3s; width: 100%; box-sizing: border-box;
+  }
+  input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.15); }
+  input::placeholder { color: rgba(255,255,255,0.3); }
+  .field-hint { color: rgba(255,255,255,0.3); font-size: 0.8rem; margin-bottom: 0.5rem; text-align: left; }
+  button[type="submit"] {
+    background: #00ff97; color: #00020f; border: none; border-radius: 14px;
+    padding: 14px 24px; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
+    margin-top: 0.75rem; transition: all 0.3s; width: 100%;
+  }
+  button[type="submit"]:hover:not(:disabled) {
+    background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+  }
+  button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Step 2 */
+  .mode-card { max-width: 540px; }
+  .mode-heading { font-size: 0.9375rem; color: rgba(255,255,255,0.6); margin: 0 0 1.5rem; }
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 400px) { .mode-grid { grid-template-columns: 1fr; } }
+
+  .mode-btn {
+    position: relative; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 1.5rem 1.25rem;
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    cursor: pointer; text-align: center; color: rgba(255,255,255,0.7);
+    transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
+  }
+  .mode-btn:hover:not(:disabled) {
+    border-color: rgba(0,255,151,0.35); background: rgba(0,255,151,0.05);
+    color: #fff; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  }
+  .mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #mode-ai { border-color: rgba(0,255,151,0.2); }
+
+  .mode-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .mode-title { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: #fff; }
+  .mode-desc { font-size: 0.8125rem; color: rgba(255,255,255,0.4); line-height: 1.5; }
+  .mode-badge {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    background: #00ff97; color: #00020f; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 10px; border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .error-msg {
+    background: rgba(229,62,62,0.06); border: 1px solid rgba(229,62,62,0.2);
+    color: #e53e3e; font-size: 0.875rem; padding: 0.75rem 1rem; border-radius: 12px; margin-top: 0.5rem;
+  }
+</style>
