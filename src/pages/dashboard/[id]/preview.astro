@@ -11,8 +11,8 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
 
 <Dashboard title={`Preview — ${project.name}`} projectId={project.id}>
   <div class="page-header">
-    <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
-    <h1 data-en="Preview">Previzualizare</h1>
+    <a href={`/dashboard/${project.id}`} class="back-link">← Back to project</a>
+    <h1>Preview</h1>
     <p class="subtitle">{project.name}</p>
   </div>
 
@@ -20,14 +20,14 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     <div class="preview-frame">
       <div class="preview-bar">
         <span>{project.preview_url}</span>
-        <a href={project.preview_url} target="_blank" rel="noopener" data-en="Open ↗">Deschide ↗</a>
+        <a href={project.preview_url} target="_blank" rel="noopener">Open ↗</a>
       </div>
       <iframe src={project.preview_url} title={project.name} />
     </div>
   ) : (
     <div class="placeholder-notice">
-      <p data-en="No preview available yet. Deploy your project first.">Nicio previzualizare disponibilă. Publică proiectul mai întâi.</p>
-      <a href={`/dashboard/${project.id}`} class="btn" data-en="Go to project">Mergi la proiect</a>
+      <p>No preview available yet. Deploy your project first.</p>
+      <a href={`/dashboard/${project.id}`} class="btn">Go to project</a>
     </div>
   )}
 </Dashboard>
@@ -44,7 +44,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   }
   .back-link:hover { color: #fafafa; }
   h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;

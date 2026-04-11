@@ -89,8 +89,8 @@ async function inspect(label, url) {
   await page.close();
 }
 
-await inspect('local', 'http://localhost:3001/');
-await inspect('vercel', 'https://astro-platform.vercel.app/');
+await inspect('local', 'http://localhost:4321/');
+await inspect('vercel', 'https://grappes.ai/');
 
 await browser.close();
 console.log(`\nScreenshots in ${OUT}`);

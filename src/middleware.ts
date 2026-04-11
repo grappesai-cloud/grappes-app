@@ -12,6 +12,8 @@ const PUBLIC_PATHS = new Set<string>([
   '/reset-password',
   '/404',
   '/500',
+  '/sitemap.xml',
+  '/robots.txt',
 ]);
 
 const PUBLIC_PREFIXES = [

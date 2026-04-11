@@ -8,15 +8,15 @@ if (!user) return Astro.redirect('/sign-in');
 <Dashboard title="New Project">
   <div class="center-wrap">
     <div class="page-header">
-      <a href="/dashboard" class="back-link" data-en="← Projects">← Proiecte</a>
-      <h1 data-en="New Project">Proiect nou</h1>
-      <p class="subtitle" data-en="Give your project a name to get started.">Dă un nume proiectului tău pentru a începe.</p>
+      <a href="/dashboard" class="back-link">← Projects</a>
+      <h1>New Project</h1>
+      <p class="subtitle">Give your project a name to get started.</p>
     </div>
 
     <!-- Step 1: Name -->
     <div id="step-name" class="form-card">
       <form id="name-form">
-        <label for="project-name" data-en="Project name">Numele proiectului</label>
+        <label for="project-name">Project name</label>
         <input
           id="project-name"
           name="name"
@@ -27,31 +27,31 @@ if (!user) return Astro.redirect('/sign-in');
           required
           maxlength="80"
         />
-        <p class="field-hint" data-en="This is just a label for your dashboard — not the site title.">Acesta este doar un nume pentru panou — nu titlul site-ului.</p>
+        <p class="field-hint">This is just a label for your dashboard — not the site title.</p>
         <div id="name-error" class="error-msg" hidden></div>
         <button type="submit" id="name-btn">
-          <span id="name-label" data-en="Continue →">Continuă →</span>
-          <span id="name-loading" hidden data-en="Please wait…">Așteaptă…</span>
+          <span id="name-label">Continue →</span>
+          <span id="name-loading" hidden>Please wait…</span>
         </button>
       </form>
     </div>
 
     <!-- Step 2: Mode selection (hidden initially) -->
     <div id="step-mode" class="form-card mode-card" hidden>
-      <p class="mode-heading" data-en="How do you want to fill the brief?">Cum vrei să completezi brief-ul?</p>
+      <p class="mode-heading">How do you want to fill the brief?</p>
       <div class="mode-grid">
 
         <button class="mode-btn" id="mode-ai">
           <span class="mode-icon">✦</span>
-          <span class="mode-title" data-en="Chat with AI">Chat cu AI</span>
-          <span class="mode-desc" data-en="Answer a few questions and the AI builds the brief for you automatically.">Răspunzi la câteva întrebări și AI-ul construiește brief-ul automat.</span>
-          <span class="mode-badge" data-en="Recommended">Recomandat</span>
+          <span class="mode-title">Chat with AI</span>
+          <span class="mode-desc">Answer a few questions and the AI builds the brief for you automatically.</span>
+          <span class="mode-badge">Recommended</span>
         </button>
 
         <button class="mode-btn" id="mode-manual">
           <span class="mode-icon">✏</span>
-          <span class="mode-title" data-en="Fill in manually">Completez eu</span>
-          <span class="mode-desc" data-en="Type the texts and choose settings yourself. Full control over every field.">Scrii textele și alegi setările tu. Control total asupra fiecărui câmp.</span>
+          <span class="mode-title">Fill in manually</span>
+          <span class="mode-desc">Type the texts and choose settings yourself. Full control over every field.</span>
         </button>
 
       </div>
@@ -74,7 +74,7 @@ if (!user) return Astro.redirect('/sign-in');
   const stepMode = document.getElementById('step-mode')!;
   const modeError = document.getElementById('mode-error')!;
 
-  const _isEn = () => (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = () => (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   // Step 1: Validate name → show mode selection
   nameForm.addEventListener('submit', (e) => {
@@ -165,7 +165,7 @@ if (!user) return Astro.redirect('/sign-in');
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700; letter-spacing: -0.03em; color: #ffffff;
     transition: all 0.3s;
@@ -188,16 +188,16 @@ if (!user) return Astro.redirect('/sign-in');
     border-radius: 12px; padding: 14px 16px; color: #ffffff; font-size: 0.9375rem;
     outline: none; transition: border-color 0.3s, box-shadow 0.3s; width: 100%; box-sizing: border-box;
   }
-  input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.15); }
+  input:focus { border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.15); }
   input::placeholder { color: rgba(255,255,255,0.3); }
   .field-hint { color: rgba(255,255,255,0.3); font-size: 0.8rem; margin-bottom: 0.5rem; text-align: left; }
   button[type="submit"] {
-    background: #00ff97; color: #00020f; border: none; border-radius: 14px;
+    background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 14px;
     padding: 14px 24px; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
     margin-top: 0.75rem; transition: all 0.3s; width: 100%;
   }
   button[type="submit"]:hover:not(:disabled) {
-    background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+    background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(155,212,215,0.25);
   }
   button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -215,18 +215,18 @@ if (!user) return Astro.redirect('/sign-in');
     transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
   }
   .mode-btn:hover:not(:disabled) {
-    border-color: rgba(0,255,151,0.35); background: rgba(0,255,151,0.05);
+    border-color: rgba(155,212,215,0.35); background: rgba(155,212,215,0.05);
     color: #fff; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.3);
   }
   .mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  #mode-ai { border-color: rgba(0,255,151,0.2); }
+  #mode-ai { border-color: rgba(155,212,215,0.2); }
 
   .mode-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  .mode-title { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 700; color: #fff; }
+  .mode-title { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 1rem; font-weight: 700; color: #fff; }
   .mode-desc { font-size: 0.8125rem; color: rgba(255,255,255,0.4); line-height: 1.5; }
   .mode-badge {
     position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-    background: #00ff97; color: #00020f; font-size: 10px; font-weight: 700;
+    background: #9BD4D7; color: #0a0a0a; font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 10px; border-radius: 20px;
     white-space: nowrap;
   }

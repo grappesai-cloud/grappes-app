@@ -32,16 +32,16 @@ const meta = d.meta ?? {};
   <div class="brief-page">
 
     <div class="page-header">
-      <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
+      <a href={`/dashboard/${project.id}`} class="back-link">← Back to project</a>
       <div class="header-row">
         <div>
-          <h1 data-en="Website Brief">Brief website</h1>
+          <h1>Website Brief</h1>
           <p class="subtitle">{project.name}</p>
         </div>
         {brief && (
           <div class="completeness-badge">
             <span class="pct">{Math.round(brief.completeness * 100)}%</span>
-            <span class="pct-label" data-en="complete">complet</span>
+            <span class="pct-label">complete</span>
           </div>
         )}
       </div>
@@ -56,8 +56,8 @@ const meta = d.meta ?? {};
 
     {isOnboarding && (
       <div class="notice warning">
-        <span data-en="Brief not yet confirmed.">Brief neconfirmat încă.</span>{' '}
-        <a href={`/dashboard/${id}/onboarding`} data-en="Complete the onboarding chat →">Completează chat-ul de onboarding →</a>
+        <span>Brief not yet confirmed.</span>{' '}
+        <a href={`/dashboard/${id}/onboarding`}>Complete the onboarding chat →</a>
       </div>
     )}
 
@@ -65,21 +65,21 @@ const meta = d.meta ?? {};
     {isGenerating && (
       <div class="notice info generating-notice">
         <div class="spinner"></div>
-        <span data-en="Generating your website with AI… this takes about 30–60 seconds.">Se generează site-ul cu AI… durează aproximativ 30–60 secunde.</span>
+        <span>Generating your website with AI… this takes about 30–60 seconds.</span>
       </div>
     )}
 
     {isGenerated && (
       <div class="notice success">
-        <span data-en="Site files generated successfully.">Fișierele site-ului au fost generate cu succes.</span>{' '}
-        <a href={`/dashboard/${id}`} data-en="View project →">Vezi proiect →</a>
+        <span>Site files generated successfully.</span>{' '}
+        <a href={`/dashboard/${id}`}>View project →</a>
       </div>
     )}
 
     {!brief || Object.keys(d).length === 0 ? (
       <div class="empty-brief">
-        <p data-en="No brief data collected yet.">Niciun brief colectat încă.</p>
-        <a href={`/dashboard/${id}/onboarding`} class="btn-primary" data-en="Start onboarding →">Începe onboarding →</a>
+        <p>No brief data collected yet.</p>
+        <a href={`/dashboard/${id}/onboarding`} class="btn-primary">Start onboarding →</a>
       </div>
     ) : (
       <div class="brief-sections">
@@ -87,12 +87,12 @@ const meta = d.meta ?? {};
         {/* Business */}
         {(business.name || business.industry || business.description || business.tagline) && (
           <div class="brief-card">
-            <h2 data-en="Business">Afacere</h2>
+            <h2>Business</h2>
             <dl>
-              {business.name && <><dt data-en="Name">Nume</dt><dd>{business.name}</dd></>}
-              {business.industry && <><dt data-en="Industry">Industrie</dt><dd>{business.industry}</dd></>}
+              {business.name && <><dt>Name</dt><dd>{business.name}</dd></>}
+              {business.industry && <><dt>Industry</dt><dd>{business.industry}</dd></>}
               {business.tagline && <><dt>Tagline</dt><dd>{business.tagline}</dd></>}
-              {business.description && <><dt data-en="Description">Descriere</dt><dd>{business.description}</dd></>}
+              {business.description && <><dt>Description</dt><dd>{business.description}</dd></>}
             </dl>
           </div>
         )}
@@ -100,14 +100,14 @@ const meta = d.meta ?? {};
         {/* Content */}
         {(content.headline || content.about || content.pages || content.services) && (
           <div class="brief-card">
-            <h2 data-en="Content">Conținut</h2>
+            <h2>Content</h2>
             <dl>
-              {content.headline && <><dt data-en="Headline">Titlu</dt><dd>{content.headline}</dd></>}
+              {content.headline && <><dt>Headline</dt><dd>{content.headline}</dd></>}
               {content.tagline && <><dt>Tagline</dt><dd>{content.tagline}</dd></>}
-              {content.about && <><dt data-en="About">Despre</dt><dd>{content.about}</dd></>}
+              {content.about && <><dt>About</dt><dd>{content.about}</dd></>}
               {content.pages?.length > 0 && (
                 <>
-                  <dt data-en="Pages">Pagini</dt>
+                  <dt>Pages</dt>
                   <dd class="chips-cell">
                     {(content.pages as string[]).map(p => <span class="chip">{p}</span>)}
                   </dd>
@@ -115,7 +115,7 @@ const meta = d.meta ?? {};
               )}
               {content.services?.length > 0 && (
                 <>
-                  <dt data-en="Services">Servicii</dt>
+                  <dt>Services</dt>
                   <dd class="chips-cell">
                     {(content.services as string[]).map(s => <span class="chip">{s}</span>)}
                   </dd>
@@ -130,10 +130,10 @@ const meta = d.meta ?? {};
           <div class="brief-card">
             <h2>Branding</h2>
             <dl>
-              {branding.style && <><dt data-en="Style">Stil</dt><dd class="capitalize">{branding.style}</dd></>}
+              {branding.style && <><dt>Style</dt><dd class="capitalize">{branding.style}</dd></>}
               {branding.colors?.primary && (
                 <>
-                  <dt data-en="Primary">Primar</dt>
+                  <dt>Primary</dt>
                   <dd>
                     <span class="color-swatch" style={`background:${branding.colors.primary}`}></span>
                     {branding.colors.primary}
@@ -142,7 +142,7 @@ const meta = d.meta ?? {};
               )}
               {branding.colors?.secondary && (
                 <>
-                  <dt data-en="Secondary">Secundar</dt>
+                  <dt>Secondary</dt>
                   <dd>
                     <span class="color-swatch" style={`background:${branding.colors.secondary}`}></span>
                     {branding.colors.secondary}
@@ -158,8 +158,8 @@ const meta = d.meta ?? {};
                   </dd>
                 </>
               )}
-              {branding.fonts?.heading && <><dt data-en="Heading font">Font titluri</dt><dd>{branding.fonts.heading}</dd></>}
-              {branding.fonts?.body && <><dt data-en="Body font">Font text</dt><dd>{branding.fonts.body}</dd></>}
+              {branding.fonts?.heading && <><dt>Heading font</dt><dd>{branding.fonts.heading}</dd></>}
+              {branding.fonts?.body && <><dt>Body font</dt><dd>{branding.fonts.body}</dd></>}
             </dl>
           </div>
         )}
@@ -170,9 +170,9 @@ const meta = d.meta ?? {};
             <h2>Media</h2>
             <dl>
               {media.has_logo !== undefined && (
-                <><dt data-en="Has logo">Are logo</dt><dd data-en={media.has_logo ? 'Yes' : 'No'}>{media.has_logo ? 'Da' : 'Nu'}</dd></>
+                <><dt>Has logo</dt><dd data-en={media.has_logo ? 'Yes' : 'No'}>{media.has_logo ? 'Da' : 'Nu'}</dd></>
               )}
-              {media.hero_style && <><dt data-en="Hero style">Stil hero</dt><dd class="capitalize">{media.hero_style}</dd></>}
+              {media.hero_style && <><dt>Hero style</dt><dd class="capitalize">{media.hero_style}</dd></>}
             </dl>
           </div>
         )}
@@ -180,7 +180,7 @@ const meta = d.meta ?? {};
         {/* Features */}
         {Object.keys(features).length > 0 && (
           <div class="brief-card">
-            <h2 data-en="Features">Funcții</h2>
+            <h2>Features</h2>
             <dl>
               {Object.entries(features).map(([k, v]) => (
                 <>
@@ -198,8 +198,8 @@ const meta = d.meta ?? {};
             <h2>Contact & Social</h2>
             <dl>
               {contact.email && <><dt>Email</dt><dd>{contact.email}</dd></>}
-              {contact.phone && <><dt data-en="Phone">Telefon</dt><dd>{contact.phone}</dd></>}
-              {contact.address && <><dt data-en="Address">Adresă</dt><dd>{contact.address}</dd></>}
+              {contact.phone && <><dt>Phone</dt><dd>{contact.phone}</dd></>}
+              {contact.address && <><dt>Address</dt><dd>{contact.address}</dd></>}
               {Object.entries(social).filter(([,v]) => v).map(([k, v]) => (
                 <><dt class="capitalize">{k}</dt><dd>{String(v)}</dd></>
               ))}
@@ -210,11 +210,11 @@ const meta = d.meta ?? {};
         {/* SEO */}
         {(meta.title || meta.description || preferences.animations) && (
           <div class="brief-card">
-            <h2 data-en="SEO & Preferences">SEO & Preferințe</h2>
+            <h2>SEO & Preferences</h2>
             <dl>
-              {meta.title && <><dt data-en="Meta title">Meta titlu</dt><dd>{meta.title}</dd></>}
-              {meta.description && <><dt data-en="Meta description">Meta descriere</dt><dd>{meta.description}</dd></>}
-              {preferences.animations && <><dt data-en="Animations">Animații</dt><dd class="capitalize">{preferences.animations}</dd></>}
+              {meta.title && <><dt>Meta title</dt><dd>{meta.title}</dd></>}
+              {meta.description && <><dt>Meta description</dt><dd>{meta.description}</dd></>}
+              {preferences.animations && <><dt>Animations</dt><dd class="capitalize">{preferences.animations}</dd></>}
             </dl>
           </div>
         )}
@@ -224,27 +224,21 @@ const meta = d.meta ?? {};
 
     {/* CTA */}
     <div class="actions">
-      <a href={`/dashboard/${id}/onboarding`} class="btn-secondary" data-en="← Edit in Chat">
-        ← Editează în Chat
-      </a>
+      <a href={`/dashboard/${id}/onboarding`} class="btn-secondary">← Edit in Chat</a>
 
       {canGenerate && (
-        <button id="generate-btn" class="btn-primary" data-en="Generate Website →">
-          Generează site →
-        </button>
+        <button id="generate-btn" class="btn-primary">Generate Website →</button>
       )}
 
       {isGenerating && (
         <button class="btn-primary" disabled>
           <span class="btn-spinner"></span>
-          <span data-en="Generating…">Se generează…</span>
+          <span>Generating…</span>
         </button>
       )}
 
       {isGenerated && (
-        <a href={`/dashboard/${id}`} class="btn-success" data-en="View Project →">
-          Vezi proiect →
-        </a>
+        <a href={`/dashboard/${id}`} class="btn-success">View Project →</a>
       )}
 
       <div id="gen-error" class="gen-error" hidden></div>
@@ -271,7 +265,7 @@ const meta = d.meta ?? {};
   if (canGenerate) {
     const btn = document.getElementById('generate-btn');
     const errEl = document.getElementById('gen-error');
-    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
     btn?.addEventListener('click', async () => {
       btn.disabled = true;
@@ -314,7 +308,7 @@ const meta = d.meta ?? {};
   .back-link:hover { color: #ffffff; }
   .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
   h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -322,10 +316,10 @@ const meta = d.meta ?? {};
   }
   .subtitle { color: rgba(255, 255, 255, 0.5); margin-top: 0.25rem; font-size: 1rem; }
   .completeness-badge { text-align: right; flex-shrink: 0; }
-  .pct { display: block; font-size: 2rem; font-weight: 700; color: #00ff97; line-height: 1; }
+  .pct { display: block; font-size: 2rem; font-weight: 700; color: #9BD4D7; line-height: 1; }
   .pct-label { font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); }
   .progress-bar { height: 3px; background: rgba(0,0,0,0.06); border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, #9BD4D7, #d4c854); border-radius: 2px; transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 
   /* Notices */
   .notice {
@@ -366,7 +360,7 @@ const meta = d.meta ?? {};
   .brief-card:nth-child(6) { animation-delay: 0.30s; }
   .brief-card:nth-child(7) { animation-delay: 0.36s; }
   h2 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.5);
@@ -395,7 +389,7 @@ const meta = d.meta ?? {};
   /* Actions */
   .actions { display: flex; align-items: center; gap: 1rem; padding-top: 1rem; flex-wrap: wrap; }
   .btn-primary {
-    background: #00ff97;
+    background: #9BD4D7;
     color: #ffffff;
     border: none;
     border-radius: 16px;
@@ -412,7 +406,7 @@ const meta = d.meta ?? {};
   .btn-primary:hover:not(:disabled) {
     background: #00e088;
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+    box-shadow: 0 8px 24px rgba(155,212,215,0.25);
   }
   .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-secondary {
@@ -442,7 +436,7 @@ const meta = d.meta ?? {};
   .spinner, .btn-spinner {
     width: 16px; height: 16px;
     border: 2px solid rgba(0,0,0,0.1);
-    border-top-color: #00ff97;
+    border-top-color: #9BD4D7;
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
@@ -464,7 +458,7 @@ const meta = d.meta ?? {};
     position: absolute;
     inset: -2px;
     border-radius: 18px;
-    background: conic-gradient(from 0deg, #00ff97, #d4c854, #00ff97);
+    background: conic-gradient(from 0deg, #9BD4D7, #d4c854, #9BD4D7);
     animation: rotateBorder 3s linear infinite;
     z-index: -1;
     opacity: 0.4;

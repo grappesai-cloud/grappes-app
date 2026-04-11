@@ -117,10 +117,10 @@ const currentStepIdx = currentSubstatus
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
     body {
-      font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+      font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
-      background: #00020f;
+      background: #0a0a0a;
       color: #eef2ff; font-size: 14px; line-height: 1.5;
     }
     a { color: inherit; text-decoration: none; }
@@ -146,11 +146,11 @@ const currentStepIdx = currentSubstatus
     }
     .topbar-left { display: flex; align-items: center; gap: 12px; }
     .topbar-logo {
-      font-family: 'Space Grotesk', 'DM Sans', sans-serif;
+      font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       font-weight: 800; font-size: 15px; letter-spacing: -0.02em; color: #fff;
     }
     .topbar-logo-accent {
-      background: linear-gradient(135deg, #00ff97, #00a4af);
+      background: linear-gradient(135deg, #9BD4D7, #00a4af);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .topbar-link {
@@ -168,9 +168,9 @@ const currentStepIdx = currentSubstatus
     .topbar-signout:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
     .topbar-avatar {
       width: 32px; height: 32px; border-radius: 50%;
-      background: linear-gradient(135deg, #00ff97, #00a4af);
+      background: linear-gradient(135deg, #9BD4D7, #00a4af);
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.75rem; font-weight: 600; color: #00020f;
+      font-size: 0.75rem; font-weight: 600; color: #0a0a0a;
       text-transform: uppercase; flex-shrink: 0;
     }
     .topbar-project { color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -181,11 +181,11 @@ const currentStepIdx = currentSubstatus
     .topbar-quota {
       display: flex; align-items: center; gap: 5px;
       padding: 5px 12px; border-radius: 20px;
-      border: 1px solid rgba(0,255,151,0.2);
-      background: rgba(0,255,151,0.06);
+      border: 1px solid rgba(155,212,215,0.2);
+      background: rgba(155,212,215,0.06);
       color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 500;
     }
-    .topbar-quota svg { color: #00ff97; flex-shrink: 0; }
+    .topbar-quota svg { color: #9BD4D7; flex-shrink: 0; }
     .topbar-quota.warn { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
     .topbar-quota.warn svg { color: #f59e0b; }
     .topbar-quota.empty { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.06); }
@@ -196,8 +196,8 @@ const currentStepIdx = currentSubstatus
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .topbar-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
-    .topbar-btn--primary { background: #00ff97; color: #00020f; border-color: transparent; font-weight: 600; }
-    .topbar-btn--primary:hover { background: #00e088; box-shadow: 0 4px 16px -4px rgba(0,255,151,0.4); }
+    .topbar-btn--primary { background: #9BD4D7; color: #0a0a0a; border-color: transparent; font-weight: 600; }
+    .topbar-btn--primary:hover { background: #00e088; box-shadow: 0 4px 16px -4px rgba(155,212,215,0.4); }
     .topbar-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
     .topbar-btn--upsell { background: rgba(251,191,36,0.12); color: #f6ad55; border-color: rgba(251,191,36,0.25); font-weight: 600; text-decoration: none; }
     .topbar-btn--upsell:hover { background: rgba(251,191,36,0.2); border-color: rgba(251,191,36,0.4); }
@@ -264,7 +264,7 @@ const currentStepIdx = currentSubstatus
 
     /* Phase: brief ready */
     .phase-brief { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; overflow-y: auto; }
-    .brief-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
+    .brief-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
     .brief-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
     .brief-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
     .brief-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
@@ -273,15 +273,15 @@ const currentStepIdx = currentSubstatus
 
     /* Phase: launching/generating */
     .phase-launch { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; }
-    .launch-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
+    .launch-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
     .launch-bar { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
-    .launch-bar-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .launch-bar-fill { height: 100%; background: linear-gradient(90deg, #9BD4D7, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
     .launch-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
     .launch-step.done { color: #38a169; }
     .launch-step.active { color: #fff; font-weight: 500; }
     .launch-step.pending { color: rgba(255,255,255,0.3); }
     .lstep-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 12px; }
-    .lstep-spinner { width: 14px; height: 14px; border: 2px solid rgba(0,255,151,0.2); border-top-color: #00ff97; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .lstep-spinner { width: 14px; height: 14px; border: 2px solid rgba(155,212,215,0.2); border-top-color: #9BD4D7; border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .launch-note { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: auto; }
 
@@ -333,7 +333,7 @@ const currentStepIdx = currentSubstatus
       font-weight: 500; letter-spacing: 0.01em;
     }
     .section-item:hover { background: rgba(255,255,255,0.06); color: #fff; border-color: rgba(255,255,255,0.12); }
-    .section-item.active { background: rgba(0,255,151,0.08); color: #00ff97; border-color: rgba(0,255,151,0.25); }
+    .section-item.active { background: rgba(155,212,215,0.08); color: #9BD4D7; border-color: rgba(155,212,215,0.25); }
 
     /* Visual editor controls */
     .ve-hint { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.5; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -460,7 +460,7 @@ const currentStepIdx = currentSubstatus
       border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.05);
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .edit-suggestion:hover { color: #fff; border-color: rgba(0,255,151,0.4); background: rgba(255,255,255,0.08); }
+    .edit-suggestion:hover { color: #fff; border-color: rgba(155,212,215,0.4); background: rgba(255,255,255,0.08); }
     .edit-tip { position: relative; display: flex; justify-content: flex-end; margin-bottom: 6px; }
     .edit-tip-icon {
       width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700; font-style: italic;
@@ -468,15 +468,15 @@ const currentStepIdx = currentSubstatus
       display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;
       font-family: Georgia, serif; line-height: 1;
     }
-    .edit-tip-icon:hover, .edit-tip-icon.active { color: #00ff97; border-color: rgba(0,255,151,0.4); background: rgba(0,255,151,0.08); }
+    .edit-tip-icon:hover, .edit-tip-icon.active { color: #9BD4D7; border-color: rgba(155,212,215,0.4); background: rgba(155,212,215,0.08); }
     .edit-tip-popup {
       display: none; position: absolute; bottom: calc(100% + 8px); right: 0; width: 240px;
-      background: #1a1a2e; border: 1px solid rgba(0,255,151,0.2); border-radius: 10px;
+      background: #1a1a2e; border: 1px solid rgba(155,212,215,0.2); border-radius: 10px;
       padding: 10px 14px; font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.7);
       box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 10;
     }
     .edit-tip-popup.show { display: block; animation: tipFadeIn 0.2s ease; }
-    .edit-tip-popup strong { color: #00ff97; }
+    .edit-tip-popup strong { color: #9BD4D7; }
     @keyframes tipFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .edit-form { display: flex; gap: 8px; }
     .edit-input {
@@ -484,14 +484,14 @@ const currentStepIdx = currentSubstatus
       color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 13px; outline: none;
       transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .edit-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.15); }
+    .edit-input:focus { border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.15); }
     .edit-input::placeholder { color: rgba(255,255,255,0.25); }
     .edit-send {
-      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 10px;
       padding: 8px 18px; font-size: 13px; font-weight: 600;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .edit-send:hover { background: #00e088; box-shadow: 0 4px 12px -4px rgba(0,255,151,0.4); }
+    .edit-send:hover { background: #00e088; box-shadow: 0 4px 12px -4px rgba(155,212,215,0.4); }
     .edit-send:disabled { opacity: 0.4; cursor: not-allowed; }
     .edit-global {
       background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1);
@@ -503,7 +503,7 @@ const currentStepIdx = currentSubstatus
 
     /* Phase: failed */
     .phase-failed { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 12px; }
-    .failed-title { font-family: 'Space Grotesk', 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #f87171; }
+    .failed-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #f87171; }
     .failed-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
 
     /* Live banner */
@@ -578,7 +578,7 @@ const currentStepIdx = currentSubstatus
             <button class="topbar-btn topbar-btn--primary" id="publish-btn">
               {isLive ? 'Re-publish' : 'Publish ✦'}
             </button>
-            <button class="topbar-btn topbar-btn--activate" id="activate-btn" data-en="Subscribe & Publish">Abonează-te ✦</button>
+            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe & Publish</button>
           </>
         )}
         {canLaunch && !isLaunching && !hasPreview && (
@@ -674,29 +674,27 @@ const currentStepIdx = currentSubstatus
         {/* Phase: Edit (generated/live) — Visual editor sidebar */}
         {hasPreview && (
           <div class="phase-edit">
-            <div class="ve-hint" id="ve-hint" data-en="Click an element to select it. Double-click to edit.">
-              Click pe element pentru selecție. Dublu-click pentru editare.
-            </div>
+            <div class="ve-hint" id="ve-hint">Click an element to select it. Double-click to edit.</div>
 
             <!-- Background edit mode toggle -->
             <div class="ve-bg-toggle">
               <button id="ve-bg-toggle-btn" class="ve-bg-toggle-btn" title="Editare fundal secțiuni"></button>
-              <span class="ve-bg-toggle-label" data-en="Edit section backgrounds">Editare fundal secțiuni</span>
+              <span class="ve-bg-toggle-label">Edit section backgrounds</span>
             </div>
             <div class="ve-bg-picker" id="ve-bg-picker">
               <div class="ve-bg-section-name" id="ve-bg-section-name"></div>
-              <label class="ve-label" data-en="Section background">Fundal secțiune</label>
+              <label class="ve-label">Section background</label>
               <input type="color" id="ve-section-bg-color" class="ve-color" />
               <button id="ve-section-delete-btn2" class="ve-delete-btn" style="margin-top:8px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                <span data-en="Delete section">Șterge secțiunea</span>
+                <span>Delete section</span>
               </button>
             </div>
 
             <!-- Background image mode toggle -->
             <div class="ve-bg-toggle">
               <button id="ve-bgimg-toggle-btn" class="ve-bg-toggle-btn" title="Editare imagini fundal"></button>
-              <span class="ve-bg-toggle-label" data-en="Edit background images">Editare imagini fundal</span>
+              <span class="ve-bg-toggle-label">Edit background images</span>
             </div>
             <div class="ve-bgimg-picker" id="ve-bgimg-picker">
               <div class="ve-bg-section-name" id="ve-bgimg-section-name"></div>
@@ -706,19 +704,19 @@ const currentStepIdx = currentSubstatus
               <button class="img-dialog-btn img-dialog-save ve-bgimg-change" id="ve-bgimg-change">Schimbă imaginea</button>
               <button id="ve-section-delete-btn" class="ve-delete-btn" style="margin-top:8px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                <span data-en="Delete section">Șterge secțiunea</span>
+                <span>Delete section</span>
               </button>
             </div>
 
             <!-- Visual editor controls (shown on element select) -->
             <div class="ve-controls" id="ve-controls" style="display:none;">
               <div class="ve-group">
-                <label class="ve-label" data-en="Font">Font</label>
+                <label class="ve-label">Font</label>
                 <select id="ve-font-family" class="ve-select"></select>
               </div>
               <div class="ve-row">
                 <div class="ve-group ve-grow">
-                  <label class="ve-label" data-en="Size">Mărime</label>
+                  <label class="ve-label">Size</label>
                   <input type="number" id="ve-font-size" class="ve-input-num" min="8" max="120" />
                 </div>
                 <div class="ve-group">
@@ -730,7 +728,7 @@ const currentStepIdx = currentSubstatus
                 </div>
               </div>
               <div class="ve-group">
-                <label class="ve-label" data-en="Alignment">Aliniere</label>
+                <label class="ve-label">Alignment</label>
                 <div class="ve-btn-row">
                   <button id="ve-align-left" class="ve-btn ve-active" title="Left">☰</button>
                   <button id="ve-align-center" class="ve-btn" title="Center">☰</button>
@@ -739,18 +737,18 @@ const currentStepIdx = currentSubstatus
               </div>
               <div class="ve-row">
                 <div class="ve-group">
-                  <label class="ve-label" data-en="Text color">Culoare text</label>
+                  <label class="ve-label">Text color</label>
                   <input type="color" id="ve-text-color" class="ve-color" />
                 </div>
                 <div class="ve-group">
-                  <label class="ve-label" data-en="Background">Fundal</label>
+                  <label class="ve-label">Background</label>
                   <input type="color" id="ve-bg-color" class="ve-color" />
                 </div>
               </div>
               <div class="ve-delete-wrap" id="ve-delete-wrap">
                 <button id="ve-delete-btn" class="ve-delete-btn">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                  <span data-en="Delete element">Șterge element</span>
+                  <span>Delete element</span>
                 </button>
               </div>
             </div>
@@ -934,23 +932,23 @@ const currentStepIdx = currentSubstatus
     #multipage-banner {
       position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
       background: rgba(15,15,20,0.92); backdrop-filter: blur(20px);
-      border: 1px solid rgba(0,255,151,0.2); border-radius: 16px;
+      border: 1px solid rgba(155,212,215,0.2); border-radius: 16px;
       padding: 14px 20px; z-index: 50; min-width: 280px; max-width: 380px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
     }
     .mp-inner { display: flex; align-items: center; gap: 14px; }
     .mp-spinner {
       width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-      border: 2px solid rgba(0,255,151,0.2);
-      border-top-color: #00ff97;
+      border: 2px solid rgba(155,212,215,0.2);
+      border-top-color: #9BD4D7;
       animation: mpSpin 0.8s linear infinite;
     }
     @keyframes mpSpin { to { transform: rotate(360deg); } }
     .mp-content { flex: 1; min-width: 0; }
-    .mp-label { font-size: 10px; font-weight: 700; color: #00ff97; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .mp-label { font-size: 10px; font-weight: 700; color: #9BD4D7; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
     .mp-text { font-size: 13px; color: rgba(255,255,255,0.85); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mp-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-    .mp-fill { height: 100%; background: linear-gradient(90deg, #00ff97, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
+    .mp-fill { height: 100%; background: linear-gradient(90deg, #9BD4D7, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
 
     /* Tour overlay */
     .tour-backdrop {
@@ -969,7 +967,7 @@ const currentStepIdx = currentSubstatus
     .tour-step-indicator { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.4); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
     .tour-text { font-size: 14px; line-height: 1.6; color: #1a1a2e; margin: 0 0 16px; }
     .tour-next-btn {
-      background: #00ff97; color: #1a1a2e; border: none; border-radius: 20px;
+      background: #9BD4D7; color: #1a1a2e; border: none; border-radius: 20px;
       padding: 8px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
       transition: all 0.2s; width: 100%;
     }
@@ -1088,7 +1086,7 @@ const currentStepIdx = currentSubstatus
       color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none;
       transition: border-color 0.2s;
     }
-    .domain-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.12); }
+    .domain-input:focus { border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.12); }
     .domain-input::placeholder { color: rgba(255,255,255,0.25); }
     .domain-modal-error {
       font-size: 13px; color: #f87171;
@@ -1096,7 +1094,7 @@ const currentStepIdx = currentSubstatus
       padding: 8px 12px; border-radius: 8px;
     }
     .domain-modal-btn {
-      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 10px;
       padding: 11px 20px; font-size: 14px; font-weight: 700; cursor: pointer;
       transition: background 0.2s; align-self: flex-start;
     }
@@ -1110,7 +1108,7 @@ const currentStepIdx = currentSubstatus
       background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
       border-radius: 10px; padding: 10px 14px;
     }
-    .domain-ns-item code { font-size: 13px; color: #00ff97; letter-spacing: 0.02em; }
+    .domain-ns-item code { font-size: 13px; color: #9BD4D7; letter-spacing: 0.02em; }
     .domain-ns-copy {
       font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5);
       background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
@@ -1133,11 +1131,11 @@ const currentStepIdx = currentSubstatus
     .domain-or { font-size: 11px; color: rgba(255,255,255,0.25); }
     .domain-buy-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      background: rgba(0,255,151,0.08); border: 1px solid rgba(0,255,151,0.2); border-radius: 8px;
-      color: #00ff97; font-size: 12px; font-weight: 600; padding: 5px 12px;
+      background: rgba(155,212,215,0.08); border: 1px solid rgba(155,212,215,0.2); border-radius: 8px;
+      color: #9BD4D7; font-size: 12px; font-weight: 600; padding: 5px 12px;
       cursor: pointer; transition: all 0.2s;
     }
-    .domain-buy-btn:hover { background: rgba(0,255,151,0.15); border-color: rgba(0,255,151,0.4); }
+    .domain-buy-btn:hover { background: rgba(155,212,215,0.15); border-color: rgba(155,212,215,0.4); }
 
     /* Buy domain modal */
     #buy-domain-modal {
@@ -1164,7 +1162,7 @@ const currentStepIdx = currentSubstatus
       color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; outline: none;
       transition: border-color 0.2s;
     }
-    .buy-domain-input:focus { border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.12); }
+    .buy-domain-input:focus { border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.12); }
     .buy-domain-input::placeholder { color: rgba(255,255,255,0.25); }
     .buy-domain-check-btn {
       background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.15);
@@ -1180,7 +1178,7 @@ const currentStepIdx = currentSubstatus
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
     }
     .buy-domain-result-card.available {
-      background: rgba(0,255,151,0.06); border: 1px solid rgba(0,255,151,0.2);
+      background: rgba(155,212,215,0.06); border: 1px solid rgba(155,212,215,0.2);
     }
     .buy-domain-result-card.unavailable {
       background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2);
@@ -1192,7 +1190,7 @@ const currentStepIdx = currentSubstatus
     .bdr-price { font-size: 13px; color: rgba(255,255,255,0.5); }
     .bdr-premium { font-size: 11px; color: #fbbf24; font-weight: 600; }
     .buy-confirm-btn {
-      background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+      background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 10px;
       padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
       transition: background 0.2s; white-space: nowrap; flex-shrink: 0;
     }
@@ -1213,7 +1211,7 @@ const currentStepIdx = currentSubstatus
 
   <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, shouldLaunch, LAUNCH_STEPS, previewUrl, justActivated, showActivate, serverSectionIds }}>
     // LANGUAGE
-    const _lang = (localStorage.getItem('i18nextLng') || 'ro').split('-')[0];
+    const _lang = (localStorage.getItem('i18nextLng') || 'en').split('-')[0];
     document.querySelectorAll('.edit-suggestion[data-msg-ro]').forEach(btn => {
       const msg = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo;
       if (msg) { btn.dataset.msg = msg; btn.textContent = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo; }
@@ -1783,7 +1781,7 @@ const currentStepIdx = currentSubstatus
       let activeSectionId = null;
       let activeElement = null; // { selector, outerHTML, tag } — set when user clicks an element
       let chatHistory = [];
-      var _isEn = (document.documentElement.lang || 'ro') === 'en';
+      var _isEn = (document.documentElement.lang || 'en') === 'en';
 
       // Load section list from preview iframe
       const iframe = document.getElementById('preview-iframe');

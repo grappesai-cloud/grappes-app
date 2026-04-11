@@ -115,7 +115,7 @@ if (isAuthed) {
 }
 
 function billingColor(status: string): string {
-  if (status === 'active')  return '#00ff97';
+  if (status === 'active')  return '#9BD4D7';
   if (status === 'free')    return '#60a5fa';
   if (status === 'expired') return '#f87171';
   return '#888';
@@ -140,9 +140,9 @@ function fmt(dateStr: string | null | undefined): string {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #00020f;
+      background: #0a0a0a;
       color: #fff;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       min-height: 100vh;
       padding: 40px 20px;
     }
@@ -155,7 +155,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: -0.05em;
       margin-bottom: 8px;
     }
-    h1 span { color: #00ff97; }
+    h1 span { color: #9BD4D7; }
 
     .subtitle {
       color: rgba(255,255,255,0.4);
@@ -192,21 +192,21 @@ function fmt(dateStr: string | null | undefined): string {
       border-radius: 10px;
       padding: 14px 16px;
       color: #fff;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       font-size: 16px;
       margin-bottom: 16px;
       outline: none;
       transition: border-color 0.2s;
     }
-    .login-card input[type="password"]:focus { border-color: #00ff97; }
+    .login-card input[type="password"]:focus { border-color: #9BD4D7; }
     .login-card button {
       width: 100%;
-      background: #00ff97;
-      color: #00020f;
+      background: #9BD4D7;
+      color: #0a0a0a;
       border: none;
       border-radius: 10px;
       padding: 14px;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       font-size: 16px;
       font-weight: 700;
       cursor: pointer;
@@ -241,7 +241,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: -0.04em;
       line-height: 1;
     }
-    .stat-value.green   { color: #00ff97; }
+    .stat-value.green   { color: #9BD4D7; }
     .stat-value.blue    { color: #60a5fa; }
     .stat-value.red     { color: #f87171; }
     .stat-value.orange  { color: #fb923c; }
@@ -297,7 +297,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .badge-green   { background: rgba(0,255,151,0.12); color: #00ff97; border: 1px solid rgba(0,255,151,0.25); }
+    .badge-green   { background: rgba(155,212,215,0.12); color: #9BD4D7; border: 1px solid rgba(155,212,215,0.25); }
     .badge-blue    { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
     .badge-red     { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
     .badge-orange  { background: rgba(251,146,60,0.12); color: #fb923c; border: 1px solid rgba(251,146,60,0.25); }
@@ -318,12 +318,12 @@ function fmt(dateStr: string | null | undefined): string {
 
     /* ── Mark Paid button ───────────────────────────────────────────── */
     .btn-mark-paid {
-      background: rgba(0,255,151,0.1);
-      color: #00ff97;
-      border: 1px solid rgba(0,255,151,0.3);
+      background: rgba(155,212,215,0.1);
+      color: #9BD4D7;
+      border: 1px solid rgba(155,212,215,0.3);
       border-radius: 8px;
       padding: 6px 14px;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
@@ -331,7 +331,7 @@ function fmt(dateStr: string | null | undefined): string {
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
-    .btn-mark-paid:hover { background: rgba(0,255,151,0.2); }
+    .btn-mark-paid:hover { background: rgba(155,212,215,0.2); }
     .btn-mark-paid:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .empty-row td {
@@ -415,7 +415,7 @@ function fmt(dateStr: string | null | undefined): string {
             ) : pendingPayouts.map((p: any) => (
               <tr>
                 <td>{(p.users as any)?.email ?? p.referrer_id}</td>
-                <td><strong style="color:#00ff97;">{Number(p.amount).toFixed(2)}€</strong></td>
+                <td><strong style="color:#9BD4D7;">{Number(p.amount).toFixed(2)}€</strong></td>
                 <td>{fmt(p.requested_at ?? p.created_at)}</td>
                 <td>
                   <button

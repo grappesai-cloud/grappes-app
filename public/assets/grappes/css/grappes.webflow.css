@@ -2040,22 +2040,6 @@ textarea.w-input, textarea.w-select {
   display: grid;
 }
 
-@font-face {
-  font-family: DM Sans;
-  src: url("../67e7c9d8a0b57d64bc7e4901_DMSans-Light.ttf") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: DM Sans;
-  src: url("../67e7c9d8ac76a76158e9b7ad_DMSans-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --th-white: white;
   --th-black-1: black;

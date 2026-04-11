@@ -19,11 +19,9 @@ const planLabel = (p: string | null) =>
     <!-- Header -->
     <div style="margin-bottom:2.5rem;">
       <h1 style="font-size:clamp(1.75rem,3vw,2.25rem);font-weight:700;letter-spacing:-0.04em;margin:0 0 8px;">
-        <span data-en="Referral program">Program de referral</span>
+        <span>Referral program</span>
       </h1>
-      <p style="color:rgba(255,255,255,0.5);font-size:15px;margin:0;" data-en="Earn cash for every person you bring to Grappes.">
-        Câștigă bani cash pentru fiecare persoană adusă pe Grappes.
-      </p>
+      <p style="color:rgba(255,255,255,0.5);font-size:15px;margin:0;">Earn cash for every person you bring to Grappes.</p>
     </div>
 
     <!-- Stats row -->
@@ -34,25 +32,25 @@ const planLabel = (p: string | null) =>
         { label: 'Referrals confirmate', enLabel: 'Confirmed referrals', value: String(stats.confirmedCount), highlight: false },
         { label: 'Referrals în așteptare', enLabel: 'Pending referrals', value: String(stats.pendingCount), highlight: false },
       ].map(s => (
-        <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(0,255,151,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
+        <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(155,212,215,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
           <p style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;" data-en={s.enLabel}>{s.label}</p>
-          <p style={`font-size:1.75rem;font-weight:700;font-family:'Space Grotesk',sans-serif;margin:0;color:${s.highlight ? '#00ff97' : '#fff'};`}>{s.value}</p>
+          <p style={`font-size:1.75rem;font-weight:700;font-family:'Inter',sans-serif;margin:0;color:${s.highlight ? '#9BD4D7' : '#fff'};`}>{s.value}</p>
         </div>
       ))}
     </div>
 
     <!-- Link & Code card -->
     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-      <h2 style="font-size:16px;font-weight:700;margin:0 0 20px;" data-en="Your referral link & code">Link-ul și codul tău de referral</h2>
+      <h2 style="font-size:16px;font-weight:700;margin:0 0 20px;">Your referral link & code</h2>
 
       <!-- Link -->
       <div style="margin-bottom:16px;">
-        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;" data-en="Link (for social media, bio, articles)">Link (social media, bio, articole)</label>
+        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Link (for social media, bio, articles)</label>
         <div style="display:flex;gap:10px;align-items:center;">
           <input id="ref-link" type="text" value={refLink} readonly
             style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;color:#fff;font-size:14px;font-family:monospace;outline:none;" />
           <button id="copy-link" onclick="navigator.clipboard.writeText(document.getElementById('ref-link').value);this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500);"
-            style="background:#00ff97;color:#00020f;border:none;border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+            style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
             Copy
           </button>
         </div>
@@ -60,11 +58,11 @@ const planLabel = (p: string | null) =>
 
       <!-- Code -->
       <div>
-        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;" data-en="Code (mention verbally — podcast, video)">Cod (menționat verbal — podcast, video)</label>
+        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Code (mention verbally — podcast, video)</label>
 
         <!-- Display mode -->
         <div id="code-display" style="display:flex;gap:10px;align-items:center;">
-          <div id="code-value" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#00ff97;">
+          <div id="code-value" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#9BD4D7;">
             {stats.code.toUpperCase()}
           </div>
           <button id="copy-code"
@@ -86,7 +84,7 @@ const planLabel = (p: string | null) =>
           </div>
           <div style="display:flex;gap:8px;">
             <button id="save-code-btn"
-              style="background:#00ff97;color:#00020f;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
+              style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
               Salvează
             </button>
             <button id="cancel-code-btn"
@@ -101,13 +99,13 @@ const planLabel = (p: string | null) =>
 
     <!-- Rewards table -->
     <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-      <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;" data-en="How rewards work">Cum funcționează recompensele</h2>
+      <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">How rewards work</h2>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead>
           <tr>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Plan">Plan</th>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Your reward">Recompensa ta</th>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="When">Când</th>
+            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Plan</th>
+            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Your reward</th>
+            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">When</th>
           </tr>
         </thead>
         <tbody>
@@ -118,53 +116,44 @@ const planLabel = (p: string | null) =>
           ].map(row => (
             <tr>
               <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);" data-en={row.enPlan}>{row.plan}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#00ff97;font-weight:700;" data-en={row.enReward}>{row.reward}</td>
+              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#9BD4D7;font-weight:700;" data-en={row.enReward}>{row.reward}</td>
               <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);" data-en={row.enWhen}>{row.when}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p style="margin:16px 0 0;font-size:13px;color:rgba(255,255,255,0.35);" data-en="Payout in cash via bank transfer when balance reaches €50.">
-        Plata cash prin transfer bancar când soldul atinge 50€.
-      </p>
+      <p style="margin:16px 0 0;font-size:13px;color:rgba(255,255,255,0.35);">Payout in cash via bank transfer when balance reaches €50.</p>
     </div>
 
     <!-- Payout request -->
     {stats.balance >= 50 && !stats.hasPendingPayout && (
-      <div style="background:rgba(0,255,151,0.06);border:1px solid rgba(0,255,151,0.2);border-radius:20px;padding:24px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div style="background:rgba(155,212,215,0.06);border:1px solid rgba(155,212,215,0.2);border-radius:20px;padding:24px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
         <div>
-          <p style="font-weight:700;color:#00ff97;margin:0 0 4px;" data-en="You can request a payout!">Poți solicita plata!</p>
-          <p style="font-size:14px;color:rgba(255,255,255,0.6);margin:0;" data-en="You have €{stats.balance.toFixed(2)} available. We'll contact you for your IBAN.">
-            Ai {stats.balance.toFixed(2)}€ disponibili. Te contactăm pentru IBAN.
-          </p>
+          <p style="font-weight:700;color:#9BD4D7;margin:0 0 4px;">You can request a payout!</p>
+          <p style="font-size:14px;color:rgba(255,255,255,0.6);margin:0;">You have €{stats.balance.toFixed(2)} available. We'll contact you for your IBAN.</p>
         </div>
         <button id="payout-btn"
-          style="background:#00ff97;color:#00020f;border:none;border-radius:12px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;"
-          data-en="Request payout">
-          Solicită plata
-        </button>
+          style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:12px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">Request payout</button>
       </div>
     )}
 
     {stats.hasPendingPayout && (
       <div style="background:rgba(246,197,71,0.06);border:1px solid rgba(246,197,71,0.2);border-radius:20px;padding:20px;margin-bottom:1.5rem;">
-        <p style="color:#f6c547;font-weight:600;margin:0;" data-en="Payout in progress — we'll contact you shortly for your IBAN.">
-          Plată în procesare — te contactăm în curând pentru IBAN.
-        </p>
+        <p style="color:#f6c547;font-weight:600;margin:0;">Payout in progress — we'll contact you shortly for your IBAN.</p>
       </div>
     )}
 
     <!-- Referrals history -->
     {stats.referrals.length > 0 && (
       <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;" data-en="Referral history">Istoric referrals</h2>
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">Referral history</h2>
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
           <thead>
             <tr>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Date">Data</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Plan">Plan</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Status">Status</th>
-              <th style="text-align:right;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Earned">Câștigat</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Date</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Plan</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Status</th>
+              <th style="text-align:right;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Earned</th>
             </tr>
           </thead>
           <tbody>
@@ -177,12 +166,12 @@ const planLabel = (p: string | null) =>
                   {planLabel(r.plan_type)}
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(0,255,151,0.12);color:#00ff97;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}
                     data-en={r.status === 'confirmed' ? 'Confirmed' : 'Pending'}>
                     {r.status === 'confirmed' ? 'Confirmat' : 'În așteptare'}
                   </span>
                 </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#00ff97;font-weight:700;">
+                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#9BD4D7;font-weight:700;">
                   {r.amount_earned > 0 ? `+${r.amount_earned}€` : '—'}
                 </td>
               </tr>
@@ -195,13 +184,13 @@ const planLabel = (p: string | null) =>
     <!-- Payout history -->
     {stats.payouts.length > 0 && (
       <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;">
-        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;" data-en="Payout history">Istoric plăți</h2>
+        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">Payout history</h2>
         <table style="width:100%;border-collapse:collapse;font-size:14px;">
           <thead>
             <tr>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Date">Data</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Amount">Sumă</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);" data-en="Status">Status</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Date</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Amount</th>
+              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -212,7 +201,7 @@ const planLabel = (p: string | null) =>
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#fff;font-weight:700;">{p.amount.toFixed(2)}€</td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(0,255,151,0.12);color:#00ff97;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}
                     data-en={p.status === 'paid' ? 'Paid' : 'Processing'}>
                     {p.status === 'paid' ? 'Plătit' : 'În procesare'}
                   </span>
@@ -231,14 +220,14 @@ const planLabel = (p: string | null) =>
   // ── Payout request ────────────────────────────────────────────────────────
   const payoutBtn = document.getElementById('payout-btn');
   if (payoutBtn) {
-    const _isEn = (localStorage.getItem('i18nextLng') || 'ro').split('-')[0] === 'en';
+    const _isEn = (localStorage.getItem('i18nextLng') || 'en').split('-')[0] === 'en';
     payoutBtn.addEventListener('click', async () => {
       payoutBtn.disabled = true;
       payoutBtn.textContent = _isEn ? 'Sending...' : 'Se trimite...';
       try {
         const res = await fetch('/api/referral/request-payout', { method: 'POST' });
         if (res.ok) {
-          payoutBtn.closest('div')!.innerHTML = `<p style="color:#00ff97;font-weight:600;margin:0;">✓ ${_isEn ? 'Request sent! We\'ll contact you shortly for your IBAN.' : 'Cerere trimisă! Te contactăm în curând pentru IBAN.'}</p>`;
+          payoutBtn.closest('div')!.innerHTML = `<p style="color:#9BD4D7;font-weight:600;margin:0;">✓ ${_isEn ? 'Request sent! We\'ll contact you shortly for your IBAN.' : 'Cerere trimisă! Te contactăm în curând pentru IBAN.'}</p>`;
         } else {
           const d = await res.json();
           payoutBtn.textContent = d.error || (_isEn ? 'Error' : 'Eroare');
@@ -316,7 +305,7 @@ const planLabel = (p: string | null) =>
         const d = await res.json();
         if (d.available) {
           codeStatus.textContent = '✓ Disponibil';
-          codeStatus.style.color = '#00ff97';
+          codeStatus.style.color = '#9BD4D7';
           isAvailable = true;
           saveBtn.disabled = false;
           saveBtn.style.opacity = '1';

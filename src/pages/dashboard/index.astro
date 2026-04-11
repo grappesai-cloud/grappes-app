@@ -20,17 +20,13 @@ try {
 
 <Dashboard title="Projects">
   <div style="text-align:center;margin-bottom:60px;">
-    <span style="display:inline-block;font-size:16px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#00ff97;margin-bottom:14px;" data-en="Dashboard">
-      Panou
-    </span>
-    <h2 style="font-family:'Space Grotesk',sans-serif;font-size:72px;font-weight:400;line-height:1.1;letter-spacing:-0.08em;color:#fff;margin-bottom:14px;" data-en="Your Projects">
-      Proiectele tale
-    </h2>
+    <span style="display:inline-block;font-size:16px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#9BD4D7;margin-bottom:14px;">Dashboard</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:72px;font-weight:400;line-height:1.1;letter-spacing:-0.08em;color:#fff;margin-bottom:14px;">Your Projects</h2>
     <p style="font-size:20px;color:rgba(255,255,255,0.5);margin-bottom:32px;">
-      {totalCount} / {dbUser?.projects_limit ?? 1} <span data-en="project(s) used">proiect(e) utilizat(e)</span>
+      {totalCount} / {dbUser?.projects_limit ?? 1} <span>project(s) used</span>
     </p>
-    <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#00ff97;color:#00020f;border:none;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;transition:all 0.3s;line-height:1;">
-      <span data-en="+ New Project">+ Proiect nou</span>
+    <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#9BD4D7;color:#0a0a0a;border:none;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;transition:all 0.3s;line-height:1;">
+      <span>+ New Project</span>
       <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
     </a>
   </div>
@@ -39,15 +35,15 @@ try {
     <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;text-align:center;gap:16px;">
       <div style="margin-bottom:12px;">
         <svg width="120" height="120" viewBox="0 0 72 72" fill="none">
-          <path d="M36 8L44 28H28L36 8Z" stroke="#00ff97" stroke-width="1.5" fill="rgba(0,255,151,0.08)"/>
-          <path d="M36 64L28 44H44L36 64Z" stroke="#00ff97" stroke-width="1.5" fill="rgba(0,255,151,0.08)"/>
-          <circle cx="36" cy="36" r="6" stroke="#00ff97" stroke-width="1.5" fill="rgba(0,255,151,0.12)"/>
-          <circle cx="36" cy="36" r="16" stroke="rgba(0,255,151,0.15)" stroke-width="1" stroke-dasharray="3 3"/>
+          <path d="M36 8L44 28H28L36 8Z" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.08)"/>
+          <path d="M36 64L28 44H44L36 64Z" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.08)"/>
+          <circle cx="36" cy="36" r="6" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.12)"/>
+          <circle cx="36" cy="36" r="16" stroke="rgba(155,212,215,0.15)" stroke-width="1" stroke-dasharray="3 3"/>
         </svg>
       </div>
-      <h2 style="font-size:32px;font-weight:700;letter-spacing:-0.04em;" data-en="No projects yet">Niciun proiect încă</h2>
-      <p style="color:rgba(255,255,255,0.5);font-size:18px;max-width:38ch;line-height:1.7;" data-en="Create your first AI-generated website in under 10 minutes.">Creează primul tău site generat de AI în sub 10 minute.</p>
-      <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#00ff97;color:#00020f;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;margin-top:8px;" data-en="Create Project">Creează proiect</a>
+      <h2 style="font-size:32px;font-weight:700;letter-spacing:-0.04em;">No projects yet</h2>
+      <p style="color:rgba(255,255,255,0.5);font-size:18px;max-width:38ch;line-height:1.7;">Create your first AI-generated website in under 10 minutes.</p>
+      <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#9BD4D7;color:#0a0a0a;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;margin-top:8px;">Create Project</a>
     </div>
   ) : (
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:28px;">

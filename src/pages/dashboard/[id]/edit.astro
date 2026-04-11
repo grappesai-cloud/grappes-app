@@ -23,9 +23,9 @@ const isLive = project.status === 'live';
     <!-- Sidebar -->
     <aside class="edit-sidebar">
       <div class="sidebar-header">
-        <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back">← Înapoi</a>
+        <a href={`/dashboard/${project.id}`} class="back-link">← Back</a>
         <h1>{project.name}</h1>
-        <p class="sidebar-sub" data-en="Double-click any element to edit">Dublu-click pe orice element</p>
+        <p class="sidebar-sub">Double-click any element to edit</p>
       </div>
 
       <!-- Sections list -->
@@ -35,9 +35,7 @@ const isLive = project.status === 'live';
 
       <div class="sidebar-actions">
         {isLive && project.preview_url && !project.preview_url.startsWith('/') && (
-          <a href={project.preview_url} target="_blank" rel="noopener" class="view-live-btn" data-en="View Live ↗">
-            Vezi Live ↗
-          </a>
+          <a href={project.preview_url} target="_blank" rel="noopener" class="view-live-btn">View Live ↗</a>
         )}
         <button class="publish-btn" id="publish-btn">
           <span id="publish-label" data-en={isLive ? 'Re-publish' : 'Publish to Web ✦'}>
@@ -51,7 +49,7 @@ const isLive = project.status === 'live';
     <!-- Preview -->
     <div class="preview-col">
       <div class="iframe-bar">
-        <span class="iframe-label" id="iframe-label" data-en="Preview">Previzualizare</span>
+        <span class="iframe-label" id="iframe-label">Preview</span>
         <div class="iframe-bar-right">
           <span class="deploy-status" id="deploy-status"></span>
           <button class="refresh-btn" id="refresh-btn" title="Reload preview">↺</button>
@@ -86,21 +84,21 @@ const isLive = project.status === 'live';
       </div>
       <!-- Container-only bg -->
       <div class="toolbar-section tb-group" id="tb-bg-only" style="display:none">
-        <label data-en="Background">Fundal</label>
+        <label>Background</label>
         <input type="color" id="tb-bg-color-only" />
       </div>
-      <div class="toolbar-hint" id="tb-hint" data-en="Double-click to edit text">Dublu-click pentru editare text</div>
+      <div class="toolbar-hint" id="tb-hint">Double-click to edit text</div>
     </div>
 
     <!-- Text edit dialog (centered) -->
     <div id="text-dialog" class="image-dialog">
       <div class="image-dialog-backdrop" id="text-dialog-backdrop"></div>
       <div class="image-dialog-box">
-        <p class="image-dialog-title" id="text-dialog-title" data-en="Edit text">Editează textul</p>
+        <p class="image-dialog-title" id="text-dialog-title">Edit text</p>
         <textarea id="text-dialog-input" class="text-dialog-input" rows="4"></textarea>
         <div class="image-dialog-actions">
-          <button id="text-dialog-cancel" class="image-btn-cancel" data-en="Cancel">Anulează</button>
-          <button id="text-dialog-apply" class="image-btn-apply" data-en="Apply">Aplică</button>
+          <button id="text-dialog-cancel" class="image-btn-cancel">Cancel</button>
+          <button id="text-dialog-apply" class="image-btn-apply">Apply</button>
         </div>
       </div>
     </div>
@@ -109,20 +107,20 @@ const isLive = project.status === 'live';
     <div id="image-dialog" class="image-dialog">
       <div class="image-dialog-backdrop" id="image-dialog-backdrop"></div>
       <div class="image-dialog-box">
-        <p class="image-dialog-title" data-en="Change image">Schimbă imaginea</p>
+        <p class="image-dialog-title">Change image</p>
         <img id="image-dialog-preview" class="image-dialog-preview" src="" alt="preview" />
         <div class="image-dialog-field">
-          <label data-en="Image URL">URL imagine</label>
+          <label>Image URL</label>
           <input type="text" id="tb-image-url" placeholder="https://..." />
         </div>
-        <div class="image-dialog-or" data-en="or">sau</div>
+        <div class="image-dialog-or">or</div>
         <div class="image-dialog-field">
-          <label data-en="Upload from device">Încarcă de pe dispozitiv</label>
+          <label>Upload from device</label>
           <input type="file" id="tb-image-file" accept="image/*" />
         </div>
         <div class="image-dialog-actions">
-          <button id="tb-image-cancel" class="image-btn-cancel" data-en="Cancel">Anulează</button>
-          <button id="tb-image-apply" class="image-btn-apply" data-en="Apply">Aplică</button>
+          <button id="tb-image-cancel" class="image-btn-cancel">Cancel</button>
+          <button id="tb-image-apply" class="image-btn-apply">Apply</button>
         </div>
       </div>
     </div>
@@ -132,7 +130,7 @@ const isLive = project.status === 'live';
 <script define:vars={{ projectId: id, previewUrl }}>
   const iframe = document.getElementById('preview-iframe');
   const toolbar = document.getElementById('wn-toolbar');
-  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   let selectedWnId = null;
   let selectedType = null;
@@ -564,7 +562,7 @@ const isLive = project.status === 'live';
   }
   .back-link { color: #71717a; text-decoration: none; font-size: 0.75rem; display: block; margin-bottom: 0.4rem; transition: color 0.2s; }
   .back-link:hover { color: #fafafa; }
-  .sidebar-header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 0.875rem; font-weight: 600; color: #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.15rem; }
+  .sidebar-header h1 { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600; color: #fafafa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.15rem; }
   .sidebar-sub { font-size: 0.7rem; color: #52525b; }
 
   .sidebar-sections {
@@ -797,7 +795,7 @@ const isLive = project.status === 'live';
   }
   .image-dialog-title {
     color: #fafafa;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 1.1rem;
     font-weight: 700;
     margin: 0;

@@ -11,25 +11,25 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
 
 <Dashboard title={`Settings — ${project.name}`} projectId={project.id}>
   <div class="page-header">
-    <a href={`/dashboard/${project.id}`} class="back-link" data-en="← Back to project">← Înapoi la proiect</a>
-    <h1 data-en="Settings">Setări</h1>
+    <a href={`/dashboard/${project.id}`} class="back-link">← Back to project</a>
+    <h1>Settings</h1>
     <p class="subtitle">{project.name}</p>
   </div>
 
   <div class="settings-sections">
     <!-- Rename project -->
     <section class="settings-card">
-      <h2 data-en="Project Name">Nume proiect</h2>
+      <h2>Project Name</h2>
       <form id="rename-form" class="form-row">
         <input type="text" name="name" value={project.name} class="input" />
-        <button type="submit" class="btn-primary" data-en="Save">Salvează</button>
+        <button type="submit" class="btn-primary">Save</button>
       </form>
     </section>
 
     <!-- Custom domain -->
     <section class="settings-card">
-      <h2 data-en="Custom Domain">Domeniu personalizat</h2>
-      <p class="help" data-en="Point your domain to this project after it's deployed.">Leagă domeniul tău de acest proiect după publicare.</p>
+      <h2>Custom Domain</h2>
+      <p class="help">Point your domain to this project after it's deployed.</p>
       <form id="domain-form" class="form-row">
         <input
           type="text"
@@ -39,20 +39,20 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
           class="input"
           id="domain-input"
         />
-        <button type="submit" class="btn-primary" data-en="Save">Salvează</button>
+        <button type="submit" class="btn-primary">Save</button>
       </form>
 
       {project.custom_domain && (
         <div class="dns-info">
-          <p class="dns-title" data-en="Required DNS record:">Configurare DNS necesară:</p>
+          <p class="dns-title">Required DNS record:</p>
           <div class="dns-record">
             <span class="dns-type">CNAME</span>
             <span class="dns-host">@</span>
             <span class="dns-value">cname.vercel-dns.com</span>
           </div>
-          <p class="dns-help" data-en="Add this CNAME record in your domain provider's DNS settings. Changes can take up to 48 hours to propagate.">Adaugă această înregistrare CNAME în setările DNS ale furnizorului tău de domeniu. Modificările pot dura până la 48 de ore.</p>
+          <p class="dns-help">Add this CNAME record in your domain provider's DNS settings. Changes can take up to 48 hours to propagate.</p>
           <div class="dns-verify-row">
-            <button id="verify-dns-btn" class="btn-secondary dns-verify-btn" data-en="Verify DNS">Verifică DNS</button>
+            <button id="verify-dns-btn" class="btn-secondary dns-verify-btn">Verify DNS</button>
             <span id="dns-status" class="dns-status-badge" style="display:none;"></span>
           </div>
         </div>
@@ -61,9 +61,9 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
 
     <!-- Danger zone -->
     <section class="settings-card danger">
-      <h2 data-en="Danger Zone">Zonă periculoasă</h2>
-      <p class="help" data-en="Archive this project. This cannot be undone.">Arhivează acest proiect. Această acțiune nu poate fi anulată.</p>
-      <button id="archive-btn" class="btn-danger" data-en="Archive Project">Arhivează proiect</button>
+      <h2>Danger Zone</h2>
+      <p class="help">Archive this project. This cannot be undone.</p>
+      <button id="archive-btn" class="btn-danger">Archive Project</button>
     </section>
   </div>
 </Dashboard>
@@ -84,7 +84,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     e.preventDefault();
     const name = new FormData(e.target).get('name');
     const btn = e.target.querySelector('.btn-primary');
-    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
@@ -111,7 +111,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     e.preventDefault();
     const domain = new FormData(e.target).get('custom_domain');
     const btn = e.target.querySelector('.btn-primary');
-    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     btn.disabled = true;
     btn.textContent = _isEn ? 'Saving…' : 'Se salvează…';
     try {
@@ -143,7 +143,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   document.getElementById('verify-dns-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('verify-dns-btn');
     const status = document.getElementById('dns-status');
-    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     btn.disabled = true;
     btn.textContent = _isEn ? 'Checking…' : 'Se verifică…';
     status.style.display = 'none';
@@ -171,7 +171,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
 
   // Archive
   document.getElementById('archive-btn')?.addEventListener('click', async () => {
-    const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     const msg = _isEn ? 'Archive this project? It will be removed from your dashboard.' : 'Arhivezi acest proiect? Va fi eliminat din panou.';
     if (!confirm(msg)) return;
     try {
@@ -200,7 +200,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -227,7 +227,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   .settings-card:nth-child(2) { animation-delay: 0.08s; }
   .settings-card:nth-child(3) { animation-delay: 0.16s; }
   .settings-card h2 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     margin-bottom: 0.75rem;
@@ -246,13 +246,13 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     transition: border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .input:focus {
-    border-color: #00ff97;
-    box-shadow: 0 0 0 3px rgba(0,255,151,0.15);
+    border-color: #9BD4D7;
+    box-shadow: 0 0 0 3px rgba(155,212,215,0.15);
     outline: none;
   }
   .btn-primary {
-    background: #00ff97;
-    color: #00020f;
+    background: #9BD4D7;
+    color: #0a0a0a;
     border: none;
     border-radius: 16px;
     padding: 12px 20px;
@@ -265,7 +265,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   .btn-primary:hover {
     background: #00e088;
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0,255,151,0.25);
+    box-shadow: 0 8px 24px rgba(155,212,215,0.25);
   }
 
   .btn-primary.save-success {
@@ -314,7 +314,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px 12px;
     font-family: 'Courier New', monospace; font-size: 13px;
   }
-  .dns-type { color: #00ff97; font-weight: 700; }
+  .dns-type { color: #9BD4D7; font-weight: 700; }
   .dns-host { color: rgba(255,255,255,0.6); }
   .dns-value { color: rgba(255,255,255,0.9); }
   .dns-help { font-size: 0.8rem; color: rgba(255,255,255,0.4); line-height: 1.5; }

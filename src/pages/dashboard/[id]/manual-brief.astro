@@ -17,20 +17,20 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
   <div class="wizard-wrap">
 
     <div class="page-header">
-      <a href="/dashboard" class="back-link" data-en="← Projects">← Proiecte</a>
-      <h1 data-en="Create Brief">{project.name}</h1>
-      <p class="subtitle" data-en="Fill in the details for your website.">Completează detaliile pentru site-ul tău.</p>
+      <a href="/dashboard" class="back-link">← Projects</a>
+      <h1>Create Brief</h1>
+      <p class="subtitle">Fill in the details for your website.</p>
     </div>
 
     <!-- Step indicator -->
     <div class="steps-bar">
-      <div class="step active" data-step="1"><span class="step-num">1</span><span class="step-label" data-en="Basics">Baze</span></div>
+      <div class="step active" data-step="1"><span class="step-num">1</span><span class="step-label">Basics</span></div>
       <div class="step-line"></div>
-      <div class="step" data-step="2"><span class="step-num">2</span><span class="step-label" data-en="Content">Conținut</span></div>
+      <div class="step" data-step="2"><span class="step-num">2</span><span class="step-label">Content</span></div>
       <div class="step-line"></div>
       <div class="step" data-step="3"><span class="step-num">3</span><span class="step-label">Branding</span></div>
       <div class="step-line"></div>
-      <div class="step" data-step="4"><span class="step-num">4</span><span class="step-label" data-en="Confirm">Confirmare</span></div>
+      <div class="step" data-step="4"><span class="step-num">4</span><span class="step-label">Confirm</span></div>
     </div>
 
     <!-- STEP 1: Basics -->
@@ -38,23 +38,23 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
       <div class="form-card">
 
         <div class="field-group">
-          <label data-en="Type of site">Tipul site-ului</label>
+          <label>Type of site</label>
           <div class="choice-row">
             <button class="choice-btn active" data-field="page_type" data-value="landing">
               <span class="choice-icon">⬛</span>
-              <span class="choice-title" data-en="Landing page">Landing page</span>
-              <span class="choice-desc" data-en="Single page, high conversion">O pagină, conversie mare</span>
+              <span class="choice-title">Landing page</span>
+              <span class="choice-desc">Single page, high conversion</span>
             </button>
             <button class="choice-btn" data-field="page_type" data-value="multi-page">
               <span class="choice-icon">⬛⬛⬛</span>
-              <span class="choice-title" data-en="Multi-page">Multi-pagini</span>
-              <span class="choice-desc" data-en="Home, About, Services, Contact...">Home, Despre, Servicii, Contact…</span>
+              <span class="choice-title">Multi-page</span>
+              <span class="choice-desc">Home, About, Services, Contact...</span>
             </button>
           </div>
         </div>
 
         <div class="field-group">
-          <label data-en="Industry / domain">Industrie / domeniu</label>
+          <label>Industry / domain</label>
           <div class="industry-chips">
             <button class="tag-btn" data-field="industry_chip" data-value="Restaurant / Cafenea">Restaurant / Cafenea</button>
             <button class="tag-btn" data-field="industry_chip" data-value="Salon / Spa">Salon / Spa</button>
@@ -70,7 +70,7 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
         </div>
 
         <div class="field-group">
-          <label data-en="Website language">Limba site-ului</label>
+          <label>Website language</label>
           <div class="choice-row">
             <button class="choice-btn active" data-field="site_language" data-value="ro">
               <span class="choice-icon">🇷🇴</span>
@@ -82,32 +82,32 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
             </button>
             <button class="choice-btn" data-field="site_language" data-value="ro-en">
               <span class="choice-icon">🌐</span>
-              <span class="choice-title" data-en="Both">Ambele</span>
+              <span class="choice-title">Both</span>
             </button>
           </div>
         </div>
 
         <div class="field-group">
-          <label data-en="Level of detail">Nivel de detaliu</label>
+          <label>Level of detail</label>
           <div class="choice-row">
             <button class="choice-btn" data-field="complexity" data-value="essential">
               <span class="choice-title">Essential</span>
-              <span class="choice-desc" data-en="6–8 sections, clean">6–8 secțiuni, curat</span>
+              <span class="choice-desc">6–8 sections, clean</span>
             </button>
             <button class="choice-btn active" data-field="complexity" data-value="complete">
               <span class="choice-title">Complete</span>
-              <span class="choice-desc" data-en="10–14 sections, full">10–14 secțiuni, complet</span>
+              <span class="choice-desc">10–14 sections, full</span>
             </button>
             <button class="choice-btn" data-field="complexity" data-value="showcase">
               <span class="choice-title">Showcase</span>
-              <span class="choice-desc" data-en="14+ sections, rich">14+ secțiuni, rich</span>
+              <span class="choice-desc">14+ sections, rich</span>
             </button>
           </div>
         </div>
 
       </div>
       <div class="step-actions">
-        <button class="btn-next" onclick="goToStep(2)" data-en="Continue →">Continuă →</button>
+        <button class="btn-next" onclick="goToStep(2)">Continue →</button>
       </div>
     </div>
 
@@ -117,32 +117,32 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
 
         <div class="field-grid-2">
           <div class="field-group">
-            <label data-en="Business name">Numele afacerii <span class="req">*</span></label>
+            <label>Business name<span class="req">*</span></label>
             <input type="text" id="business-name" placeholder="ex: Bella Cucina, Acme SRL..." />
           </div>
           <div class="field-group">
-            <label>Tagline <span class="opt" data-en="optional">opțional</span></label>
+            <label>Tagline <span class="opt">optional</span></label>
             <input type="text" id="business-tagline" placeholder="ex: Mâncare cu suflet din 1998" />
           </div>
         </div>
 
         <div class="field-group">
-          <label data-en="Business description (2-3 sentences)">Descriere afacere (2-3 propoziții) <span class="req">*</span></label>
+          <label>Business description (2-3 sentences)<span class="req">*</span></label>
           <textarea id="business-description" rows="3" placeholder="Spune pe scurt ce faci, pentru cine și ce te diferențiază..."></textarea>
         </div>
 
         <div class="field-group">
-          <label data-en="Main headline for the site">Titlu principal pe site <span class="req">*</span></label>
+          <label>Main headline for the site<span class="req">*</span></label>
           <input type="text" id="content-headline" placeholder="ex: Construim case cu suflet în București" />
         </div>
 
         <div class="field-group">
-          <label data-en="About section text">Text secțiunea Despre <span class="opt" data-en="optional">opțional</span></label>
+          <label>About section text<span class="opt">optional</span></label>
           <textarea id="content-about" rows="3" placeholder="Povestea ta, misiunea, echipa..."></textarea>
         </div>
 
         <div class="field-group" id="pages-group" style="display:none">
-          <label data-en="Pages">Pagini</label>
+          <label>Pages</label>
           <div class="tag-wrap" id="pages-wrap">
             <button class="tag-btn active" data-field="page" data-value="Home">Home</button>
             <button class="tag-btn active" data-field="page" data-value="Despre">Despre</button>
@@ -157,44 +157,44 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
         </div>
 
         <div class="field-group">
-          <label data-en="Services / products (one per line)">Servicii / produse (unul pe linie) <span class="opt" data-en="optional">opțional</span></label>
+          <label>Services / products (one per line)<span class="opt">optional</span></label>
           <textarea id="content-services" rows="3" placeholder="Design interior&#10;Renovare completă&#10;Consultanță"></textarea>
         </div>
 
         <div class="field-grid-3">
           <div class="field-group">
-            <label>Email <span class="opt" data-en="optional">opțional</span></label>
+            <label>Email <span class="opt">optional</span></label>
             <input type="email" id="contact-email" placeholder="contact@firma.ro" />
           </div>
           <div class="field-group">
-            <label data-en="Phone">Telefon <span class="opt" data-en="optional">opțional</span></label>
+            <label>Phone<span class="opt">optional</span></label>
             <input type="text" id="contact-phone" placeholder="+40 700 000 000" />
           </div>
           <div class="field-group">
-            <label data-en="Address">Adresă <span class="opt" data-en="optional">opțional</span></label>
+            <label>Address<span class="opt">optional</span></label>
             <input type="text" id="contact-address" placeholder="Str. Exemplu 1, București" />
           </div>
         </div>
 
         <div class="field-grid-3">
           <div class="field-group">
-            <label>Facebook <span class="opt" data-en="optional">opțional</span></label>
+            <label>Facebook <span class="opt">optional</span></label>
             <input type="text" id="social-facebook" placeholder="facebook.com/pagina" />
           </div>
           <div class="field-group">
-            <label>Instagram <span class="opt" data-en="optional">opțional</span></label>
+            <label>Instagram <span class="opt">optional</span></label>
             <input type="text" id="social-instagram" placeholder="@username" />
           </div>
           <div class="field-group">
-            <label>LinkedIn <span class="opt" data-en="optional">opțional</span></label>
+            <label>LinkedIn <span class="opt">optional</span></label>
             <input type="text" id="social-linkedin" placeholder="linkedin.com/company/..." />
           </div>
         </div>
 
       </div>
       <div class="step-actions">
-        <button class="btn-back" onclick="goToStep(1)" data-en="← Back">← Înapoi</button>
-        <button class="btn-next" onclick="validateAndGoStep3()" data-en="Continue →">Continuă →</button>
+        <button class="btn-back" onclick="goToStep(1)">← Back</button>
+        <button class="btn-next" onclick="validateAndGoStep3()">Continue →</button>
       </div>
     </div>
 
@@ -203,7 +203,7 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
       <div class="form-card">
 
         <div class="field-group">
-          <label data-en="Visual style">Stil vizual <span class="opt" data-en="optional">opțional</span></label>
+          <label>Visual style<span class="opt">optional</span></label>
           <div class="tag-wrap">
             <button class="tag-btn" data-field="style" data-value="Minimal">Minimal</button>
             <button class="tag-btn" data-field="style" data-value="Modern">Modern</button>
@@ -218,28 +218,28 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
 
         <div class="field-group">
           <div class="colors-header">
-            <label data-en="Colors">Culori</label>
-            <button class="btn-ai-colors" id="ai-colors-toggle" type="button">✦ <span data-en="Suggest with AI">Sugerează cu AI</span></button>
+            <label>Colors</label>
+            <button class="btn-ai-colors" id="ai-colors-toggle" type="button">✦ <span>Suggest with AI</span></button>
           </div>
 
           <div class="ai-colors-panel" id="ai-panel" style="display:none">
             <div class="ai-colors-input-row">
               <input type="text" id="ai-color-prompt" placeholder="ex: cald, primitor, culori toamnă, logo portocaliu..." data-en-placeholder="e.g: warm, welcoming, autumn colors, orange logo..." />
-              <button type="button" id="ai-colors-btn" class="btn-generate-colors" data-en="Generate">Generează</button>
+              <button type="button" id="ai-colors-btn" class="btn-generate-colors">Generate</button>
             </div>
             <div id="ai-palettes" class="palettes-grid"></div>
           </div>
 
           <div class="colors-row">
             <div class="color-field">
-              <span class="color-label" data-en="Primary">Primar</span>
+              <span class="color-label">Primary</span>
               <div class="color-input-wrap">
                 <input type="color" id="color-primary" value="#2563eb" />
                 <input type="text" id="color-primary-hex" value="#2563eb" maxlength="7" class="hex-input" placeholder="#000000" />
               </div>
             </div>
             <div class="color-field">
-              <span class="color-label" data-en="Secondary">Secundar</span>
+              <span class="color-label">Secondary</span>
               <div class="color-input-wrap">
                 <input type="color" id="color-secondary" value="#f8fafc" />
                 <input type="text" id="color-secondary-hex" value="#f8fafc" maxlength="7" class="hex-input" placeholder="#000000" />
@@ -257,56 +257,56 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
 
         <div class="field-grid-2">
           <div class="field-group">
-            <label data-en="Heading font (optional)">Font titluri <span class="opt" data-en="optional">opțional</span></label>
+            <label>Heading font (optional)<span class="opt">optional</span></label>
             <input type="text" id="font-heading" placeholder="ex: Playfair Display, Space Grotesk..." />
           </div>
           <div class="field-group">
-            <label data-en="Body font (optional)">Font text <span class="opt" data-en="optional">opțional</span></label>
+            <label>Body font (optional)<span class="opt">optional</span></label>
             <input type="text" id="font-body" placeholder="ex: Inter, DM Sans..." />
           </div>
         </div>
 
         <div class="field-group">
-          <label data-en="Do you have a logo?">Ai un logo?</label>
+          <label>Do you have a logo?</label>
           <div class="choice-row">
             <button class="choice-btn" data-field="has_logo" data-value="true">
               <span class="choice-icon">✓</span>
-              <span class="choice-title" data-en="Yes">Da</span>
+              <span class="choice-title">Yes</span>
             </button>
             <button class="choice-btn active" data-field="has_logo" data-value="false">
               <span class="choice-icon">✗</span>
-              <span class="choice-title" data-en="No">Nu</span>
+              <span class="choice-title">No</span>
             </button>
           </div>
         </div>
 
         <div class="field-group">
-          <label data-en="Features">Funcționalități</label>
+          <label>Features</label>
           <div class="tag-wrap">
-            <button class="tag-btn active" data-field="feature" data-value="contact_form" data-en="Contact form">Formular contact</button>
-            <button class="tag-btn" data-field="feature" data-value="gallery" data-en="Gallery">Galerie foto</button>
-            <button class="tag-btn" data-field="feature" data-value="testimonials" data-en="Testimonials">Testimoniale</button>
-            <button class="tag-btn" data-field="feature" data-value="blog" data-en="Blog">Blog</button>
-            <button class="tag-btn" data-field="feature" data-value="newsletter" data-en="Newsletter">Newsletter</button>
-            <button class="tag-btn" data-field="feature" data-value="booking" data-en="Booking">Rezervări</button>
+            <button class="tag-btn active" data-field="feature" data-value="contact_form">Contact form</button>
+            <button class="tag-btn" data-field="feature" data-value="gallery">Gallery</button>
+            <button class="tag-btn" data-field="feature" data-value="testimonials">Testimonials</button>
+            <button class="tag-btn" data-field="feature" data-value="blog">Blog</button>
+            <button class="tag-btn" data-field="feature" data-value="newsletter">Newsletter</button>
+            <button class="tag-btn" data-field="feature" data-value="booking">Booking</button>
           </div>
         </div>
 
         <div class="field-grid-2">
           <div class="field-group">
-            <label data-en="Meta title (SEO)">Meta titlu (SEO) <span class="opt" data-en="optional">opțional</span></label>
+            <label>Meta title (SEO)<span class="opt">optional</span></label>
             <input type="text" id="meta-title" placeholder="ex: Bella Cucina | Restaurant Italian București" />
           </div>
           <div class="field-group">
-            <label data-en="Meta description (SEO)">Meta descriere (SEO) <span class="opt" data-en="optional">opțional</span></label>
+            <label>Meta description (SEO)<span class="opt">optional</span></label>
             <input type="text" id="meta-description" placeholder="max 160 caractere..." maxlength="160" />
           </div>
         </div>
 
       </div>
       <div class="step-actions">
-        <button class="btn-back" onclick="goToStep(2)" data-en="← Back">← Înapoi</button>
-        <button class="btn-next" onclick="goToStep(4)" data-en="Review →">Revizuire →</button>
+        <button class="btn-back" onclick="goToStep(2)">← Back</button>
+        <button class="btn-next" onclick="goToStep(4)">Review →</button>
       </div>
     </div>
 
@@ -317,8 +317,8 @@ if (['brief_ready', 'generating', 'generated', 'deploying', 'live'].includes(pro
       </div>
       <div id="submit-error" class="error-msg" hidden></div>
       <div class="step-actions">
-        <button class="btn-back" onclick="goToStep(3)" data-en="← Edit">← Editează</button>
-        <button class="btn-confirm" id="confirm-btn" data-en="Confirm & generate site →">Confirmă și generează site →</button>
+        <button class="btn-back" onclick="goToStep(3)">← Edit</button>
+        <button class="btn-confirm" id="confirm-btn">Confirm & generate site →</button>
       </div>
     </div>
 
@@ -372,7 +372,7 @@ function validateAndGoStep3() {
   const name = document.getElementById('business-name').value.trim();
   const desc = document.getElementById('business-description').value.trim();
   const headline = document.getElementById('content-headline').value.trim();
-  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   if (!name) {
     alert(_isEn ? 'Please enter a business name.' : 'Te rugăm introdu numele afacerii.');
@@ -485,7 +485,7 @@ document.getElementById('ai-colors-btn').addEventListener('click', async () => {
   const prompt = document.getElementById('ai-color-prompt').value.trim();
   if (!prompt) return;
   const btn = document.getElementById('ai-colors-btn');
-  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
   btn.textContent = _isEn ? 'Generating…' : 'Se generează…';
   btn.disabled = true;
 
@@ -546,7 +546,7 @@ function applyPalette(idx) {
 
 // ── Build review ─────────────────────────────────────────────────────────────
 function buildReview() {
-  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
   const d = collectBriefData();
 
   const rows = [
@@ -572,7 +572,7 @@ function buildReview() {
   ].filter(Boolean);
 
   document.getElementById('review-content').innerHTML = `
-    <h2 class="review-title" data-en="Review before generating">Revizuire înainte de generare</h2>
+    <h2 class="review-title">Review before generating</h2>
     <table class="review-table">
       ${rows.map(([k, v]) => k ? `<tr><td class="rk">${k}</td><td class="rv">${v}</td></tr>` : '<tr class="divider-row"><td colspan="2"></td></tr>').join('')}
     </table>
@@ -643,7 +643,7 @@ function collectBriefData() {
 document.getElementById('confirm-btn').addEventListener('click', async () => {
   const btn = document.getElementById('confirm-btn');
   const errEl = document.getElementById('submit-error');
-  const _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
+  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   btn.disabled = true;
   btn.textContent = _isEn ? 'Saving…' : 'Se salvează…';
@@ -729,7 +729,7 @@ window.applyPalette = applyPalette;
   /* Header */
   .back-link { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.875rem; display: block; margin-bottom: 0.75rem; transition: color 0.2s; }
   .back-link:hover { color: #fff; }
-  h1 { font-family: 'Space Grotesk', sans-serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -0.03em; color: #fff; }
+  h1 { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; letter-spacing: -0.03em; color: #fff; }
   .subtitle { color: rgba(255,255,255,0.5); font-size: 0.9375rem; margin-top: 0.25rem; }
 
   /* Steps bar */
@@ -743,8 +743,8 @@ window.applyPalette = applyPalette;
     justify-content: center; font-size: 0.75rem; font-weight: 600; color: rgba(255,255,255,0.6);
     flex-shrink: 0;
   }
-  .step.active .step-num { background: #00ff97; border-color: #00ff97; color: #00020f; }
-  .step.done .step-num { background: rgba(0,255,151,0.2); border-color: rgba(0,255,151,0.4); color: #00ff97; }
+  .step.active .step-num { background: #9BD4D7; border-color: #9BD4D7; color: #0a0a0a; }
+  .step.done .step-num { background: rgba(155,212,215,0.2); border-color: rgba(155,212,215,0.4); color: #9BD4D7; }
   .step-label { font-size: 0.8125rem; color: rgba(255,255,255,0.6); }
   .step.active .step-label { color: #fff; font-weight: 600; }
   .step-line { flex: 1; height: 1px; background: rgba(255,255,255,0.1); margin: 0 0.5rem; }
@@ -766,7 +766,7 @@ window.applyPalette = applyPalette;
   /* Fields */
   .field-group { display: flex; flex-direction: column; gap: 0.5rem; }
   .field-group label { font-size: 0.875rem; font-weight: 500; color: rgba(255,255,255,0.7); }
-  .req { color: #00ff97; }
+  .req { color: #9BD4D7; }
   .opt { color: rgba(255,255,255,0.3); font-weight: 400; font-size: 0.8rem; }
   .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .field-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
@@ -781,7 +781,7 @@ window.applyPalette = applyPalette;
     font-family: inherit; width: 100%; box-sizing: border-box;
   }
   input:focus, textarea:focus {
-    border-color: #00ff97; box-shadow: 0 0 0 3px rgba(0,255,151,0.12);
+    border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.12);
   }
   input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.25); }
 
@@ -794,15 +794,15 @@ window.applyPalette = applyPalette;
     cursor: pointer; transition: all 0.2s; color: rgba(255,255,255,0.6);
     text-align: center;
   }
-  .choice-btn:hover { border-color: rgba(0,255,151,0.25); color: #fff; }
+  .choice-btn:hover { border-color: rgba(155,212,215,0.25); color: #fff; }
   .choice-btn.active {
-    background: rgba(0,255,151,0.08); border-color: rgba(0,255,151,0.35);
-    color: #00ff97;
+    background: rgba(155,212,215,0.08); border-color: rgba(155,212,215,0.35);
+    color: #9BD4D7;
   }
   .choice-icon { font-size: 1.1rem; }
   .choice-title { font-size: 0.875rem; font-weight: 600; }
   .choice-desc { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
-  .choice-btn.active .choice-desc { color: rgba(0,255,151,0.6); }
+  .choice-btn.active .choice-desc { color: rgba(155,212,215,0.6); }
 
   /* Tag chips */
   .tag-wrap, .industry-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
@@ -813,28 +813,28 @@ window.applyPalette = applyPalette;
   }
   .tag-btn:hover { border-color: rgba(255,255,255,0.2); color: #fff; }
   .tag-btn.active {
-    background: rgba(0,255,151,0.1); border-color: rgba(0,255,151,0.35); color: #00ff97;
+    background: rgba(155,212,215,0.1); border-color: rgba(155,212,215,0.35); color: #9BD4D7;
   }
 
   /* Colors */
   .colors-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; }
   .colors-header label { margin: 0; }
   .btn-ai-colors {
-    font-size: 0.8125rem; font-weight: 600; color: #00ff97;
-    background: rgba(0,255,151,0.08); border: 1px solid rgba(0,255,151,0.2);
+    font-size: 0.8125rem; font-weight: 600; color: #9BD4D7;
+    background: rgba(155,212,215,0.08); border: 1px solid rgba(155,212,215,0.2);
     border-radius: 20px; padding: 5px 14px; cursor: pointer; transition: all 0.2s;
   }
-  .btn-ai-colors:hover { background: rgba(0,255,151,0.15); }
+  .btn-ai-colors:hover { background: rgba(155,212,215,0.15); }
 
   .ai-colors-panel {
-    background: rgba(0,255,151,0.04); border: 1px solid rgba(0,255,151,0.15);
+    background: rgba(155,212,215,0.04); border: 1px solid rgba(155,212,215,0.15);
     border-radius: 16px; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;
     margin-bottom: 0.75rem;
   }
   .ai-colors-input-row { display: flex; gap: 0.5rem; }
   .ai-colors-input-row input { flex: 1; }
   .btn-generate-colors {
-    background: #00ff97; color: #00020f; border: none; border-radius: 10px;
+    background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 10px;
     padding: 10px 18px; font-size: 0.875rem; font-weight: 700; cursor: pointer;
     white-space: nowrap; transition: all 0.2s;
   }
@@ -847,18 +847,18 @@ window.applyPalette = applyPalette;
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 12px; padding: 0.75rem 1rem; transition: border-color 0.2s;
   }
-  .palette-card.selected { border-color: rgba(0,255,151,0.4); }
+  .palette-card.selected { border-color: rgba(155,212,215,0.4); }
   .palette-swatches { display: flex; gap: 4px; flex-shrink: 0; }
   .swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
   .palette-info { flex: 1; min-width: 0; }
   .palette-info strong { display: block; font-size: 0.875rem; color: #fff; }
   .palette-info span { font-size: 0.75rem; color: rgba(255,255,255,0.45); }
   .btn-apply-palette {
-    background: rgba(0,255,151,0.1); color: #00ff97; border: 1px solid rgba(0,255,151,0.25);
+    background: rgba(155,212,215,0.1); color: #9BD4D7; border: 1px solid rgba(155,212,215,0.25);
     border-radius: 8px; padding: 5px 14px; font-size: 0.8rem; font-weight: 600;
     cursor: pointer; white-space: nowrap; transition: all 0.2s;
   }
-  .btn-apply-palette:hover { background: rgba(0,255,151,0.2); }
+  .btn-apply-palette:hover { background: rgba(155,212,215,0.2); }
 
   .colors-row { display: flex; gap: 1rem; flex-wrap: wrap; }
   .color-field { display: flex; flex-direction: column; gap: 0.375rem; flex: 1; min-width: 120px; }
@@ -873,11 +873,11 @@ window.applyPalette = applyPalette;
   /* Actions */
   .step-actions { display: flex; align-items: center; gap: 1rem; padding-top: 0.5rem; }
   .btn-next, .btn-confirm {
-    background: #00ff97; color: #00020f; border: none; border-radius: 14px;
+    background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 14px;
     padding: 13px 28px; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
     transition: all 0.2s; margin-left: auto;
   }
-  .btn-next:hover, .btn-confirm:hover { background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,255,151,0.25); }
+  .btn-next:hover, .btn-confirm:hover { background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(155,212,215,0.25); }
   .btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
   .btn-back {
     background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6);
@@ -894,7 +894,7 @@ window.applyPalette = applyPalette;
     box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
   }
   .review-title {
-    font-family: 'Space Grotesk', sans-serif; font-size: 0.875rem; font-weight: 600;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 0.875rem; font-weight: 600;
     color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.06em;
     margin: 0 0 1.25rem;
   }
@@ -938,10 +938,10 @@ window.applyPalette = applyPalette;
     width: 44px; height: 44px;
     background: radial-gradient(circle at 40% 33%, #f5fffa, #dff5eb 62%, #c5e8d8);
     border-radius: 50%;
-    border: 2px solid rgba(0,255,151,0.4);
+    border: 2px solid rgba(155,212,215,0.4);
     box-shadow:
       0 5px 20px rgba(0,0,0,0.6),
-      0 0 0 1px rgba(0,255,151,0.18),
+      0 0 0 1px rgba(155,212,215,0.18),
       inset 0 -5px 10px rgba(0,0,0,0.15),
       inset 0 3px 6px rgba(255,255,255,0.5);
     position: relative; overflow: hidden;
@@ -972,7 +972,7 @@ window.applyPalette = applyPalette;
     width: 28px; height: 28px;
     background:
       radial-gradient(circle at 37% 33%, rgba(200,255,225,0.9) 0%, transparent 28%),
-      radial-gradient(circle at 37% 33%, #00ff97 0%, #00c870 30%, #006e3a 65%, #003320 100%);
+      radial-gradient(circle at 37% 33%, #9BD4D7 0%, #00c870 30%, #006e3a 65%, #003320 100%);
     border-radius: 50%;
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -30%);

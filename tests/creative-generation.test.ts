@@ -25,7 +25,7 @@ describe('injectAnalytics', () => {
 
   it('injects self-hosted beacon when no GA ID', () => {
     const result = injectAnalytics(html, {}, 'proj-123');
-    expect(result).toContain('__webnow_track');
+    expect(result).toContain('__grappes_track');
     expect(result).toContain('proj-123');
   });
 
@@ -43,10 +43,10 @@ describe('injectAnalytics', () => {
 });
 
 describe('injectBacklink', () => {
-  it('injects webnow.dev badge', () => {
+  it('injects grappes.ai badge', () => {
     const html = '<html><body><p>Content</p></body></html>';
     const result = injectBacklink(html);
-    expect(result).toContain('webnow.dev');
+    expect(result).toContain('grappes.ai');
   });
 
   it('normalizes copyright year', () => {
@@ -61,7 +61,7 @@ describe('injectFormHandler', () => {
   it('injects form handler when forms present', () => {
     const html = '<html><body><form><input type="text" /></form></body></html>';
     const result = injectFormHandler(html, 'proj-123');
-    expect(result).toContain('webnow form handler');
+    expect(result).toContain('grappes form handler');
     expect(result).toContain('proj-123');
   });
 
