@@ -45,7 +45,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!name) return json({ error: 'name is required' }, 400);
 
     // Fetch user profile for plan limit check
-    const dbUser = await db.users.findById(user.id);
+    let dbUser;
+    try {
+      dbUser = await db.users.findById(user.id);
+    } catch (dbErr: any) {
+      return json({ error: 'DB: users.findById failed', debug: JSON.stringify(dbErr, Object.getOwnPropertyNames(dbErr ?? {})) }, 500);
+    }
     if (!dbUser) return json({ error: 'User profile not found' }, 404);
 
     // Free-tier users: max 1 unactivated (free) site at a time
