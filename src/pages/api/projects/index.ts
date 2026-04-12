@@ -54,6 +54,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!dbUser) return json({ error: 'User profile not found' }, 404);
 
     // Free-tier users: max 1 unactivated (free) site at a time
+    let step = 'countFree';
     if (dbUser.plan === 'free') {
       const freeCount = await db.projects.countFree(user.id);
       if (freeCount >= 1) {
@@ -64,7 +65,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     }
 
-    // Enforce plan limit
+    step = 'countByUser';
     const count = await db.projects.countByUser(user.id);
     if (count >= dbUser.projects_limit) {
       return json(
@@ -73,7 +74,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       );
     }
 
-    // Generate unique slug per user
+    step = 'slugExists';
     let slug = generateSlug(name);
     let attempt = 0;
     while (await db.projects.slugExists(slug, user.id)) {
@@ -81,7 +82,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       slug = `${generateSlug(name)}-${attempt}`;
     }
 
-    // Create project + brief + conversation (with rollback on partial failure)
+    step = 'insertProject';
     const supabase = createAdminClient();
 
     const { data: project, error: projErr } = await supabase
@@ -92,13 +93,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     if (projErr) throw projErr;
 
+    step = 'insertBrief';
     const { error: briefErr } = await supabase.from('briefs').insert({ project_id: project.id });
     if (briefErr) {
-      // Rollback: delete the orphaned project
       await supabase.from('projects').delete().eq('id', project.id);
       throw briefErr;
     }
 
+    step = 'insertConversation';
     const { data: conversation, error: convErr } = await supabase
       .from('conversations')
       .insert({ project_id: project.id })
@@ -106,7 +108,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .single();
 
     if (convErr) {
-      // Rollback: delete brief and project
       await supabase.from('briefs').delete().eq('project_id', project.id);
       await supabase.from('projects').delete().eq('id', project.id);
       throw convErr;
@@ -121,7 +122,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     );
   } catch (e: any) {
     const debugInfo = JSON.stringify(e, Object.getOwnPropertyNames(e ?? {}));
-    console.error('[POST /api/projects] ERROR:', debugInfo);
-    return json({ error: 'Internal server error', debug: debugInfo }, 500);
+    return json({ error: 'Internal server error', step: (typeof step !== 'undefined' ? step : 'unknown'), debug: debugInfo }, 500);
   }
 };
