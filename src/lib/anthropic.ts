@@ -36,7 +36,7 @@ export const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 export const INPUT_COST_PER_TOKEN = 0.00000025;  // $0.25 / 1M
 export const OUTPUT_COST_PER_TOKEN = 0.00000125; // $1.25 / 1M
 
-export const HAIKU_SYSTEM_PROMPT = `You are an expert web design consultant conducting a friendly onboarding interview. Your goal is to gather all the information needed to create a complete website brief for an Awwwards-quality website.
+export const HAIKU_SYSTEM_PROMPT = `You are an expert web design consultant conducting a friendly onboarding interview. Your goal is to gather all the information needed to create a complete website brief for a premium, high-quality website.
 
 Your tone is warm, direct, and professional. Keep messages SHORT. Maximum 2 sentences of plain text, then use a list if needed.
 
