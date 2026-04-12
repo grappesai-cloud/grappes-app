@@ -94,12 +94,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
       path.startsWith('/api/webhooks/') ||
       path.startsWith('/api/analytics/') ||
       path.startsWith('/api/forms/') ||
-      path.startsWith('/api/auth/');
+      path.startsWith('/api/auth/') ||
+      path === '/sign-up' ||
+      path === '/sign-in' ||
+      path === '/forgot-password' ||
+      path === '/reset-password';
 
     if (origin && !isPublicEndpoint) {
       const requestOrigin = new URL(context.url).origin;
       const configuredOrigin = (import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE || '').replace(/\/$/, '');
-      const allowed = new Set([requestOrigin, configuredOrigin].filter(Boolean));
+      const appOrigin = (import.meta.env.PUBLIC_APP_URL || '').replace(/\/$/, '');
+      const allowed = new Set([requestOrigin, configuredOrigin, appOrigin].filter(Boolean));
       if (!allowed.has(origin)) {
         return new Response(JSON.stringify({ error: 'CSRF: origin mismatch' }), {
           status: 403,
