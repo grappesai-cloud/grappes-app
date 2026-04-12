@@ -11,7 +11,6 @@ const authUser = Astro.locals.user!;
 const project = await db.projects.findById(id!);
 if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
 
-const shouldLaunch = new URL(Astro.request.url).searchParams.get('launch') === '1';
 const justActivated = new URL(Astro.request.url).searchParams.get('activated') === '1';
 
 const [brief, conversation, deployments] = await Promise.all([
@@ -29,12 +28,12 @@ const isLive       = project.status === 'live';
 const isFailed     = project.status === 'failed';
 const hasPreview   = isGenerated || isLive || isDeploying;
 const briefCompleteness = brief?.completeness ?? 0;
-const shareToken = generateShareToken(id!);
-const siteUrl = import.meta.env.SITE ?? import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
-const sharePreviewUrl = `${siteUrl}/preview/${id}?token=${shareToken}`;
 const hasConversation = conversation && conversation.messages && conversation.messages.length >= 2;
 const canForceGenerate = isOnboarding && (briefCompleteness >= 0.3 || hasConversation);
-const canLaunch    = ['brief_ready', 'generated', 'failed'].includes(project.status) || canForceGenerate;
+const canLaunch = ['brief_ready', 'generated', 'failed'].includes(project.status) || canForceGenerate;
+const shareToken = generateShareToken(id!);
+const siteUrl = import.meta.env.SITE ?? import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
+const sharePreviewUrl = `${siteUrl}/preview/${id}?token=${shareToken}`;
 
 // ── Billing status ──────────────────────────────────────────────────────────
 const billingStatus = project.billing_status ?? 'free';
@@ -94,15 +93,6 @@ if (hasPreview) {
   }
 }
 
-const LAUNCH_STEPS = [
-  { key: 'confirming_brief',  label: 'Confirmând brieful' },
-  { key: 'merging_assets',    label: 'Pregătind asset-urile' },
-  { key: 'generating_site',   label: 'Generând website-ul cu AI' },
-];
-
-const currentSubstatus = project.substatus ?? null;
-const currentStepIdx = currentSubstatus
-  ? LAUNCH_STEPS.findIndex(s => s.key === currentSubstatus) : -1;
 ---
 
 <html lang="en">
@@ -250,8 +240,6 @@ const currentStepIdx = currentSubstatus
     .preview-empty-icon { font-size: 48px; opacity: 0.15; color: #fff; }
     .preview-empty-text { font-size: 14px; color: rgba(255,255,255,0.4); max-width: 280px; text-align: center; line-height: 1.7; font-weight: 500; }
 
-    /* PANEL PHASES */
-
     /* Phase: onboarding chat */
     .phase-onboarding { flex: 1; display: flex; flex-direction: column; min-height: 0; }
     .phase-onboarding :global(.chat-container) {
@@ -262,28 +250,17 @@ const currentStepIdx = currentSubstatus
     }
     .phase-onboarding :global(.messages) { flex: 1; overflow-y: auto; background: transparent; min-height: 0; }
 
-    /* Phase: brief ready */
-    .phase-brief { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; overflow-y: auto; }
-    .brief-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
-    .brief-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
-    .brief-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
-    .brief-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.4); margin-bottom: 6px; }
-    .brief-card-value { font-size: 13px; color: rgba(255,255,255,0.6); }
-    .brief-actions { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-
-    /* Phase: launching/generating */
-    .phase-launch { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 16px; }
-    .launch-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #fff; }
-    .launch-bar { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; }
-    .launch-bar-fill { height: 100%; background: linear-gradient(90deg, #9BD4D7, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-    .launch-step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
-    .launch-step.done { color: #38a169; }
-    .launch-step.active { color: #fff; font-weight: 500; }
-    .launch-step.pending { color: rgba(255,255,255,0.3); }
-    .lstep-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 12px; }
-    .lstep-spinner { width: 14px; height: 14px; border: 2px solid rgba(155,212,215,0.2); border-top-color: #9BD4D7; border-radius: 50%; animation: spin 0.7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .launch-note { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: auto; }
+    /* Phase: generating spinner */
+    .phase-generating {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px;
+    }
+    .gen-spinner {
+      width: 40px; height: 40px; border: 3px solid rgba(155,212,215,0.2); border-top-color: #9BD4D7;
+      border-radius: 50%; animation: genSpin 0.8s linear infinite;
+    }
+    @keyframes genSpin { to { transform: rotate(360deg); } }
+    .gen-title { font-size: 15px; font-weight: 600; color: #fff; }
+    .gen-sub { font-size: 13px; color: rgba(255,255,255,0.4); }
 
     /* Section list header */
     .section-list-header {
@@ -501,11 +478,6 @@ const currentStepIdx = currentSubstatus
     .edit-global:hover { color: #ff9800; border-color: rgba(255,152,0,0.4); background: rgba(255,152,0,0.08); }
     .edit-global:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Phase: failed */
-    .phase-failed { flex: 1; display: flex; flex-direction: column; padding: 24px; gap: 12px; }
-    .failed-title { font-family: 'Inter', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 15px; font-weight: 600; color: #f87171; }
-    .failed-sub { font-size: 13px; color: rgba(255,255,255,0.45); }
-
     /* Live banner */
     .live-banner {
       padding: 8px 16px; background: rgba(34,197,94,0.08);
@@ -596,6 +568,27 @@ const currentStepIdx = currentSubstatus
       <!-- LEFT PANEL -->
       <div class="panel">
 
+        {/* Phase: Onboarding / Chat */}
+        {(isOnboarding || isBriefReady) && (
+          <div class="phase-onboarding">
+            <OnboardingChat
+              projectId={project.id}
+              initialMessages={conversation?.messages ?? []}
+              initialCompleteness={brief?.completeness ?? 0}
+              initialPhase={conversation?.phase ?? 'discovery'}
+            />
+          </div>
+        )}
+
+        {/* Phase: Generating — simple spinner */}
+        {isLaunching && (
+          <div class="phase-generating">
+            <div class="gen-spinner"></div>
+            <p class="gen-title">Se generează website-ul...</p>
+            <p class="gen-sub">Durează 60-120 secunde. Nu închide pagina.</p>
+          </div>
+        )}
+
         {/* Live banner */}
         {isLive && project.preview_url && !project.preview_url.startsWith('/') && (
           <div class="live-banner">
@@ -631,43 +624,6 @@ const currentStepIdx = currentSubstatus
                 </button>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Phase: Onboarding */}
-        {(isOnboarding || isBriefReady) && (
-          <div class="phase-onboarding">
-            <OnboardingChat
-              projectId={project.id}
-              initialMessages={conversation?.messages ?? []}
-              initialCompleteness={brief?.completeness ?? 0}
-              initialPhase={conversation?.phase ?? 'discovery'}
-            />
-          </div>
-        )}
-
-        {/* Phase: Generating */}
-        {isLaunching && (
-          <div class="phase-launch" id="launch-panel">
-            <div>
-              <p class="launch-title">Generăm website-ul...</p>
-              <p style="font-size: 12px; color: #71717a; margin-top: 4px;">Durează 60-120 secunde</p>
-            </div>
-            <div class="launch-bar">
-              <div class="launch-bar-fill" id="launch-fill"
-                style={`width: ${currentStepIdx >= 0 ? Math.round((currentStepIdx + 1) / LAUNCH_STEPS.length * 100) : 10}%`}>
-              </div>
-            </div>
-            <div id="launch-steps">
-              {LAUNCH_STEPS.map((step, i) => (
-                <div class={`launch-step ${i < currentStepIdx ? 'done' : i === currentStepIdx ? 'active' : 'pending'}`} data-key={step.key}>
-                  <span class="lstep-icon">{i < currentStepIdx ? '✓' : i === currentStepIdx ? '' : '○'}</span>
-                  <span>{step.label}</span>
-                  {i === currentStepIdx && <div class="lstep-spinner"></div>}
-                </div>
-              ))}
-            </div>
-            <p class="launch-note">Nu închide pagina.</p>
           </div>
         )}
 
@@ -756,13 +712,6 @@ const currentStepIdx = currentSubstatus
           </div>
         )}
 
-        {/* Phase: Failed */}
-        {isFailed && !canLaunch && (
-          <div class="phase-failed">
-            <p class="failed-title">Generation failed</p>
-            <p class="failed-sub">Click "Retry" in the top bar to try again.</p>
-          </div>
-        )}
       </div>
 
       <!-- RIGHT PREVIEW -->
@@ -770,16 +719,6 @@ const currentStepIdx = currentSubstatus
         {hasPreview ? (
           <div class="preview-wrapper" id="preview-wrapper">
             <iframe class="preview-iframe" id="preview-iframe" src={`${previewUrl}?edit`} title={project.name}></iframe>
-            <div id="multipage-banner" style="display:none;">
-              <div class="mp-inner">
-                <div class="mp-spinner"></div>
-                <div class="mp-content">
-                  <p class="mp-label">Multi-page site</p>
-                  <p id="mp-text" class="mp-text">Generating inner pages...</p>
-                  <div class="mp-bar"><div id="mp-fill" class="mp-fill" style="width:0%"></div></div>
-                </div>
-              </div>
-            </div>
           </div>
         ) : (
           <div class="preview-empty" id="preview-empty">
@@ -787,10 +726,6 @@ const currentStepIdx = currentSubstatus
             <p class="preview-empty-text">
               {isLaunching
                 ? 'Website-ul se generează...'
-                : isOnboarding
-                ? 'Completează onboarding-ul în panoul stâng pentru a genera website-ul.'
-                : isBriefReady
-                ? 'Brief-ul e gata. Apasă "Generate" pentru a crea website-ul.'
                 : isFailed
                 ? 'Generarea a eșuat. Apasă "Retry" pentru a reîncerca.'
                 : 'Preview-ul va apărea aici după generare.'
@@ -928,28 +863,6 @@ const currentStepIdx = currentSubstatus
   )}
 
   <style>
-    /* Multi-page continuation banner */
-    #multipage-banner {
-      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: rgba(15,15,20,0.92); backdrop-filter: blur(20px);
-      border: 1px solid rgba(155,212,215,0.2); border-radius: 16px;
-      padding: 14px 20px; z-index: 50; min-width: 280px; max-width: 380px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-    .mp-inner { display: flex; align-items: center; gap: 14px; }
-    .mp-spinner {
-      width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-      border: 2px solid rgba(155,212,215,0.2);
-      border-top-color: #9BD4D7;
-      animation: mpSpin 0.8s linear infinite;
-    }
-    @keyframes mpSpin { to { transform: rotate(360deg); } }
-    .mp-content { flex: 1; min-width: 0; }
-    .mp-label { font-size: 10px; font-weight: 700; color: #9BD4D7; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
-    .mp-text { font-size: 13px; color: rgba(255,255,255,0.85); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mp-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-    .mp-fill { height: 100%; background: linear-gradient(90deg, #9BD4D7, #d4c854); border-radius: 2px; transition: width 0.6s cubic-bezier(0.16,1,0.3,1); }
-
     /* Tour overlay */
     .tour-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 900;
@@ -1209,7 +1122,7 @@ const currentStepIdx = currentSubstatus
     }
   </style>
 
-  <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, shouldLaunch, LAUNCH_STEPS, previewUrl, justActivated, showActivate, serverSectionIds }}>
+  <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, previewUrl, justActivated, showActivate, serverSectionIds }}>
     // LANGUAGE
     const _lang = (localStorage.getItem('i18nextLng') || 'en').split('-')[0];
     document.querySelectorAll('.edit-suggestion[data-msg-ro]').forEach(btn => {
@@ -1653,109 +1566,41 @@ const currentStepIdx = currentSubstatus
       }
     }
 
-    // LAUNCH
-    document.getElementById('launch-btn')?.addEventListener('click', triggerLaunch);
-
-    if (shouldLaunch && !isLaunching && !isLive) {
-      triggerLaunch();
-    }
-
-    async function triggerLaunch() {
-      const btn = document.getElementById('launch-btn');
-      if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
-      const res = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
-      if (res.ok) { window.location.reload(); }
-      else {
-        const data = await res.json().catch(() => ({}));
-        alert(data.error || 'Generation failed.');
-        if (btn) { btn.disabled = false; btn.textContent = 'Generate ✦'; }
+    // LAUNCH — trigger generation and poll until done, then reload into editor
+    document.getElementById('launch-btn')?.addEventListener('click', async function() {
+      this.disabled = true;
+      this.textContent = 'Generating…';
+      try {
+        const res = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert(data.error || 'Generation failed.');
+          this.disabled = false;
+          this.textContent = 'Generate ✦';
+        }
+      } catch {
+        alert('Network error.');
+        this.disabled = false;
+        this.textContent = 'Generate ✦';
       }
-    }
+    });
 
-    // MULTI-PAGE CONTINUATION
-    function showMpBanner(progress) {
-      const banner = document.getElementById('multipage-banner');
-      if (!banner) return;
-      banner.style.display = 'block';
-      updateMpBanner(progress);
-    }
-    function updateMpBanner(progress) {
-      const text = document.getElementById('mp-text');
-      const fill = document.getElementById('mp-fill');
-      if (text) text.textContent = `Generating page ${progress.done + 1}/${progress.total}...`;
-      if (fill) fill.style.width = `${Math.round(progress.done / progress.total * 100)}%`;
-    }
-    function hideMpBanner() {
-      const banner = document.getElementById('multipage-banner');
-      if (banner) banner.style.display = 'none';
-    }
-
-    async function runMultiPageContinuation(progress) {
-      showMpBanner(progress);
-      while (progress.done < progress.total) {
-        try {
-          const res = await fetch(`/api/projects/${projectId}/launch/continue`, { method: 'POST' });
-          if (!res.ok) break;
-          const data = await res.json();
-          progress = { done: data.doneCount, total: data.total };
-          updateMpBanner(progress);
-          if (data.allDone) break;
-        } catch { break; }
-      }
-      hideMpBanner();
-    }
-
-    // On load: resume continuation if page is generated but multi-page is incomplete
-    if (isGenerated) {
-      (async () => {
-        try {
-          const res = await fetch(`/api/projects/${projectId}/launch`);
-          if (!res.ok) return;
-          const data = await res.json();
-          if (data.multiPageProgress && data.multiPageProgress.done < data.multiPageProgress.total) {
-            await runMultiPageContinuation(data.multiPageProgress);
-            window.location.reload();
-          }
-        } catch {}
-      })();
-    }
-
-    // POLL WHILE GENERATING
+    // Poll while generating — reload page when site is ready (editor loads automatically)
     if (isLaunching) {
-      const interval = setInterval(async () => {
+      setInterval(async () => {
         try {
           const res = await fetch(`/api/projects/${projectId}/launch`);
           if (!res.ok) return;
           const data = await res.json();
-          updateLaunchUI(data.substatus, data.status);
           if (data.status === 'generated' || data.status === 'live') {
-            clearInterval(interval);
-            if (data.multiPageProgress && data.multiPageProgress.done < data.multiPageProgress.total) {
-              // Home page done — reload to show preview, then continue inner pages
-              setTimeout(() => window.location.reload(), 300);
-            } else {
-              setTimeout(() => window.location.reload(), 500);
-            }
+            window.location.reload();
           } else if (data.status === 'failed') {
-            clearInterval(interval);
             window.location.reload();
           }
         } catch {}
-      }, 2000);
-    }
-
-    function updateLaunchUI(substatus, status) {
-      const steps = document.querySelectorAll('.launch-step');
-      const targetIdx = substatus ? LAUNCH_STEPS.findIndex(s => s.key === substatus) : -1;
-      steps.forEach((step, i) => {
-        const icon = step.querySelector('.lstep-icon');
-        if (i < targetIdx) { step.className = 'launch-step done'; if (icon) icon.textContent = '✓'; }
-        else if (i === targetIdx) { step.className = 'launch-step active'; if (icon) icon.textContent = ''; }
-        else { step.className = 'launch-step pending'; if (icon) icon.textContent = '○'; }
-      });
-      const pct = targetIdx >= 0 ? Math.round((targetIdx + 1) / LAUNCH_STEPS.length * 100) : 10;
-      const fill = document.getElementById('launch-fill');
-      if (fill) fill.style.width = pct + '%';
+      }, 3000);
     }
 
     // PUBLISH

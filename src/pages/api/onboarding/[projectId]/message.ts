@@ -89,12 +89,6 @@ function buildActionMessage(action: string, type: string, extra?: Record<string,
   if (action === 'menu_uploaded') {
     return `I've uploaded a photo of my menu. Please acknowledge it and continue to the next phase.`;
   }
-  if (action === 'ai_generated') {
-    return `An AI image has been generated for the ${type}. Please acknowledge and continue to the next asset or phase.`;
-  }
-  if (action === 'enhance_uploaded') {
-    return `I've uploaded a photo for enhancement. The AI has professionally enhanced it. Please continue to the next asset or phase.`;
-  }
   return 'Please continue to the next step.';
 }
 

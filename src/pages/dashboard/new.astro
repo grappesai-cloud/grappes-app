@@ -13,8 +13,7 @@ if (!user) return Astro.redirect('/sign-in');
       <p class="subtitle">Give your project a name to get started.</p>
     </div>
 
-    <!-- Step 1: Name -->
-    <div id="step-name" class="form-card">
+    <div class="form-card">
       <form id="name-form">
         <label for="project-name">Project name</label>
         <input
@@ -30,123 +29,59 @@ if (!user) return Astro.redirect('/sign-in');
         <p class="field-hint">This is just a label for your dashboard — not the site title.</p>
         <div id="name-error" class="error-msg" hidden></div>
         <button type="submit" id="name-btn">
-          <span id="name-label">Continue →</span>
-          <span id="name-loading" hidden>Please wait…</span>
+          <span id="name-label">Create project →</span>
+          <span id="name-loading" hidden>Creating…</span>
         </button>
       </form>
     </div>
-
-    <!-- Step 2: Mode selection (hidden initially) -->
-    <div id="step-mode" class="form-card mode-card" hidden>
-      <p class="mode-heading">How do you want to fill the brief?</p>
-      <div class="mode-grid">
-
-        <button class="mode-btn" id="mode-ai">
-          <span class="mode-icon">✦</span>
-          <span class="mode-title">Chat with AI</span>
-          <span class="mode-desc">Answer a few questions and the AI builds the brief for you automatically.</span>
-          <span class="mode-badge">Recommended</span>
-        </button>
-
-        <button class="mode-btn" id="mode-manual">
-          <span class="mode-icon">✏</span>
-          <span class="mode-title">Fill in manually</span>
-          <span class="mode-desc">Type the texts and choose settings yourself. Full control over every field.</span>
-        </button>
-
-      </div>
-      <div id="mode-error" class="error-msg" hidden></div>
-    </div>
-
   </div>
 </Dashboard>
 
 <script>
-  let projectName = '';
-  let createdProjectId: string | null = null;
-
   const nameForm = document.getElementById('name-form') as HTMLFormElement;
   const nameBtn = document.getElementById('name-btn') as HTMLButtonElement;
   const nameLabel = document.getElementById('name-label')!;
   const nameLoading = document.getElementById('name-loading')!;
   const nameError = document.getElementById('name-error')!;
-  const stepName = document.getElementById('step-name')!;
-  const stepMode = document.getElementById('step-mode')!;
-  const modeError = document.getElementById('mode-error')!;
 
   const _isEn = () => (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
-  // Step 1: Validate name → show mode selection
-  nameForm.addEventListener('submit', (e) => {
+  nameForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const val = (nameForm.elements.namedItem('name') as HTMLInputElement).value.trim();
     if (!val) return;
-    projectName = val;
 
-    // Animate transition
-    stepName.style.opacity = '0';
-    stepName.style.transform = 'translateY(-8px)';
-    setTimeout(() => {
-      stepName.hidden = true;
-      stepMode.hidden = false;
-      stepMode.style.opacity = '0';
-      stepMode.style.transform = 'translateY(8px)';
-      requestAnimationFrame(() => {
-        stepMode.style.transition = 'all 0.3s cubic-bezier(0.16,1,0.3,1)';
-        stepMode.style.opacity = '1';
-        stepMode.style.transform = 'translateY(0)';
-      });
-      // Update heading with project name
-      document.querySelector('h1')!.textContent = projectName;
-      document.querySelector('.subtitle')!.setAttribute('data-en', `Choose how to brief "${projectName}"`);
-      document.querySelector<HTMLElement>('.subtitle')!.textContent = `Cum vrei să faci brief-ul pentru „${projectName}"?`;
-    }, 200);
-  });
-
-  // Create project then redirect
-  async function createAndRedirect(mode: 'ai' | 'manual') {
-    const btn = mode === 'ai'
-      ? document.getElementById('mode-ai') as HTMLButtonElement
-      : document.getElementById('mode-manual') as HTMLButtonElement;
-
-    btn.disabled = true;
-    btn.querySelector('.mode-title')!.textContent = _isEn() ? 'Creating…' : 'Se creează…';
-    modeError.hidden = true;
+    nameBtn.disabled = true;
+    nameLabel.hidden = true;
+    nameLoading.hidden = false;
+    nameError.hidden = true;
 
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName }),
+        body: JSON.stringify({ name: val }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        modeError.textContent = data.error || (mode === 'ai'
-          ? (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.')
-          : (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.'));
-        modeError.hidden = false;
-        btn.disabled = false;
-        btn.querySelector('.mode-title')!.textContent = mode === 'ai'
-          ? (_isEn() ? 'Chat with AI' : 'Chat cu AI')
-          : (_isEn() ? 'Fill in manually' : 'Completez eu');
+        nameError.textContent = data.error || (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.');
+        nameError.hidden = false;
+        nameBtn.disabled = false;
+        nameLabel.hidden = false;
+        nameLoading.hidden = true;
         return;
       }
 
-      const pid = data.project.id;
-      window.location.href = mode === 'ai'
-        ? `/dashboard/${pid}/onboarding`
-        : `/dashboard/${pid}/manual-brief`;
-
+      window.location.href = `/dashboard/${data.project.id}`;
     } catch {
-      modeError.textContent = _isEn() ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
-      modeError.hidden = false;
-      btn.disabled = false;
+      nameError.textContent = _isEn() ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+      nameError.hidden = false;
+      nameBtn.disabled = false;
+      nameLabel.hidden = false;
+      nameLoading.hidden = true;
     }
-  }
-
-  document.getElementById('mode-ai')!.addEventListener('click', () => createAndRedirect('ai'));
-  document.getElementById('mode-manual')!.addEventListener('click', () => createAndRedirect('manual'));
+  });
 </script>
 
 <style>
@@ -168,7 +103,6 @@ if (!user) return Astro.redirect('/sign-in');
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700; letter-spacing: -0.03em; color: #ffffff;
-    transition: all 0.3s;
   }
   .subtitle { color: rgba(255, 255, 255, 0.5); margin-top: 8px; font-size: 1rem; }
 
@@ -177,10 +111,8 @@ if (!user) return Astro.redirect('/sign-in');
     -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.04);
     border-radius: 24px; padding: 2.5rem; max-width: 480px; width: 100%;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
   }
 
-  /* Step 1 */
   form { display: flex; flex-direction: column; gap: 0.75rem; }
   label { font-size: 0.875rem; font-weight: 500; color: rgba(255,255,255,0.5); text-align: left; }
   input {
@@ -200,36 +132,6 @@ if (!user) return Astro.redirect('/sign-in');
     background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(155,212,215,0.25);
   }
   button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  /* Step 2 */
-  .mode-card { max-width: 540px; }
-  .mode-heading { font-size: 0.9375rem; color: rgba(255,255,255,0.6); margin: 0 0 1.5rem; }
-  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  @media (max-width: 400px) { .mode-grid { grid-template-columns: 1fr; } }
-
-  .mode-btn {
-    position: relative; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 1.5rem 1.25rem;
-    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-    cursor: pointer; text-align: center; color: rgba(255,255,255,0.7);
-    transition: all 0.25s cubic-bezier(0.16,1,0.3,1);
-  }
-  .mode-btn:hover:not(:disabled) {
-    border-color: rgba(155,212,215,0.35); background: rgba(155,212,215,0.05);
-    color: #fff; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.3);
-  }
-  .mode-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  #mode-ai { border-color: rgba(155,212,215,0.2); }
-
-  .mode-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  .mode-title { font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; font-size: 1rem; font-weight: 700; color: #fff; }
-  .mode-desc { font-size: 0.8125rem; color: rgba(255,255,255,0.4); line-height: 1.5; }
-  .mode-badge {
-    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
-    background: #9BD4D7; color: #0a0a0a; font-size: 10px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 10px; border-radius: 20px;
-    white-space: nowrap;
-  }
 
   .error-msg {
     background: rgba(229,62,62,0.06); border: 1px solid rgba(229,62,62,0.2);

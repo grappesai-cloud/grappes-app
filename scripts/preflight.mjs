@@ -87,7 +87,6 @@ for (const [key, group] of CRITICAL_VARS) {
 }
 
 const OPTIONAL_VARS = [
-  ['GEMINI_API_KEY', 'Gemini (image gen)'],
   ['STRIPE_SECRET_KEY', 'Stripe (billing)'],
   ['STRIPE_WEBHOOK_SECRET', 'Stripe (billing)'],
   ['SENTRY_DSN', 'Sentry (errors)'],

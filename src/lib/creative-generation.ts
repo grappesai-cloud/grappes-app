@@ -47,7 +47,7 @@ Single self-contained HTML file. Everything inline:
 - GSAP 3.12 + ScrollTrigger + ScrollToPlugin (CDN: https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/)
 - Lenis smooth scroll (CDN: https://unpkg.com/lenis@1.1.18/dist/lenis.min.js)
 - Google Fonts (2-3 families max, with preconnect)
-- Images: if brief has media.no_photos=true, use ZERO <img> tags — build with typography, color, shapes, CSS, canvas. Otherwise: images are your PRIMARY medium. Full-bleed, edge-to-edge, overlapping text, as backgrounds. Client photos first, Unsplash fallback (?w=1920&q=85&auto=format for large, ?w=800 for medium).
+- Images: only use assets the client has uploaded (provided in "Uploaded Assets"). Never fetch from Unsplash, Pexels, or any stock photo service. If the client has no uploaded image for a section, do NOT insert a placeholder — design that section with typography, color, geometric CSS shapes, gradients, or canvas instead. If brief has media.no_photos=true, use ZERO <img> tags anywhere and build the entire experience with typography and CSS.
 
 ## Your creative process
 
@@ -228,7 +228,7 @@ Embed as an iframe or video element with explicit dimensions (width:100%;aspect-
   // No-photos directive
   const noPhotos = brief?.media?.no_photos === true;
   const noPhotosBlock = noPhotos
-    ? `\n## ⚠️ NO PHOTOS — TYPOGRAPHY-ONLY DESIGN\n\nThe client explicitly requested ZERO images. Do NOT use any <img> tags, Unsplash URLs, or stock photos. Build the entire visual experience with typography, color, geometric CSS shapes, borders, gradients, and whitespace. This is a creative challenge — some of the best Awwwards sites are image-free.\n`
+    ? `\n## ⚠️ NO PHOTOS — TYPOGRAPHY-ONLY DESIGN\n\nThe client explicitly requested ZERO images. Do NOT use any <img> tags or stock photo URLs (Unsplash, Pexels, or anything else). Build the entire visual experience with typography, color, geometric CSS shapes, borders, gradients, and whitespace. This is a creative challenge — some of the best Awwwards sites are image-free.\n`
     : '';
 
   return `## Client Brief
@@ -368,7 +368,7 @@ export function injectAnalytics(html: string, brief: Record<string, any>, projec
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');</script>`;
   } else {
     snippet = `
-<script>/* __grappes_track */(function(){var p='https://grappes.ai/api/analytics/${projectId}';var d={url:location.href,ref:document.referrer,w:screen.width};navigator.sendBeacon?navigator.sendBeacon(p,JSON.stringify(d)):fetch(p,{method:'POST',body:JSON.stringify(d),keepalive:true}).catch(function(){});})();</script>`;
+<script>/* __grappes_track */(function(){var p='https://grappes.dev/api/analytics/${projectId}';var d={url:location.href,ref:document.referrer,w:screen.width};navigator.sendBeacon?navigator.sendBeacon(p,JSON.stringify(d)):fetch(p,{method:'POST',body:JSON.stringify(d),keepalive:true}).catch(function(){});})();</script>`;
   }
 
   const headClose = html.indexOf('</head>');
@@ -387,7 +387,7 @@ export function injectBacklink(html: string): string {
   // Normalize any old copyright year (e.g. © 2024, © 2023) to current year
   let result = html.replace(/©\s*20[0-9]{2}/g, `© ${currentYear}`);
 
-  const backlink = `\n<!-- grappes.ai -->\n<div style="position:fixed;bottom:8px;right:12px;z-index:9999;font-size:11px;opacity:0.55;pointer-events:auto;font-family:sans-serif"><a href="https://grappes.ai" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">by grappes.ai</a></div>`;
+  const backlink = `\n<!-- grappes.dev -->\n<div style="position:fixed;bottom:8px;right:12px;z-index:9999;font-size:11px;opacity:0.55;pointer-events:auto;font-family:sans-serif"><a href="https://grappes.dev" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">by grappes.dev</a></div>`;
 
   const bodyClose = result.lastIndexOf('</body>');
   if (bodyClose !== -1) {
@@ -414,7 +414,7 @@ export function injectFormHandler(html: string, projectId: string): string {
       e.preventDefault();
       var data = {};
       new FormData(form).forEach(function(v,k){ data[k]=v; });
-      fetch('https://grappes.ai/api/forms/${projectId}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+      fetch('https://grappes.dev/api/forms/${projectId}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
         .then(function(r){return r.json();})
         .then(function(res){
           if(res.success){
@@ -537,7 +537,7 @@ ${description}
 Style: ${style || 'surprise me — make it unforgettable'}
 Complexity: ${complexity}
 Language: ${lang}
-${noPhotos ? 'NO PHOTOGRAPHS. Zero <img> tags. Build the entire visual experience with typography, CSS shapes, canvas, color, and whitespace. Some of the best Awwwards sites are image-free.' : 'Images are available via Unsplash. Use them as the PRIMARY visual medium — full-bleed, edge-to-edge, overlapping, as backgrounds. Not decoration in boxes.'}
+${noPhotos ? 'NO PHOTOGRAPHS. Zero <img> tags. Build the entire visual experience with typography, CSS shapes, canvas, color, and whitespace. Some of the best Awwwards sites are image-free.' : 'Only the client-uploaded assets are available — no stock photo services. Use each uploaded image as a PRIMARY visual medium (full-bleed, edge-to-edge, overlapping, as backgrounds — never decoration in boxes). For sections without an uploaded image, design with typography, CSS shapes, color, and whitespace instead of stock placeholders.'}
 
 Full brief:
 ${briefJson}

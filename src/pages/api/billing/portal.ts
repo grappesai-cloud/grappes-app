@@ -32,7 +32,7 @@ export const POST: APIRoute = async ({ locals }) => {
 
   try {
     const stripe = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
-    const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+    const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
     const session = await stripe.billingPortal.sessions.create({
       customer: dbUser.stripe_customer_id,

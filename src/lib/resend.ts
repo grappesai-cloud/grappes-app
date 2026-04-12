@@ -2,7 +2,7 @@
 // Sends form submission emails to site owners when visitors submit contact forms.
 
 const RESEND_API = 'https://api.resend.com/emails';
-const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
 function getApiKey(): string {
   const key = import.meta.env.RESEND_API_KEY;
@@ -170,7 +170,7 @@ function wrapEmail(title: string, body: string): string {
   </td></tr>
 
   <tr><td style="padding:20px 0 0;font-size:12px;color:#c0c0c0;letter-spacing:0.02em;">
-    Grappes · <a href="${SITE_URL}" style="color:#c0c0c0;text-decoration:none;">grappes.ai</a>
+    Grappes · <a href="${SITE_URL}" style="color:#c0c0c0;text-decoration:none;">grappes.dev</a>
   </td></tr>
 
 </table>

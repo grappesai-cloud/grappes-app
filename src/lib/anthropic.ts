@@ -180,24 +180,14 @@ CRITICAL — sectionId rules:
 - Example: if content.sections = [{"id":"mission","title":"Mission"},{"id":"merch","title":"Merch"}]
   then ask for mission image with sectionId:"mission" and merch image with sectionId:"merch"
 
-WHEN USER HAS NO PHOTO — always offer exactly these three options:
-  "uiAction": { "type": "choice", "options": ["Fac eu cu telefonul, editati voi cu AI", "Generati voi cu AI de la zero", "Luati o imagine stock de pe Pexels"] }
-  - If user picks "Fac eu cu telefonul, editati voi cu AI":
-    Tell them: "Perfect! Fa cateva poze in lumina naturala, nu conteaza calitatea — le vom corecta profesional cu AI (culori, iluminare, compozitie)."
-    uiAction: { "type": "upload", "variant": "enhance", "sectionId": "ACTUAL_ID", "sectionTitle": "ACTUAL_TITLE" }
-  - If user picks "Generati voi cu AI de la zero":
-    uiAction: { "type": "upload", "variant": "ai_generate", "sectionId": "ACTUAL_ID", "sectionTitle": "ACTUAL_TITLE" }
-    The system will auto-generate an image based on the brief.
-  - If user picks "Luati o imagine stock de pe Pexels":
-    Tell them: "Vom alege automat o imagine relevanta de pe Pexels in timpul generarii."
-    Move to next asset (no upload needed).
+WHEN USER HAS NO PHOTO for a specific asset:
+  Offer to skip and note that the design will be typography-driven for that section:
+    "Nicio problema — pentru aceasta sectiune vom folosi un design bazat pe tipografie si culoare, fara fotografie. Poti oricand adauga una mai tarziu din editor."
+  Move to the next asset (no upload needed, no AI generation, no stock photos).
 
-IF USER SAYS THEY HAVE PHOTOS BUT MENTIONS low quality / phone / bad lighting:
-  Proactively suggest: "Nici o problema — incarca-le asa cum sunt si le vom imbunatati profesional cu AI."
-  uiAction: { "type": "upload", "variant": "enhance", "sectionId": "ACTUAL_ID", "sectionTitle": "ACTUAL_TITLE" }
-
-IF USER HAS NO PHOTOS AT ALL for any section and seems unsure:
-  Recommend proactively: "Daca nu ai fotografii acum, cel mai simplu e sa faci cateva poze rapide cu telefonul (in lumina naturala, fara flash) si le editam noi cu AI. Sau putem genera imagini realiste cu AI de la zero, complet gratuit — spune-mi ce preferi."
+IF USER HAS NO PHOTOS AT ALL for the whole site:
+  Set media.no_photos to true in ---DATA--- and skip the entire media phase. The generator will build a stunning typography-only design.
+  Acknowledge: "Perfect, vom crea un design bazat pe tipografie si culori, fara fotografii."
 
 The frontend renders upload widgets automatically. You just ask the question and include the uiAction — do not explain the widget mechanics.
 After each upload/skip, the system will call you with a status update. Acknowledge briefly and move to the next asset.

@@ -4,7 +4,7 @@ import { createAuthClient } from '@lib/supabase';
 export const GET: APIRoute = async ({ request, cookies }) => {
   const supabase = createAuthClient(request, cookies);
 
-  const appUrl = import.meta.env.PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://grappes.ai';
+  const appUrl = import.meta.env.PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://grappes.dev';
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',

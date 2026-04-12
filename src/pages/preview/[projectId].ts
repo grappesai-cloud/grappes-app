@@ -100,7 +100,7 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
       "media-src 'self' https: blob:",
-      "connect-src 'self' https://grappes.ai https://www.google-analytics.com",
+      "connect-src 'self' https://grappes.dev https://www.google-analytics.com",
       "frame-ancestors 'self'",
     ].join('; ');
 
@@ -154,19 +154,19 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
  * Runs on every preview request so old stored HTML gets fixed transparently.
  */
 function normalizeOldHtml(html: string, projectId: string): string {
-  // Replace adsnow.ro analytics beacons with grappes.ai
+  // Replace adsnow.ro analytics beacons with grappes.dev
   html = html.replace(
     /['"]https?:\/\/(?:www\.)?adsnow\.ro\/api\/analytics\/[^'"]+['"]/g,
-    `'https://grappes.ai/api/analytics/${projectId}'`
+    `'https://grappes.dev/api/analytics/${projectId}'`
   );
   // Replace old relative analytics path that resolves to wrong origin on deployed sites
   html = html.replace(
     /var p=['"]\/api\/analytics\/[^'"]+['"]/g,
-    `var p='https://grappes.ai/api/analytics/${projectId}'`
+    `var p='https://grappes.dev/api/analytics/${projectId}'`
   );
-  // Replace adsnow.ro backlink with grappes.ai
-  html = html.replace(/https:\/\/adsnow\.ro(?=['"])/g, 'https://grappes.ai');
-  html = html.replace(/by adsnow\.ro/g, 'by grappes.ai');
+  // Replace adsnow.ro backlink with grappes.dev
+  html = html.replace(/https:\/\/adsnow\.ro(?=['"])/g, 'https://grappes.dev');
+  html = html.replace(/by adsnow\.ro/g, 'by grappes.dev');
 
   // Remove duplicate inline <script> blocks (same first 80 chars = same script)
   const seen = new Set<string>();

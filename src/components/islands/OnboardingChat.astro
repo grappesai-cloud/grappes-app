@@ -298,8 +298,6 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     hero:    { title: 'Hero Image',        hint: 'JPG, PNG, WEBP — max 10 MB', accept: '.jpg,.jpeg,.png,.webp' },
     section: { title: 'Section Image',     hint: 'JPG, PNG, WEBP — max 5 MB',  accept: '.jpg,.jpeg,.png,.webp' },
     menu:    { title: 'Menu Photo',        hint: 'JPG, PNG — poză cu meniul — max 10 MB', accept: '.jpg,.jpeg,.png,.webp' },
-    enhance: { title: 'Enhance Photos',    hint: 'JPG, PNG — pozele tale, le facem profesionale', accept: '.jpg,.jpeg,.png,.webp' },
-    ai_generate: { title: 'AI Generate',   hint: 'Se generează automat din brieful tău', accept: '' },
     og:      { title: 'OG / Social Image', hint: 'JPG, PNG — 1200×630 — max 2 MB', accept: '.jpg,.jpeg,.png,.webp' },
     favicon: { title: 'Favicon',           hint: 'SVG or PNG — max 512 KB',    accept: '.svg,.png,.ico' },
   };
@@ -308,103 +306,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     const container = document.createElement('div');
     container.className = 'media-widget';
 
-    if (uiAction.type === 'upload' && uiAction.variant === 'ai_generate') {
-      // AI Generate — no upload, just a generate button
-      container.dataset.variant = 'ai_generate';
-      container.dataset.sectionId = uiAction.sectionId || '';
-      const sectionType = uiAction.sectionId || 'hero';
-
-      container.innerHTML = `
-        <div class="dz-zone ai-generate-zone">
-          <div class="dz-body">
-            <div class="dz-icon">✦</div>
-            <div class="dz-label">Generare AI</div>
-            <div class="dz-hint">Generăm o imagine profesională din brieful tău</div>
-          </div>
-          <div class="dz-success" hidden>
-            <span class="dz-ok">✓</span>
-            <span class="dz-ok-label">Generat!</span>
-          </div>
-        </div>
-        <div class="dz-footer">
-          <button class="ai-gen-btn dz-skip-btn" type="button" style="background: rgba(255,255,255,0.06); color: var(--text-primary, #fff);">Generează cu AI ✦</button>
-        </div>`;
-
-      const genBtn = container.querySelector('.ai-gen-btn');
-      const dzBody = container.querySelector('.dz-body');
-      const dzSuccess = container.querySelector('.dz-success');
-
-      genBtn.addEventListener('click', async () => {
-        genBtn.disabled = true;
-        genBtn.textContent = 'Se generează...';
-        dzBody.innerHTML = '<div class="dz-icon" style="animation: pulse 1.5s infinite">✦</div><div class="dz-label">Generare în curs...</div><div class="dz-hint">Poate dura 10-20 secunde</div>';
-
-        try {
-          const res = await fetch(`/api/assets/${projectId}/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: uiAction.sectionId ? 'section' : 'hero', section: sectionType, sectionId: uiAction.sectionId, variant: uiAction.sectionTitle || '' }),
-          });
-          const genData = await res.json();
-
-          if (!res.ok) throw new Error(genData.error || 'Generation failed');
-
-          dzBody.hidden = true;
-          dzSuccess.hidden = false;
-          if (genData.publicUrl) {
-            const img = document.createElement('img');
-            img.src = genData.publicUrl;
-            img.style.cssText = 'max-width:100%;max-height:140px;object-fit:contain;border-radius:6px;margin-top:0.5rem;';
-            dzSuccess.appendChild(img);
-          }
-
-          setInputEnabled(false);
-          const thinking = showThinking();
-          const { res: apiRes, data: apiData } = await callAPI({
-            action: 'ai_generated',
-            type: uiAction.sectionId ? 'section' : 'hero',
-            assetId: genData.asset?.id,
-            sectionId: uiAction.sectionId,
-            sectionTitle: uiAction.sectionTitle,
-          });
-          handleApiResponse(apiRes.ok ? apiData : { reply: apiData.error || 'Something went wrong.' }, thinking);
-        } catch (err) {
-          dzBody.innerHTML = `<div class="dz-icon">✗</div><div class="dz-label">Eroare</div><div class="dz-hint">${escapeHtml(String(err.message || 'Unknown error'))}</div>`;
-          dzBody.hidden = false;
-          dzSuccess.hidden = true;
-          genBtn.disabled = false;
-          genBtn.textContent = 'Încearcă din nou ✦';
-          setInputEnabled(true);
-        }
-      });
-
-    } else if (uiAction.type === 'upload' && uiAction.variant === 'enhance') {
-      // Enhance mode — upload zone that sends to /enhance endpoint
-      const info = WIDGET_LABELS.enhance;
-      container.dataset.variant = 'enhance';
-      container.dataset.sectionId = uiAction.sectionId || '';
-      container.dataset.sectionTitle = uiAction.sectionTitle || '';
-
-      container.innerHTML = `
-        <div class="dz-zone" tabindex="0" role="button" aria-label="Upload photo for enhancement">
-          <input type="file" class="dz-input" accept="${info.accept}" hidden />
-          <div class="dz-body">
-            <div class="dz-icon">↑✦</div>
-            <div class="dz-label">${info.title}</div>
-            <div class="dz-hint">${info.hint}</div>
-          </div>
-          <div class="dz-success" hidden>
-            <span class="dz-ok">✓</span>
-            <span class="dz-ok-label">Enhanced!</span>
-          </div>
-        </div>
-        <div class="dz-footer">
-          <button class="dz-skip-btn" type="button">Skip →</button>
-        </div>`;
-
-      wireEnhanceZone(container, uiAction);
-
-    } else if (uiAction.type === 'upload') {
+    if (uiAction.type === 'upload') {
       const variant = uiAction.variant || 'section';
       const info = WIDGET_LABELS[variant] || WIDGET_LABELS.section;
       const label = uiAction.sectionTitle ? uiAction.sectionTitle : info.title;
@@ -509,92 +411,6 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
         skipBtn.textContent = 'Skip →';
       }
     });
-  }
-
-  function wireEnhanceZone(container, uiAction) {
-    const zone = container.querySelector('.dz-zone');
-    const fileInput = container.querySelector('.dz-input');
-    const dzBody = container.querySelector('.dz-body');
-    const dzSuccess = container.querySelector('.dz-success');
-    const skipBtn = container.querySelector('.dz-skip-btn');
-
-    zone.addEventListener('click', () => fileInput.click());
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', e => {
-      e.preventDefault();
-      zone.classList.remove('drag-over');
-      const file = e.dataTransfer?.files[0];
-      if (file) doEnhance(file, container, uiAction, dzBody, dzSuccess);
-    });
-    fileInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) doEnhance(file, container, uiAction, dzBody, dzSuccess);
-    });
-    skipBtn?.addEventListener('click', async () => {
-      skipBtn.disabled = true;
-      setInputEnabled(false);
-      const thinking = showThinking();
-      try {
-        const { res, data } = await callAPI({ action: 'media_skipped', type: uiAction.sectionId ? 'section' : 'hero' });
-        handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
-      } catch (err) {
-        thinking?.remove();
-        appendMessage('assistant', 'A apărut o eroare. Te rog să încerci din nou.');
-        setInputEnabled(true);
-      }
-    });
-  }
-
-  async function doEnhance(file, container, uiAction, dzBody, dzSuccess) {
-    const zone = container.querySelector('.dz-zone');
-    if (zone.dataset.uploaded) return;
-    if (file.size > 10 * 1024 * 1024) {
-      dzBody.innerHTML = '<div class="dz-icon">✗</div><div class="dz-label">File too large</div><div class="dz-hint">Maximum 10 MB</div>';
-      return;
-    }
-    zone.dataset.uploaded = '1';
-
-    dzBody.innerHTML = '<div class="dz-icon" style="animation: pulse 1.5s infinite">✦</div><div class="dz-label">Se îmbunătățește...</div><div class="dz-hint">AI-ul procesează fotografia ta</div>';
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', uiAction.sectionId ? 'section' : 'hero');
-      formData.append('sectionId', uiAction.sectionId || '');
-      formData.append('sectionTitle', uiAction.sectionTitle || '');
-
-      const res = await fetch(`/api/assets/${projectId}/enhance`, { method: 'POST', body: formData });
-      const enhData = await res.json();
-
-      if (!res.ok) throw new Error(enhData.error || 'Enhancement failed');
-
-      dzBody.hidden = true;
-      dzSuccess.hidden = false;
-      if (enhData.publicUrl) {
-        const img = document.createElement('img');
-        img.src = enhData.publicUrl;
-        img.style.cssText = 'max-width:100%;max-height:140px;object-fit:contain;border-radius:6px;margin-top:0.5rem;';
-        dzSuccess.appendChild(img);
-      }
-
-      setInputEnabled(false);
-      const thinking = showThinking();
-      const { res: apiRes, data: apiData } = await callAPI({
-        action: 'enhance_uploaded',
-        type: uiAction.sectionId ? 'section' : 'hero',
-        assetId: enhData.asset?.id,
-        sectionId: uiAction.sectionId,
-        sectionTitle: uiAction.sectionTitle,
-      });
-      handleApiResponse(apiRes.ok ? apiData : { reply: apiData.error || 'Something went wrong.' }, thinking);
-    } catch (err) {
-      dzBody.innerHTML = `<div class="dz-icon">✗</div><div class="dz-label">Eroare</div><div class="dz-hint">${escapeHtml(String(err.message || 'Unknown error'))}</div>`;
-      dzBody.hidden = false;
-      dzSuccess.hidden = true;
-      zone.dataset.uploaded = '';
-      setInputEnabled(true);
-    }
   }
 
   async function doUpload(file, container, uiAction, dzBody, dzSuccess) {

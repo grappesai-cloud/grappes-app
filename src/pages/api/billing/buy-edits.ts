@@ -9,7 +9,7 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { json } from '../../../lib/api-utils';
 
 
-const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
 export const POST: APIRoute = async ({ locals }) => {
   const user = locals.user;

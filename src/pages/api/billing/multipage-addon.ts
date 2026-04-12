@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
   }
 
   const stripeKey = import.meta.env.STRIPE_SECRET_KEY;
-  const siteUrl   = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+  const siteUrl   = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
   if (!stripeKey) return json({ error: 'Stripe not configured' }, 503);
 

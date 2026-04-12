@@ -28,7 +28,7 @@ export const POST: APIRoute = async ({ request }) => {
     const html = `
       <div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto">
         <div style="background:#0a0a0a;color:#fff;padding:24px 28px;border-radius:12px 12px 0 0">
-          <h2 style="margin:0;font-size:18px">New contact from grappes.ai</h2>
+          <h2 style="margin:0;font-size:18px">New contact from grappes.dev</h2>
         </div>
         <div style="border:1px solid #e5e5e5;border-top:none;padding:24px 28px;border-radius:0 0 12px 12px">
           <table style="width:100%;border-collapse:collapse;font-size:15px">

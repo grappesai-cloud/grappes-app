@@ -81,18 +81,6 @@ const inProject = !!projectId;
             </a>
           )}
           {inProject && (
-            <a href={`/dashboard/${projectId}/onboarding`}
-              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/onboarding') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
-              <span>Onboarding</span>
-            </a>
-          )}
-          {inProject && (
-            <a href={`/dashboard/${projectId}/brief`}
-              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/brief') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
-              <span>Brief</span>
-            </a>
-          )}
-          {inProject && (
             <a href={`/dashboard/${projectId}/deploy`}
               style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/deploy') ? 'color:#0a0a0a;background:#9BD4D7;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
               <span>Deploy</span>

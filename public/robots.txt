@@ -4,4 +4,4 @@ Disallow: /dashboard
 Disallow: /admin
 Disallow: /api
 
-Sitemap: https://grappes.ai/sitemap.xml
+Sitemap: https://grappes.dev/sitemap.xml

@@ -28,8 +28,6 @@ const ENV_SPEC: Record<string, { group: string; required: boolean }> = {
   // Stripe — optional until real payments
   STRIPE_SECRET_KEY:         { group: 'Stripe',    required: false },
   STRIPE_WEBHOOK_SECRET:     { group: 'Stripe',    required: false },
-  // Gemini — optional, image generation
-  GEMINI_API_KEY:            { group: 'Gemini',    required: false },
   // Sentry — optional, error tracking
   SENTRY_DSN:                { group: 'Sentry',    required: false },
 };

@@ -68,7 +68,7 @@ function flattenObject(obj: Record<string, any>, prefix = ''): Record<string, an
 
 export interface UiAction {
   type: 'upload' | 'choice';
-  variant?: 'logo' | 'hero' | 'section' | 'og' | 'favicon' | 'gallery' | 'menu' | 'ai_generate' | 'enhance';
+  variant?: 'logo' | 'hero' | 'section' | 'og' | 'favicon' | 'gallery' | 'menu';
   sectionId?: string;
   sectionTitle?: string;
   options?: string[];

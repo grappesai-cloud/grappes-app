@@ -50,7 +50,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
   }
 
   const stripe   = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
-  const siteUrl  = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.ai';
+  const siteUrl  = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
   const mode     = PLAN_MODES[plan];
 
   // Check if user is eligible for referral discount

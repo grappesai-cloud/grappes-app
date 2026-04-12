@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 
-const SITE = 'https://grappes.ai';
+const SITE = 'https://grappes.dev';
 
 // Public routes that should appear in the sitemap. Dashboard/admin/api routes
 // are authenticated and intentionally excluded (and blocked via robots.txt).

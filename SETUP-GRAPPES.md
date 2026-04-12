@@ -4,7 +4,7 @@ This Astro project is the full Grappes platform:
 - **Landing page** (`/`) — the ported Webflow landing with hero video, animated "Boring is expensive" section, pricing, and white-label CTA
 - **Auth** (`/sign-in`, `/sign-up`, `/forgot-password`, `/reset-password`) — Supabase SSR
 - **Dashboard** (`/dashboard`, `/dashboard/[id]/onboarding`, `/brief`, `/preview`, `/edit`, `/deploy`, `/settings`) — user project management
-- **AI generation pipeline** — Anthropic + Gemini for copy, layout, and design
+- **AI generation pipeline** — Anthropic for copy, layout, and design
 - **Vercel deploy integration** — generated sites deploy to Vercel via API
 - **GitHub integration** — generated sites live in a GitHub org
 - **Billing** — Stripe checkout + subscriptions
@@ -48,19 +48,14 @@ supabase db push
 4. **Settings → API Keys** → Create Key → name it "grappes-prod"
 5. Copy key → `ANTHROPIC_API_KEY`
 
-### d) Google Gemini (optional — used for image generation)
-1. Go to https://aistudio.google.com/app/apikey
-2. Create API key
-3. Copy → `GEMINI_API_KEY`
-
-### e) Vercel
+### d) Vercel
 1. Sign up at https://vercel.com with `hello@grappes.ai`
 2. Create a new team **"Grappes"**
 3. **Account Settings → Tokens** → Create Token → name it "grappes-deploy", scope: "Full Account"
 4. Copy → `VERCEL_TOKEN`
 5. From **Team Settings → General**, copy the **Team ID** → `VERCEL_TEAM_ID`
 
-### f) GitHub
+### e) GitHub
 1. Sign up at https://github.com (new account) or use existing
 2. Create a new organization **"grappes-sites"** (this hosts generated user sites)
 3. Create a Personal Access Token at https://github.com/settings/tokens (classic)
