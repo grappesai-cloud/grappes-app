@@ -39,22 +39,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'Too many requests. Please wait before creating another project.' }, 429);
   }
 
+  let step = 'init';
   try {
+    step = 'parseBody';
     const body = await request.json().catch(() => null);
     const name = body?.name?.trim();
     if (!name) return json({ error: 'name is required' }, 400);
 
-    // Fetch user profile for plan limit check
-    let dbUser;
-    try {
-      dbUser = await db.users.findById(user.id);
-    } catch (dbErr: any) {
-      return json({ error: 'DB: users.findById failed', debug: JSON.stringify(dbErr, Object.getOwnPropertyNames(dbErr ?? {})) }, 500);
-    }
-    if (!dbUser) return json({ error: 'User profile not found' }, 404);
+    step = 'findUser';
+    const dbUser = await db.users.findById(user.id);
+    if (!dbUser) return json({ error: 'User profile not found', userId: user.id }, 404);
 
-    // Free-tier users: max 1 unactivated (free) site at a time
-    let step = 'countFree';
+    step = 'countFree';
     if (dbUser.plan === 'free') {
       const freeCount = await db.projects.countFree(user.id);
       if (freeCount >= 1) {
