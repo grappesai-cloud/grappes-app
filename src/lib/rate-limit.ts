@@ -52,12 +52,26 @@ export async function checkPersistentRateLimit(
 
     if ((count ?? 0) >= max) return false;
 
-    // Record this request
-    await client.from('rate_limits').insert({ key, created_at: new Date().toISOString() });
+    // Don't record here — caller records on success via recordPersistentRateLimit()
     return true;
   } catch {
     // Fallback: in-memory passed, allow
     return true;
+  }
+}
+
+/**
+ * Record a successful rate-limited operation in the DB.
+ * Call this AFTER the operation succeeds, not before — so failed attempts
+ * don't consume rate-limit slots.
+ */
+export async function recordPersistentRateLimit(key: string): Promise<void> {
+  try {
+    const { createAdminClient } = await import('./supabase');
+    const client = createAdminClient();
+    await client.from('rate_limits').insert({ key, created_at: new Date().toISOString() });
+  } catch (e) {
+    console.warn('[rate-limit] Failed to record rate limit entry:', e);
   }
 }
 

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { log } from '../../../../lib/logger';
-import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
+import { checkRateLimit, checkPersistentRateLimit, recordPersistentRateLimit } from '../../../../lib/rate-limit';
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
@@ -88,10 +88,17 @@ export const POST: APIRoute = async ({ params, locals }) => {
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  // 3 generation attempts per hour per user (each costs ~$0.10–0.50 in AI)
-  // Persistent limiter: works across cold starts and concurrent instances
-  if (!(await checkPersistentRateLimit(`launch:${user.id}`, 3, 3_600_000))) {
-    return json({ error: 'Too many generation requests. Please wait before trying again.' }, 429);
+  // Rate limit generation attempts per hour (each costs ~$0.10–0.50 in AI)
+  // Owner plan: unlimited — skip rate limit entirely
+  // Paid plans: 10/hour, Free: 3/hour
+  const dbUser = await db.users.findById(user.id);
+  const userPlan = dbUser?.plan ?? 'free';
+  const launchRateKey = `launch:${user.id}`;
+  if (userPlan !== 'owner') {
+    const maxLaunches = ['pro', 'agency'].includes(userPlan) ? 10 : userPlan === 'starter' ? 5 : 3;
+    if (!(await checkPersistentRateLimit(launchRateKey, maxLaunches, 3_600_000))) {
+      return json({ error: 'Too many generation requests. Please wait before trying again.' }, 429);
+    }
   }
 
   // Multi-page requires active billing
@@ -122,12 +129,23 @@ export const POST: APIRoute = async ({ params, locals }) => {
     await runPipeline(params.projectId!);
   } catch (e: any) {
     const errMsg = (e?.message || String(e)).slice(0, 200);
+    const isAnthropicRateLimit = e?.status === 429 || e?.error?.error?.type === 'rate_limit_error';
     console.error('[launch] Pipeline error:', errMsg, e?.stack?.split('\n').slice(0, 5).join('\n'));
     try {
       await db.projects.updateStatus(params.projectId!, 'failed');
       await db.projects.updateSubstatus(params.projectId!, `err:${errMsg}`);
     } catch {}
-    return json({ error: errMsg }, 500);
+    // Don't record rate limit on failure — failed attempts shouldn't consume slots
+    return json({
+      error: isAnthropicRateLimit
+        ? 'AI provider is temporarily overloaded. Please try again in a few minutes.'
+        : errMsg,
+    }, isAnthropicRateLimit ? 503 : 500);
+  }
+
+  // Record rate limit ONLY on success — failed attempts get a free retry
+  if (userPlan !== 'owner') {
+    await recordPersistentRateLimit(launchRateKey);
   }
 
   return json({ started: true, status: 'generated' });

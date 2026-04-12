@@ -501,6 +501,7 @@ const isLive = project.status === 'live';
           el.textContent = '⚠ Error'; el.className = 'deploy-status warn';
         }
       }, 5000);
+      setTimeout(function() { clearInterval(poll); }, 5 * 60 * 1000);
     } catch {
       el.textContent = '⚠ Network error'; el.className = 'deploy-status warn';
     } finally {

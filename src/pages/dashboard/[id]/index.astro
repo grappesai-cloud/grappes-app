@@ -1589,18 +1589,19 @@ if (hasPreview) {
 
     // Poll while generating — reload page when site is ready (editor loads automatically)
     if (isLaunching) {
-      setInterval(async () => {
+      var _launchPoll = setInterval(async () => {
         try {
           const res = await fetch(`/api/projects/${projectId}/launch`);
           if (!res.ok) return;
           const data = await res.json();
-          if (data.status === 'generated' || data.status === 'live') {
-            window.location.reload();
-          } else if (data.status === 'failed') {
+          if (data.status === 'generated' || data.status === 'live' || data.status === 'failed') {
+            clearInterval(_launchPoll);
             window.location.reload();
           }
         } catch {}
-      }, 3000);
+      }, 4000);
+      // Safety: stop polling after 15 minutes (generation maxDuration is 800s)
+      setTimeout(() => clearInterval(_launchPoll), 15 * 60 * 1000);
     }
 
     // PUBLISH
@@ -1610,11 +1611,12 @@ if (hasPreview) {
       if (res.ok) {
         this.textContent = 'Published ✓';
         // Poll for live status
-        const poll = setInterval(async () => {
+        var _publishPoll = setInterval(async () => {
           const r = await fetch(`/api/projects/${projectId}/launch`);
           const d = await r.json();
-          if (d.status === 'live') { clearInterval(poll); window.location.reload(); }
-        }, 3000);
+          if (d.status === 'live') { clearInterval(_publishPoll); window.location.reload(); }
+        }, 4000);
+        setTimeout(() => clearInterval(_publishPoll), 5 * 60 * 1000);
       } else {
         this.disabled = false; this.textContent = 'Publish ✦';
         alert('Publish failed. Try again.');
