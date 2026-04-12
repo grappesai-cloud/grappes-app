@@ -5,10 +5,16 @@
 import type { APIRoute } from 'astro';
 import { createAdminClient } from '../../../lib/supabase';
 import { json } from '../../../lib/api-utils';
+import { checkRateLimit } from '../../../lib/rate-limit';
 
 export const POST: APIRoute = async ({ locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 1 deletion/day per user
+  if (!checkRateLimit(`account:delete:${user.id}`, 1, 86_400_000)) {
+    return json({ error: 'Account deletion already requested. Try again tomorrow.' }, 429);
+  }
 
   const client = createAdminClient();
 

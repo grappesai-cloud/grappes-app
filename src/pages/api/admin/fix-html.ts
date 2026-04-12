@@ -6,8 +6,14 @@ import type { APIRoute } from 'astro';
 import { timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '../../../lib/supabase';
 import { stripTypescriptFromHtml } from '../../../lib/strip-ts';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 
 export const POST: APIRoute = async ({ request }) => {
+  // 10 admin requests/hour per IP
+  if (!checkRateLimit(`admin:${getClientIp(request)}`, 10, 3_600_000)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), { status: 429 });
+  }
+
   const secret      = request.headers.get('x-admin-secret') ?? '';
   const adminSecret = import.meta.env.ADMIN_SECRET ?? '';
   const allowed = adminSecret !== '' && (() => {
@@ -50,7 +56,8 @@ export const POST: APIRoute = async ({ request }) => {
     .single();
 
   if (error || !data) {
-    return new Response(JSON.stringify({ error: 'No generated files found', detail: error?.message }), {
+    if (error) console.error('[admin/fix-html] Lookup error:', error);
+    return new Response(JSON.stringify({ error: 'No generated files found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -76,7 +83,8 @@ export const POST: APIRoute = async ({ request }) => {
     .eq('id', data.id);
 
   if (updateError) {
-    return new Response(JSON.stringify({ error: 'Failed to update', detail: updateError.message }), {
+    console.error('[admin/fix-html] Update error:', updateError);
+    return new Response(JSON.stringify({ error: 'Failed to update' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

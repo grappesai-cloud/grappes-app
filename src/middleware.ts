@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { createAuthClient } from './lib/supabase';
+import { checkRateLimit, getClientIp } from './lib/rate-limit';
 
 /** Routes that render without any auth/DB dependency. */
 const PUBLIC_PATHS = new Set<string>([
@@ -73,6 +74,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       maxAge: 60 * 60 * 24 * 30, // 30 days
       httpOnly: true,
       sameSite: 'lax',
+      secure: import.meta.env.PROD,
     });
   }
 
@@ -104,6 +106,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+    }
+  }
+
+  // Global per-IP rate limit on all API requests (100 req/min)
+  if (path.startsWith('/api/')) {
+    const ip = getClientIp(context.request);
+    if (!checkRateLimit(`global:ip:${ip}`, 100, 60_000)) {
+      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
   }
 

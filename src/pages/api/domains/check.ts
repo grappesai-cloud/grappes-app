@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../../lib/api-utils';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 
 
 /**
@@ -8,6 +9,11 @@ import { json } from '../../../lib/api-utils';
  */
 export const GET: APIRoute = async ({ request, locals }) => {
   if (!locals.user) return json({ error: 'Unauthorized' }, 401);
+
+  // 30 domain checks/hour per IP
+  if (!checkRateLimit(`domains:check:${getClientIp(request)}`, 30, 3_600_000)) {
+    return json({ error: 'Too many requests. Please try again later.' }, 429);
+  }
 
   const url = new URL(request.url);
   const name = url.searchParams.get('name')?.toLowerCase().trim();
@@ -40,8 +46,9 @@ export const GET: APIRoute = async ({ request, locals }) => {
       price:     data.price ?? null,       // USD/year
       premium:   data.premium ?? false,
       period:    data.period ?? 1,          // years
-    });
+    }, 200, { 'Cache-Control': 'private, max-age=120' });
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    console.error('[domains/check] Error:', e);
+    return json({ error: 'Domain check failed. Please try again.' }, 500);
   }
 };

@@ -3,8 +3,14 @@
 import type { APIRoute } from 'astro';
 import { timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '../../../lib/supabase';
+import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
 
 export const POST: APIRoute = async ({ request }) => {
+  // 10 admin requests/hour per IP
+  if (!checkRateLimit(`admin:${getClientIp(request)}`, 10, 3_600_000)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), { status: 429 });
+  }
+
   const secret      = request.headers.get('x-admin-secret') ?? '';
   const adminSecret = import.meta.env.ADMIN_SECRET ?? '';
   const allowed = adminSecret !== '' && (() => {
@@ -26,7 +32,8 @@ export const POST: APIRoute = async ({ request }) => {
     .eq('email', email)
     .single();
   if (authErr || !userData) {
-    return new Response(JSON.stringify({ error: 'User not found', detail: authErr?.message }), { status: 404 });
+    if (authErr) console.error('[admin/set-owner] Lookup error:', authErr);
+    return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
   }
 
   const userId = userData.id;
@@ -38,7 +45,8 @@ export const POST: APIRoute = async ({ request }) => {
     .eq('id', userId);
 
   if (updateErr) {
-    return new Response(JSON.stringify({ error: updateErr.message }), { status: 500 });
+    console.error('[admin/set-owner] Update error:', updateErr);
+    return new Response(JSON.stringify({ error: 'Update failed' }), { status: 500 });
   }
 
   return new Response(JSON.stringify({ ok: true, userId, plan: 'owner' }), { status: 200 });

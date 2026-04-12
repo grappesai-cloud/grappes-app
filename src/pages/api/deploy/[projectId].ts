@@ -5,6 +5,7 @@ import {
 } from '../../../lib/vercel-api';
 import { runVisualQA } from '../../../lib/visual-qa';
 import { json } from '../../../lib/api-utils';
+import { checkRateLimit } from '../../../lib/rate-limit';
 
 // ─── GET — poll current deployment status ─────────────────────────────────────
 
@@ -88,6 +89,11 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
 
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
+
+  // 10 deploys/hour per user
+  if (!checkRateLimit(`deploy:${user.id}`, 10, 3_600_000)) {
+    return json({ error: 'Too many deploy requests. Please wait.' }, 429);
+  }
 
   if (!['generated', 'failed', 'live'].includes(project.status)) {
     return json({ error: `Cannot deploy from status "${project.status}". Generate files first.` }, 409);

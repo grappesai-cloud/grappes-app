@@ -5,6 +5,7 @@ import type { AssetType } from '../../../../lib/db';
 import sharp from 'sharp';
 
 import { json } from '../../../../lib/api-utils';
+import { checkRateLimit } from '../../../../lib/rate-limit';
 const BUCKET = 'assets';
 
 const TYPE_LIMITS: Record<AssetType, number> = {
@@ -155,6 +156,11 @@ async function generateResponsiveVariants(
 export const POST: APIRoute = async ({ params, locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 50 uploads/hour per user
+  if (!checkRateLimit(`upload:${user.id}`, 50, 3_600_000)) {
+    return json({ error: 'Too many uploads. Please wait.' }, 429);
+  }
 
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);

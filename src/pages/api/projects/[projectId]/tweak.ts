@@ -3,6 +3,7 @@ import { db } from '../../../../lib/db';
 import { FULL_PAGE_KEY } from '../../../../lib/creative-generation';
 import { buildGoogleFontsUrl } from '../../../../lib/template';
 import { json } from '../../../../lib/api-utils';
+import { checkRateLimit } from '../../../../lib/rate-limit';
 
 
 // ── POST — global CSS variable tweak ─────────────────────────────────────────
@@ -41,6 +42,11 @@ function replaceGoogleFontsUrl(html: string, newUrl: string): string {
 export const POST: APIRoute = async ({ params, request, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 50 tweaks/hour per user
+  if (!checkRateLimit(`tweak:${user.id}`, 50, 3_600_000)) {
+    return json({ error: 'Too many requests. Please wait.' }, 429);
+  }
 
   try {
     const body = (await request.json().catch(() => ({}))) as TweakBody;

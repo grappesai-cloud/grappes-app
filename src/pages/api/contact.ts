@@ -1,10 +1,17 @@
 import type { APIRoute } from 'astro';
 
 import { json } from '../../lib/api-utils';
+import { checkRateLimit, getClientIp } from '../../lib/rate-limit';
 const RESEND_API = 'https://api.resend.com/emails';
 
 
 export const POST: APIRoute = async ({ request }) => {
+  // 5 contact submissions/hour per IP
+  const ip = getClientIp(request);
+  if (!checkRateLimit(`contact:${ip}`, 5, 3_600_000)) {
+    return json({ error: 'Too many messages. Please try again later.' }, 429);
+  }
+
   const apiKey = import.meta.env.RESEND_API_KEY;
   if (!apiKey) return json({ error: 'Email service not configured' }, 500);
 

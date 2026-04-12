@@ -1,6 +1,6 @@
 ---
-// TODO: Connect Supabase Realtime subscription in Step 4
-// For now: polls every 5s when in active deployment state.
+// Supabase Realtime subscription for live deployment status updates.
+// Falls back to 5s polling if Realtime connection fails.
 
 interface Props {
   projectId: string;
@@ -17,6 +17,9 @@ interface Props {
 }
 
 const { projectId, projectStatus, initialDeployment = null } = Astro.props;
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 const STATUS_STEPS = [
   { key: 'generating', label: 'Generating files', description: 'Claude is writing your site code…' },
@@ -81,7 +84,7 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
   </div>
 )}
 
-<script define:vars={{ projectId, initialStatus: projectStatus, isActive }}>
+<script define:vars={{ projectId, initialStatus: projectStatus, isActive, supabaseUrl, supabaseAnonKey }}>
   let currentStatus = initialStatus;
 
   // Toggle logs
@@ -104,9 +107,42 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
     });
   }
 
-  // Poll when active
+  // Realtime subscription with polling fallback
   if (isActive) {
+    let realtimeConnected = false;
+
+    // Try Supabase Realtime
+    if (supabaseUrl && supabaseAnonKey) {
+      import('@supabase/supabase-js').then(({ createClient }) => {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const channel = supabase
+          .channel(`project-status-${projectId}`)
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${projectId}` },
+            (payload) => {
+              const newStatus = payload.new.status;
+              if (newStatus !== currentStatus) {
+                currentStatus = newStatus;
+                if (!['generating', 'deploying', 'building'].includes(newStatus)) {
+                  channel.unsubscribe();
+                  window.location.reload();
+                }
+              }
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              realtimeConnected = true;
+            }
+          });
+      }).catch(() => {
+        // Realtime import failed — polling fallback will handle it
+      });
+    }
+
+    // Polling fallback: runs every 8s, only if Realtime isn't connected
     const interval = setInterval(async () => {
+      if (realtimeConnected) return;
       try {
         const res = await fetch(`/api/projects/${projectId}`);
         if (res.ok) {
@@ -120,7 +156,7 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
       } catch {
         // ignore poll errors
       }
-    }, 5000);
+    }, 8000);
   }
 </script>
 
