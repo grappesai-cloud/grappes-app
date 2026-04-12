@@ -1573,13 +1573,21 @@ if (hasPreview) {
       try {
         // Confirm brief first (idempotent — transitions onboarding → brief_ready)
         await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
-        // Fire generation — don't await the full pipeline response (takes 60-800s)
-        // The POST handler sets status='generating' atomically at the start,
-        // so after a brief delay the page reload will see the generating state + polling.
-        fetch(`/api/projects/${projectId}/launch`, { method: 'POST' }).catch(() => {});
-        // Give server 1.5s to set status to 'generating' before reload
-        await new Promise(r => setTimeout(r, 1500));
-        window.location.reload();
+        // Fire generation — wait only for the initial response (status lock),
+        // not the full pipeline. Server returns quickly after setting status='generating'.
+        var launchRes = await Promise.race([
+          fetch(`/api/projects/${projectId}/launch`, { method: 'POST' }),
+          new Promise(r => setTimeout(() => r({ ok: true, _timeout: true }), 8000)),
+        ]);
+        if (launchRes._timeout || launchRes.ok) {
+          // Pipeline started or took too long to respond — reload to show spinner
+          window.location.reload();
+        } else {
+          var errData = await launchRes.json().catch(() => ({}));
+          alert(errData.error || 'Generation failed. Try again.');
+          this.disabled = false;
+          this.textContent = 'Generate ✦';
+        }
       } catch {
         alert('Network error.');
         this.disabled = false;

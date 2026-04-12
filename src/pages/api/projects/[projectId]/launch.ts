@@ -101,6 +101,22 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }
   }
 
+  // Auto-confirm brief if still in onboarding (user clicked Generate directly)
+  if (project.status === 'onboarding') {
+    try {
+      const brief = await db.briefs.findByProjectId(params.projectId!);
+      if (brief) {
+        const { applySmartDefaults, calculateCompleteness } = await import('../../../../lib/onboarding');
+        const enriched = applySmartDefaults(brief.data);
+        await db.briefs.update(params.projectId!, enriched, calculateCompleteness(enriched));
+        if (!brief.confirmed) await db.briefs.confirm(params.projectId!);
+      }
+      await db.projects.updateStatus(params.projectId!, 'brief_ready');
+    } catch (e) {
+      console.warn('[launch] Auto-confirm failed (non-blocking):', e);
+    }
+  }
+
   // Multi-page requires active billing
   const brief = await db.briefs.findByProjectId(params.projectId!);
   const isMultiPageRequest = brief?.data?.preferences?.websiteType === 'multi-page';
