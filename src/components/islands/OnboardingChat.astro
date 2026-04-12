@@ -229,7 +229,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     if (existing) return;
     const cta = document.createElement('div');
     cta.className = 'review-cta';
-    cta.innerHTML = `<span>Your brief looks great!</span><a href="/dashboard/${projectId}/brief" class="review-btn">Review Brief →</a>`;
+    cta.innerHTML = `<span>Your brief looks great!</span><a href="/dashboard/${projectId}" class="review-btn">Review Brief →</a>`;
     messagesEl.appendChild(cta);
     cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -242,7 +242,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     cta.innerHTML = `
       <span>Brieful tău e complet!</span>
       <div class="launch-cta-btns">
-        <a href="/dashboard/${projectId}/brief" class="btn-outline-sm">Review Brief</a>
+        <a href="/dashboard/${projectId}" class="btn-outline-sm">Review Brief</a>
         <button class="btn-launch-sm" id="chat-launch-btn">Lansează Website →</button>
       </div>`;
     messagesEl.appendChild(cta);
@@ -271,14 +271,14 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
       }
 
       if (data.isComplete) {
-        // Brief confirmed by AI — confirm THEN redirect (must persist before navigation)
+        // Brief confirmed by AI — confirm THEN redirect to dashboard
         (async () => {
           try {
             await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
           } catch (e) {
             console.warn('Brief confirmation failed:', e);
           }
-          window.location.href = `/dashboard/${projectId}/brief`;
+          window.location.href = `/dashboard/${projectId}`;
         })();
       } else if (data.isReviewReady && completeness >= 0.85) {
         showLaunchCTA();
@@ -701,18 +701,18 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     }
   });
 
-  // ── Auto-launch trigger (from brief page redirect) ─────────────────────────
+  // ── Auto-launch trigger (from review CTA redirect) ─────────────────────────
   if (new URLSearchParams(window.location.search).get('launch') === '1') {
     window.history.replaceState({}, '', window.location.pathname);
     (async () => {
       try {
-        const launchRes = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
-        if (launchRes.ok) {
-          window.location.href = `/dashboard/${projectId}`;
-        } else {
-          const errData = await launchRes.json().catch(() => ({}));
-          appendMessage('assistant', errData.error || 'Launch failed. Please try again from the project page.');
-        }
+        // Confirm brief first (transitions status onboarding → brief_ready)
+        await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
+        // Fire generation — don't await pipeline (takes 60-800s)
+        fetch(`/api/projects/${projectId}/launch`, { method: 'POST' }).catch(() => {});
+        // Give server time to set status='generating', then redirect to dashboard
+        await new Promise(r => setTimeout(r, 1500));
+        window.location.href = `/dashboard/${projectId}`;
       } catch (e) {
         appendMessage('assistant', 'Network error during launch. Please try again.');
       }

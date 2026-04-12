@@ -275,7 +275,30 @@ export function applySmartDefaults(data: Record<string, any>): Record<string, an
   if (!hasValue(result?.features?.contact_form)) {
     setNestedValue(result, 'features.contact_form', true);
   }
-  // No animation or hero_style fallbacks — let the AI decide creatively
+
+  // Auto-fill P1/P2 fields from brief context so completeness can reach 100%
+  const bName = result?.business?.name ?? '';
+  const bDesc = result?.business?.description ?? '';
+  const bIndustry = result?.business?.industry ?? '';
+
+  // P1 defaults
+  if (!hasValue(result?.meta?.title) && bName) {
+    setNestedValue(result, 'meta.title', `${bName} — ${bIndustry || 'Official Website'}`);
+  }
+  if (!hasValue(result?.meta?.description) && bDesc) {
+    setNestedValue(result, 'meta.description', bDesc.slice(0, 160));
+  }
+  if (!hasValue(result?.branding?.fonts?.heading)) {
+    setNestedValue(result, 'branding.fonts.heading', 'Inter');
+  }
+
+  // P2 defaults
+  if (!hasValue(result?.business?.tagline) && bDesc) {
+    setNestedValue(result, 'business.tagline', bDesc.split('.')[0]?.trim() || bDesc.slice(0, 80));
+  }
+  if (!hasValue(result?.media?.has_logo)) {
+    setNestedValue(result, 'media.has_logo', !!result?.branding?.logo);
+  }
 
   return result;
 }

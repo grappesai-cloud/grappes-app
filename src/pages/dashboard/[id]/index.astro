@@ -1566,20 +1566,20 @@ if (hasPreview) {
       }
     }
 
-    // LAUNCH — trigger generation and poll until done, then reload into editor
+    // LAUNCH — confirm brief, fire generation (don't await pipeline), reload to show spinner
     document.getElementById('launch-btn')?.addEventListener('click', async function() {
       this.disabled = true;
       this.textContent = 'Generating…';
       try {
-        const res = await fetch(`/api/projects/${projectId}/launch`, { method: 'POST' });
-        if (res.ok) {
-          window.location.reload();
-        } else {
-          const data = await res.json().catch(() => ({}));
-          alert(data.error || 'Generation failed.');
-          this.disabled = false;
-          this.textContent = 'Generate ✦';
-        }
+        // Confirm brief first (idempotent — transitions onboarding → brief_ready)
+        await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
+        // Fire generation — don't await the full pipeline response (takes 60-800s)
+        // The POST handler sets status='generating' atomically at the start,
+        // so after a brief delay the page reload will see the generating state + polling.
+        fetch(`/api/projects/${projectId}/launch`, { method: 'POST' }).catch(() => {});
+        // Give server 1.5s to set status to 'generating' before reload
+        await new Promise(r => setTimeout(r, 1500));
+        window.location.reload();
       } catch {
         alert('Network error.');
         this.disabled = false;
