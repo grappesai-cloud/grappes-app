@@ -31,23 +31,10 @@ try {
     </a>
   </div>
 
-  {projects.length === 0 ? (
-    <div style="display:flex;flex-direction:column;align-items:center;padding:60px 20px;text-align:center;gap:16px;">
-      <div style="margin-bottom:12px;">
-        <svg width="120" height="120" viewBox="0 0 72 72" fill="none">
-          <path d="M36 8L44 28H28L36 8Z" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.08)"/>
-          <path d="M36 64L28 44H44L36 64Z" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.08)"/>
-          <circle cx="36" cy="36" r="6" stroke="#9BD4D7" stroke-width="1.5" fill="rgba(155,212,215,0.12)"/>
-          <circle cx="36" cy="36" r="16" stroke="rgba(155,212,215,0.15)" stroke-width="1" stroke-dasharray="3 3"/>
-        </svg>
-      </div>
-      <h2 style="font-size:32px;font-weight:700;letter-spacing:-0.04em;">No projects yet</h2>
-      <p style="color:rgba(255,255,255,0.5);font-size:18px;max-width:38ch;line-height:1.7;">Create your first AI-generated website in under 10 minutes.</p>
-      <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#9BD4D7;color:#0a0a0a;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;margin-top:8px;">Create Project</a>
-    </div>
-  ) : (
+  {projects.length > 0 && (
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:28px;">
       {projects.map(p => <ProjectCard project={p} />)}
     </div>
   )}
 </Dashboard>
+
