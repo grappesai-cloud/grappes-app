@@ -136,8 +136,10 @@ export const POST: APIRoute = async ({ params, locals }) => {
     .maybeSingle();
 
   if (!locked) {
-    if (project.status === 'generating') return json({ started: true, alreadyRunning: true });
-    return json({ error: `Cannot launch from status "${project.status}"` }, 409);
+    // Re-read current status — original `project.status` may be stale
+    const current = await db.projects.findById(params.projectId!);
+    if (current?.status === 'generating') return json({ started: true, alreadyRunning: true });
+    return json({ error: `Cannot launch from status "${current?.status || project.status}"` }, 409);
   }
 
   // ── Run pipeline synchronously (Vercel Fluid Compute — up to 800s) ──────

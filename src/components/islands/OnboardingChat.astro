@@ -154,6 +154,10 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
   function appendMessage(role, content) {
     const wrapper = document.createElement('div');
     wrapper.className = `message ${role === 'user' ? 'user-msg' : 'assistant-msg'}`;
@@ -166,7 +170,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     bubble.textContent = content;
     wrapper.appendChild(bubble);
     messagesEl.appendChild(wrapper);
-    wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    scrollToBottom();
     return wrapper;
   }
 
@@ -220,7 +224,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     el.className = 'message assistant-msg thinking-msg';
     el.innerHTML = '<span class="msg-label">Grappes</span><div class="bubble thinking-bubble">Thinking…</div>';
     messagesEl.appendChild(el);
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    el.scrollIntoView({ behavior: 'smooth', block: 'end' });
     return el;
   }
 
@@ -231,7 +235,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
     cta.className = 'review-cta';
     cta.innerHTML = `<span>Your brief looks great!</span><a href="/dashboard/${projectId}" class="review-btn">Review Brief →</a>`;
     messagesEl.appendChild(cta);
-    cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    cta.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }
 
   function showLaunchCTA() {
@@ -246,7 +250,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
         <button class="btn-launch-sm" id="chat-launch-btn">Lansează Website →</button>
       </div>`;
     messagesEl.appendChild(cta);
-    cta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    cta.scrollIntoView({ behavior: 'smooth', block: 'end' });
     document.getElementById('chat-launch-btn')?.addEventListener('click', () => {
       window.location.href = `/dashboard/${projectId}?launch=1`;
     });
@@ -266,7 +270,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
         const widget = buildWidget(data.uiAction);
         if (widget) {
           msgEl.appendChild(widget);
-          msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          msgEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }
 
@@ -485,7 +489,10 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
 
   // ── Auto-init ──────────────────────────────────────────────────────────────
 
-  if (!hasMessages) {
+  // Scroll to bottom on load when there are existing messages
+  if (hasMessages) {
+    scrollToBottom();
+  } else {
     setInputEnabled(false);
     setTimeout(() => initSession(0), 200);
   }
@@ -625,7 +632,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
         <div class="ub-status">Se încarcă...</div>`;
       wrapper.appendChild(bubble);
       messagesEl.appendChild(wrapper);
-      wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
       // Upload all in parallel
       const results = await Promise.all(filesToUpload.map(async ({ file, type }) => {
@@ -757,12 +764,13 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
   .chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 11rem);
+    min-height: 400px;
     background: rgba(255, 255, 255, 0.04);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 24px; overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   /* Progress */
@@ -778,26 +786,41 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
   .phase-chip.done { background: rgba(56,161,105,0.08); color: #38a169; }
 
   /* Messages */
-  .messages { flex: 1; overflow-y: auto; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; background: rgba(10,10,20,0.5); }
+  .messages {
+    flex: 1; overflow-y: auto; padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem;
+    background: rgba(10,10,20,0.5);
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  /* Scrollbar styling */
+  .messages::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+  .messages::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
   .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.3); text-align: center; padding: 2rem; gap: 0.75rem; font-size: 0.875rem; }
   .spinner { width: 20px; height: 20px; border: 2px solid rgba(155,212,215,0.2); border-top-color: #9BD4D7; border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .message { display: flex; flex-direction: column; max-width: 75%; }
-  .msg-label { display: none; }
+  .message { display: flex; flex-direction: column; max-width: 80%; animation: msgFadeIn 0.25s ease-out; }
+  @keyframes msgFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-label { font-size: 0.65rem; color: rgba(255,255,255,0.35); margin-bottom: 0.2rem; padding: 0 0.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
   .user-msg { align-self: flex-end; }
+  .user-msg .msg-label { text-align: right; }
   .assistant-msg { align-self: flex-start; }
 
-  .bubble { padding: 0.6rem 0.9rem; border-radius: 18px; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+  .bubble { padding: 0.7rem 1rem; border-radius: 18px; font-size: 0.9rem; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; }
   .user-msg .bubble {
-    background: #00c853;
+    background: linear-gradient(135deg, #00c853, #00a846);
     color: #fff;
     border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,200,83,0.2);
   }
   .assistant-msg .bubble {
-    background: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.1);
     color: rgba(255,255,255,0.95);
     border-bottom-left-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.06);
   }
   .thinking-bubble { color: rgba(255, 255, 255, 0.35); font-style: italic; background: rgba(255,255,255,0.06) !important; }
 
@@ -869,7 +892,7 @@ const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'rev
   .dz-choice-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Input area wrapper */
-  .input-area { position: relative; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15,15,25,0.5); }
+  .input-area { position: relative; flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(15,15,25,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
   /* Type picker popup */
   .type-picker {
