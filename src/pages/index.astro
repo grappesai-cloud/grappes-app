@@ -597,6 +597,7 @@ requestAnimationFrame(raf)
 <script src="https://cdn.jsdelivr.net/npm/split-type" is:inline></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js" is:inline></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/ScrollTrigger.min.js" is:inline></script>
+<script is:inline>if(typeof gsap!=='undefined')gsap.config({nullTargetWarn:false});</script>
 
 <script is:inline>
 const lineAnimations = gsap.utils.toArray('[animate="line"]');
@@ -887,20 +888,38 @@ function endLoaderAnimation() {
   if (el) el.click();
 }
 
-let tl = gsap.timeline({
-  onComplete: endLoaderAnimation
-});
-tl.to(counter, {
-  value: 100,
-  onUpdate: updateLoaderText,
-  duration: loaderDuration,
-  ease: CustomEase.create("custom", customEase)
-});
-tl.to(".loader_progress", {
-    width: "100%",
+// Force-complete loader if tab is hidden (Chrome throttles rAF on background tabs)
+gsap.ticker.lagSmoothing(0);
+if (document.hidden) {
+  // Tab opened in background — skip animation, go straight to 100
+  counter.value = 100;
+  updateLoaderText();
+  var bar = document.querySelector('.loader_progress');
+  if (bar) bar.style.width = '100%';
+  setTimeout(endLoaderAnimation, 100);
+} else {
+  let tl = gsap.timeline({
+    onComplete: endLoaderAnimation
+  });
+  tl.to(counter, {
+    value: 100,
+    onUpdate: updateLoaderText,
     duration: loaderDuration,
     ease: CustomEase.create("custom", customEase)
-}, 0);
+  });
+  tl.to(".loader_progress", {
+      width: "100%",
+      duration: loaderDuration,
+      ease: CustomEase.create("custom", customEase)
+  }, 0);
+
+  // Safety net: if loader hasn't finished after 2x expected duration, force-complete
+  setTimeout(function() {
+    if (counter.value < 100) {
+      tl.progress(1);
+    }
+  }, (loaderDuration * 2000) + 500);
+}
 </script>
 <div class="elfsight-app-71a27e1c-ff98-42e8-bf20-906d6cdd31d0" data-elfsight-app-lazy></div>
 </body></html>
