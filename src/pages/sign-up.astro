@@ -2,6 +2,7 @@
 import { sendWelcomeEmail } from '../lib/resend';
 import { recordReferral } from '../lib/referral';
 import { checkRateLimit, getClientIp } from '../lib/rate-limit';
+import { createAdminClient } from '../lib/supabase';
 
 if (Astro.locals.user) return Astro.redirect('/dashboard');
 
@@ -29,6 +30,19 @@ if (Astro.request.method === 'POST') {
     if (authError) {
       error = authError.message;
     } else {
+      // Ensure user profile exists (fallback if DB trigger missed)
+      if (newUser?.id) {
+        try {
+          const admin = createAdminClient();
+          await admin.from('users').upsert({
+            id: newUser.id,
+            email,
+            name: name || null,
+          }, { onConflict: 'id', ignoreDuplicates: true });
+        } catch (e) {
+          console.warn('[sign-up] User profile upsert failed:', e);
+        }
+      }
       // Track referral (from form field or cookie)
       const cookieRef = Astro.cookies.get('ref_code')?.value ?? '';
       const finalRef = refCode || cookieRef;

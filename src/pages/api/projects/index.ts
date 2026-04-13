@@ -47,8 +47,18 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!name) return json({ error: 'name is required' }, 400);
 
     step = 'findUser';
-    const dbUser = await db.users.findById(user.id);
-    if (!dbUser) return json({ error: 'User profile not found', userId: user.id }, 404);
+    let dbUser = await db.users.findById(user.id);
+    if (!dbUser) {
+      // Auto-create profile if auth trigger missed (e.g. user signed up before trigger existed)
+      const client = createAdminClient();
+      await client.from('users').upsert({
+        id: user.id,
+        email: user.email ?? '',
+        name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+      }, { onConflict: 'id' });
+      dbUser = await db.users.findById(user.id);
+      if (!dbUser) return json({ error: 'Failed to create user profile' }, 500);
+    }
 
     step = 'countFree';
     if (dbUser.plan === 'free') {

@@ -2,6 +2,7 @@
 import Dashboard from '../../layouts/Dashboard.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import { db } from '../../lib/db';
+import { createAdminClient } from '../../lib/supabase';
 
 const authUser = Astro.locals.user!;
 let dbUser = null;
@@ -9,6 +10,16 @@ let projects: import('../../lib/db').Project[] = [];
 let totalCount = 0;
 try {
   dbUser = await db.users.findById(authUser.id);
+  // Auto-create profile if trigger missed
+  if (!dbUser) {
+    const client = createAdminClient();
+    await client.from('users').upsert({
+      id: authUser.id,
+      email: authUser.email ?? '',
+      name: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? null,
+    }, { onConflict: 'id' });
+    dbUser = await db.users.findById(authUser.id);
+  }
   if (dbUser) {
     projects = await db.projects.findByUser(dbUser.id);
     totalCount = projects.length;

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createAuthClient } from '@lib/supabase';
+import { createAdminClient } from '../../../lib/supabase';
 import { recordReferral } from '../../../lib/referral';
 
 export const GET: APIRoute = async ({ request, cookies, redirect }) => {
@@ -15,6 +16,20 @@ export const GET: APIRoute = async ({ request, cookies, redirect }) => {
 
   if (error) {
     return redirect('/sign-in');
+  }
+
+  // Ensure user profile exists (fallback if DB trigger missed)
+  if (data.user?.id) {
+    try {
+      const admin = createAdminClient();
+      await admin.from('users').upsert({
+        id: data.user.id,
+        email: data.user.email ?? '',
+        name: data.user.user_metadata?.full_name ?? data.user.user_metadata?.name ?? null,
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch (e) {
+      console.warn('[auth/callback] User profile upsert failed:', e);
+    }
   }
 
   // Track referral for OAuth sign-ups
