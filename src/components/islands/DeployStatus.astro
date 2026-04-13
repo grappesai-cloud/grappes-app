@@ -142,7 +142,10 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
 
     // Polling fallback: runs every 8s, only if Realtime isn't connected
     const interval = setInterval(async () => {
-      if (realtimeConnected) return;
+      if (realtimeConnected) {
+        clearInterval(interval);
+        return;
+      }
       try {
         const res = await fetch(`/api/projects/${projectId}`);
         if (res.ok) {

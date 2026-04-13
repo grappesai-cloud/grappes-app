@@ -4,10 +4,10 @@ import { db } from '../../lib/db';
 import { getEditQuota } from '../../lib/edit-quota';
 
 const authUser = Astro.locals.user!;
-const dbUser = await db.users.findById(authUser.id);
-const projects = dbUser ? await db.projects.findByUser(dbUser.id) : [];
-const quota = await getEditQuota(authUser.id);
-
+const [dbUser, quota] = await Promise.all([
+  db.users.findById(authUser.id),
+  getEditQuota(authUser.id),
+]);
 const totalCount = dbUser ? await db.projects.countByUser(dbUser.id) : 0;
 const totalEditsAvailable = quota.limit + quota.extra;
 const totalEditsUsed = quota.used;

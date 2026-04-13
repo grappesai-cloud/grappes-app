@@ -4,6 +4,7 @@ import dns from 'dns';
 import { promisify } from 'util';
 
 import { json } from '../../../../lib/api-utils';
+import { checkRateLimit } from '../../../../lib/rate-limit';
 const resolveCname = promisify(dns.resolveCname);
 
 
@@ -21,6 +22,11 @@ const VERCEL_CNAME_TARGETS = [
 export const GET: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 20 verify attempts per hour per user
+  if (!checkRateLimit(`verify-domain:${user.id}`, 20, 3_600_000)) {
+    return json({ error: 'Too many verification attempts. Please wait.' }, 429);
+  }
 
   const { projectId } = params;
   const client = createAdminClient();

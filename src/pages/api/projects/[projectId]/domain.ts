@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { createAdminClient } from '../../../../lib/supabase';
 import { json } from '../../../../lib/api-utils';
+import { checkRateLimit } from '../../../../lib/rate-limit';
 
 
 const VERCEL_NAMESERVERS = ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'];
@@ -16,6 +17,11 @@ const VERCEL_NAMESERVERS = ['ns1.vercel-dns.com', 'ns2.vercel-dns.com'];
 export const POST: APIRoute = async ({ params, locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 10 domain operations per hour per user
+  if (!checkRateLimit(`domain:${user.id}`, 10, 3_600_000)) {
+    return json({ error: 'Too many domain requests. Please wait.' }, 429);
+  }
 
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);

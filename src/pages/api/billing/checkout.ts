@@ -118,6 +118,6 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ url: session.url });
   } catch (e: any) {
     console.error('[checkout] Stripe error:', e.message);
-    return json({ error: e.message }, 500);
+    return json({ error: 'Failed to create checkout session' }, 500);
   }
 };

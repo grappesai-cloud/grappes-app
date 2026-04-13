@@ -17,7 +17,8 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  const body = await request.json();
+  let body: any;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const { filename, contentType } = body as { filename: string; contentType: string };
 
   if (!filename || !contentType) return json({ error: 'filename and contentType required' }, 400);

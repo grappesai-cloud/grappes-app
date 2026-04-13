@@ -105,7 +105,7 @@ export const POST: APIRoute = async ({ request }) => {
             expires_at:              getExpiresAt(billingType),
             ...(subId && { site_subscription_id: subId }),
             ...(piId  && { site_payment_intent_id: piId }),
-          });
+          }, ['free', 'expired']);
 
           // Save customer ID on user for future checkouts
           if (customerId && session.metadata.user_id) {
@@ -263,9 +263,9 @@ export const POST: APIRoute = async ({ request }) => {
         const subId = typeof (invoice as any).subscription === 'string' ? (invoice as any).subscription : (invoice as any).subscription?.id;
         if (subId) {
           // Look up the subscription to find the project or user
-          const stripe = new Stripe(import.meta.env.STRIPE_SECRET_KEY!, { apiVersion: '2026-03-25.dahlia' as any });
+          const stripeClient = new Stripe(stripeKey, { apiVersion: '2026-03-25.dahlia' });
           try {
-            const sub = await stripe.subscriptions.retrieve(subId);
+            const sub = await stripeClient.subscriptions.retrieve(subId);
             if (sub.metadata?.type === 'site_subscription' && sub.metadata?.project_id) {
               // Mark site as past_due so the user gets a warning
               await db.projects.updateBilling(sub.metadata.project_id, {

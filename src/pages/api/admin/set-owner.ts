@@ -20,7 +20,9 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
   }
 
-  const { email } = await request.json();
+  let body: any;
+  try { body = await request.json(); } catch { return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 }); }
+  const { email } = body;
   if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400 });
 
   const client = createAdminClient();

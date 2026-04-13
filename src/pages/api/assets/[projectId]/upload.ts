@@ -42,10 +42,17 @@ function sanitizeSvg(svgBuffer: Buffer): Buffer {
   svg = svg.replace(/<script[\s\S]*?<\/script>/gi, '');
   // Remove event handler attributes (onclick, onload, onerror, etc.)
   svg = svg.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-  // Remove javascript: and data: URIs in href/xlink:href/src
+  // Remove javascript: and data: URIs in href/xlink:href/src (case-insensitive, whitespace-tolerant)
   svg = svg.replace(/(href|src)\s*=\s*["']?\s*(?:javascript|data\s*:(?!image\/))[^"'>\s]*/gi, '$1=""');
   // Remove foreignObject (can embed arbitrary HTML)
   svg = svg.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '');
+  // Remove iframe, embed, object elements
+  svg = svg.replace(/<iframe[\s\S]*?<\/iframe>/gi, '');
+  svg = svg.replace(/<embed[\s\S]*?>/gi, '');
+  svg = svg.replace(/<object[\s\S]*?<\/object>/gi, '');
+  // Remove set/animate elements that can trigger scripts via attributeName="href"
+  svg = svg.replace(/<set[\s\S]*?\/?\s*>/gi, '');
+  svg = svg.replace(/<animate[\s\S]*?\/?\s*>/gi, '');
   // Remove use elements pointing to external resources
   svg = svg.replace(/<use[^>]*href\s*=\s*["']https?:\/\/[^"']*["'][^>]*\/?\s*>/gi, '');
   return Buffer.from(svg, 'utf-8');

@@ -11,7 +11,7 @@ try {
   dbUser = await db.users.findById(authUser.id);
   if (dbUser) {
     projects = await db.projects.findByUser(dbUser.id);
-    totalCount = await db.projects.countByUser(dbUser.id);
+    totalCount = projects.length;
   }
 } catch (err) {
   console.error('[dashboard] DB error:', err);

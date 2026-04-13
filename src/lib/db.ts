@@ -158,11 +158,13 @@ export const db = {
   // ── USERS ──────────────────────────────────────────────
   users: {
     async findById(id: string): Promise<User | null> {
-      const { data } = await getClient()
+      const { data, error } = await getClient()
         .from('users')
         .select('*')
         .eq('id', id)
         .single();
+      // PGRST116 = "no rows" — expected for missing users
+      if (error && error.code !== 'PGRST116') throw error;
       return (data as User | null) ?? null;
     },
   },
@@ -191,11 +193,12 @@ export const db = {
     },
 
     async findById(id: string): Promise<Project | null> {
-      const { data } = await getClient()
+      const { data, error } = await getClient()
         .from('projects')
         .select('*')
         .eq('id', id)
         .single();
+      if (error && error.code !== 'PGRST116') throw error;
       return (data as Project | null) ?? null;
     },
 
@@ -290,12 +293,18 @@ export const db = {
         | 'site_payment_intent_id'
         | 'activated_at'
         | 'expires_at'
-      >>
+      >>,
+      /** Only transition if current billing_status is one of these values (prevents race conditions) */
+      fromStatuses?: SiteBillingStatus[]
     ): Promise<void> {
-      const { error } = await getClient()
+      let query = getClient()
         .from('projects')
         .update({ ...data, updated_at: now() })
         .eq('id', id);
+      if (fromStatuses?.length) {
+        query = query.in('billing_status', fromStatuses);
+      }
+      const { error } = await query;
       if (error) throw error;
     },
 
@@ -323,11 +332,12 @@ export const db = {
   // ── BRIEFS ─────────────────────────────────────────────
   briefs: {
     async findByProjectId(projectId: string): Promise<Brief | null> {
-      const { data } = await getClient()
+      const { data, error } = await getClient()
         .from('briefs')
         .select('*')
         .eq('project_id', projectId)
         .single();
+      if (error && error.code !== 'PGRST116') throw error;
       return (data as Brief | null) ?? null;
     },
 
@@ -348,31 +358,31 @@ export const db = {
      * Implements ONBOARDING.md Section 4.4.
      */
     async merge(projectId: string, extracted: Record<string, any>): Promise<Brief> {
-      const brief = await db.briefs.findByProjectId(projectId);
-      const briefData = structuredClone(brief?.data ?? {});
-
+      // Flatten dot-path keys into a nested JSONB object for atomic merge
+      const patch: Record<string, any> = {};
       for (const [dotPath, value] of Object.entries(extracted)) {
         const keys = dotPath.split('.');
-        let target: any = briefData;
-
+        let target: any = patch;
         for (let i = 0; i < keys.length - 1; i++) {
           if (!target[keys[i]] || typeof target[keys[i]] !== 'object') {
             target[keys[i]] = {};
           }
           target = target[keys[i]];
         }
-
-        const finalKey = keys[keys.length - 1];
-        if (Array.isArray(target[finalKey]) && !Array.isArray(value)) {
-          // Single item added to existing array (e.g. "also add photography")
-          target[finalKey].push(value);
-        } else {
-          // Everything else: overwrite (including array→array corrections)
-          target[finalKey] = value;
-        }
+        target[keys[keys.length - 1]] = value;
       }
 
-      return await db.briefs.update(projectId, briefData, brief?.completeness ?? 0);
+      // Atomic merge via Postgres RPC with FOR UPDATE lock — avoids read-then-write race
+      const { error } = await getClient().rpc('merge_brief_data', {
+        p_project_id: projectId,
+        p_extracted: patch,
+      });
+      if (error) throw error;
+
+      // Return the updated brief
+      const updated = await db.briefs.findByProjectId(projectId);
+      if (!updated) throw new Error('Brief not found after merge');
+      return updated;
     },
 
     async confirm(projectId: string): Promise<Brief> {
@@ -390,22 +400,21 @@ export const db = {
   // ── CONVERSATIONS ──────────────────────────────────────
   conversations: {
     async findByProjectId(projectId: string): Promise<Conversation | null> {
-      const { data } = await getClient()
+      const { data, error } = await getClient()
         .from('conversations')
         .select('*')
         .eq('project_id', projectId)
         .single();
+      if (error && error.code !== 'PGRST116') throw error;
       return (data as Conversation | null) ?? null;
     },
 
     async appendMessage(projectId: string, message: ConversationMessage): Promise<void> {
-      const conv = await db.conversations.findByProjectId(projectId);
-      if (!conv) throw new Error('Conversation not found');
-      const messages = [...conv.messages, message];
-      const { error } = await getClient()
-        .from('conversations')
-        .update({ messages, updated_at: now() })
-        .eq('project_id', projectId);
+      // Atomic append via Postgres jsonb concatenation — avoids read-then-write race condition
+      const { error } = await getClient().rpc('append_conversation_message', {
+        p_project_id: projectId,
+        p_message: message,
+      });
       if (error) throw error;
     },
 
@@ -510,11 +519,12 @@ export const db = {
     },
 
     async findById(id: string): Promise<Asset | null> {
-      const { data } = await getClient()
+      const { data, error } = await getClient()
         .from('assets')
         .select('*')
         .eq('id', id)
         .single();
+      if (error && error.code !== 'PGRST116') throw error;
       return (data as Asset | null) ?? null;
     },
 

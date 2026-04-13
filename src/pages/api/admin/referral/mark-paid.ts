@@ -26,7 +26,9 @@ function verifyAdminSession(token: string): boolean {
 export const POST: APIRoute = async ({ request, cookies }) => {
   if (!verifyAdminSession(cookies.get('admin_session')?.value ?? '')) return json({ error: 'Forbidden' }, 403);
 
-  const { payoutId } = await request.json();
+  let body: any;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  const { payoutId } = body;
   if (!payoutId) return json({ error: 'payoutId required' }, 400);
 
   const client = createAdminClient();

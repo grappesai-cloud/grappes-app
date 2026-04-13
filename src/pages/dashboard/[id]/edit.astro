@@ -5,7 +5,13 @@ import { db } from '../../../lib/db';
 const { id } = Astro.params;
 const authUser = Astro.locals.user!;
 
-const project = await db.projects.findById(id!);
+let project;
+try {
+  project = await db.projects.findById(id!);
+} catch (e) {
+  console.error('[edit] DB error:', e);
+  return Astro.redirect('/dashboard');
+}
 if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
 
 const allowedStatuses = ['generated', 'live', 'deploying', 'failed'];

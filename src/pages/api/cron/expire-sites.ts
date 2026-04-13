@@ -4,7 +4,13 @@
 // when their expires_at has passed.
 
 import type { APIRoute } from 'astro';
+import { timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '../../../lib/supabase';
+
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 export const GET: APIRoute = async ({ request }) => {
   // Vercel Cron authenticates with Authorization: Bearer <CRON_SECRET>
@@ -12,8 +18,8 @@ export const GET: APIRoute = async ({ request }) => {
   if (!cronSecret) {
     return new Response('CRON_SECRET not configured', { status: 500 });
   }
-  const auth = request.headers.get('authorization');
-  if (auth !== `Bearer ${cronSecret}`) {
+  const auth = request.headers.get('authorization') ?? '';
+  if (!safeCompare(auth, `Bearer ${cronSecret}`)) {
     return new Response('Unauthorized', { status: 401 });
   }
 

@@ -117,7 +117,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       201
     );
   } catch (e: any) {
-    const debugInfo = JSON.stringify(e, Object.getOwnPropertyNames(e ?? {}));
-    return json({ error: 'Internal server error', step: (typeof step !== 'undefined' ? step : 'unknown'), debug: debugInfo }, 500);
+    console.error('[POST /api/projects]', typeof step !== 'undefined' ? `step=${step}` : '', e);
+    return json({ error: 'Internal server error' }, 500);
   }
 };

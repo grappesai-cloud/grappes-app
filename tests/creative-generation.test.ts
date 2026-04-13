@@ -43,10 +43,10 @@ describe('injectAnalytics', () => {
 });
 
 describe('injectBacklink', () => {
-  it('injects grappes.ai badge', () => {
+  it('injects grappes.dev badge', () => {
     const html = '<html><body><p>Content</p></body></html>';
     const result = injectBacklink(html);
-    expect(result).toContain('grappes.ai');
+    expect(result).toContain('grappes.dev');
   });
 
   it('normalizes copyright year', () => {

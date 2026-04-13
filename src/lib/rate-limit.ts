@@ -5,6 +5,35 @@
 // catches cross-instance abuse at the cost of one query per check.
 
 const store = new Map<string, number[]>();
+const MAX_STORE_KEYS = 10_000;
+let lastSweep = Date.now();
+
+/** Evict expired entries to prevent unbounded memory growth under many unique IPs */
+function sweepStore(windowMs: number): void {
+  const now = Date.now();
+  // Sweep at most once per 60s
+  if (now - lastSweep < 60_000) return;
+  lastSweep = now;
+
+  for (const [key, timestamps] of store) {
+    const live = timestamps.filter(ts => now - ts < windowMs);
+    if (live.length === 0) {
+      store.delete(key);
+    } else {
+      store.set(key, live);
+    }
+  }
+
+  // Hard cap: if still too large, evict oldest entries
+  if (store.size > MAX_STORE_KEYS) {
+    const excess = store.size - MAX_STORE_KEYS;
+    const keys = store.keys();
+    for (let i = 0; i < excess; i++) {
+      const { value } = keys.next();
+      if (value) store.delete(value);
+    }
+  }
+}
 
 /**
  * Fast in-memory rate limiter (per-instance).
@@ -12,6 +41,7 @@ const store = new Map<string, number[]>();
  */
 export function checkRateLimit(key: string, max: number, windowMs: number): boolean {
   const now = Date.now();
+  sweepStore(windowMs);
   const history = (store.get(key) ?? []).filter(ts => now - ts < windowMs);
   if (history.length >= max) return false;
   history.push(now);

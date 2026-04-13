@@ -217,10 +217,12 @@ const planLabel = (p: string | null) =>
 </Dashboard>
 
 <script>
+  // ── Language detection (used by payout + save handlers) ──────────────────
+  const _isEn = (localStorage.getItem('i18nextLng') || 'en').split('-')[0] === 'en';
+
   // ── Payout request ────────────────────────────────────────────────────────
   const payoutBtn = document.getElementById('payout-btn');
   if (payoutBtn) {
-    const _isEn = (localStorage.getItem('i18nextLng') || 'en').split('-')[0] === 'en';
     payoutBtn.addEventListener('click', async () => {
       payoutBtn.disabled = true;
       payoutBtn.textContent = _isEn ? 'Sending...' : 'Se trimite...';

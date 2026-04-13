@@ -23,7 +23,20 @@ function qs(extra: Record<string, string> = {}) {
 }
 
 async function vercel(path: string, init: RequestInit = {}) {
-  return fetch(`${BASE}${path}`, { ...init, headers: headers() });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  try {
+    const res = await fetch(`${BASE}${path}`, { ...init, headers: headers(), signal: controller.signal });
+    // Retry once on 429 (rate limited) with backoff
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '5', 10);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      return fetch(`${BASE}${path}`, { ...init, headers: headers() });
+    }
+    return res;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────

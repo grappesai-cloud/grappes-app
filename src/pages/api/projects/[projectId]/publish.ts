@@ -18,6 +18,7 @@ import {
   getProjectProductionUrl,
 } from '../../../../lib/vercel-api';
 import { json } from '../../../../lib/api-utils';
+import { checkRateLimit } from '../../../../lib/rate-limit';
 
 
 function repoName(slug: string) {
@@ -27,6 +28,11 @@ function repoName(slug: string) {
 export const POST: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
+
+  // 5 publish attempts per hour per user
+  if (!checkRateLimit(`publish:${user.id}`, 5, 3_600_000)) {
+    return json({ error: 'Too many publish attempts. Please wait.' }, 429);
+  }
 
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);

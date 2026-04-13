@@ -42,6 +42,6 @@ export const POST: APIRoute = async ({ locals }) => {
     return json({ url: session.url });
   } catch (e: any) {
     console.error('[POST /api/billing/portal]', e);
-    return json({ error: e.message || 'Failed to create portal session' }, 500);
+    return json({ error: 'Failed to create portal session' }, 500);
   }
 };

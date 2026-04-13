@@ -100,7 +100,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
       path === '/forgot-password' ||
       path === '/reset-password';
 
-    if (origin && !isPublicEndpoint) {
+    if (!isPublicEndpoint) {
+      if (!origin) {
+        // Reject state-changing requests without Origin header (CSRF protection)
+        return new Response(JSON.stringify({ error: 'CSRF: missing origin header' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       const requestOrigin = new URL(context.url).origin;
       const configuredOrigin = (import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE || '').replace(/\/$/, '');
       const appOrigin = (import.meta.env.PUBLIC_APP_URL || '').replace(/\/$/, '');
@@ -137,7 +144,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     !path.startsWith('/api/cron/') &&
     !path.startsWith('/api/domains/check') &&
     !path.startsWith('/api/admin/') &&
-    path !== '/api/health'
+    path !== '/api/health' &&
+    path !== '/api/contact'
   ) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,

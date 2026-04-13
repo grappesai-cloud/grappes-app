@@ -14,6 +14,18 @@ function escapeDollar(str: string): string {
   return str.replace(/\$/g, '$$$$');
 }
 
+/** Strip dangerous HTML tags from innerHTML values to prevent stored XSS */
+function sanitizeInnerHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[\s\S]*?>/gi, '')
+    .replace(/<link[\s\S]*?>/gi, '')
+    .replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*["']?\s*javascript\s*:/gi, '$1="');
+}
+
 
 export const POST: APIRoute = async ({ params, request, locals }) => {
   const user = locals.user;
@@ -246,7 +258,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
           }
 
           if (contentEnd === -1) return json({ error: 'Could not match element boundaries' }, 404);
-          html = html.slice(0, contentStart) + value + html.slice(contentEnd);
+          html = html.slice(0, contentStart) + sanitizeInnerHtml(value) + html.slice(contentEnd);
           break;
         }
 
@@ -340,11 +352,18 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       }
       case 'image': {
         if (!html.includes(oldValue)) return json({ error: 'Image URL not found' }, 404);
+        // Only allow URLs as image replacements — prevent script injection
+        if (/^javascript:/i.test(newValue.trim()) || /<script/i.test(newValue)) {
+          return json({ error: 'Invalid image URL' }, 400);
+        }
         html = html.split(oldValue).join(newValue);
         break;
       }
       case 'link': {
         if (!html.includes(oldValue)) return json({ error: 'Link not found' }, 404);
+        if (/^javascript:/i.test(newValue.trim()) || /<script/i.test(newValue)) {
+          return json({ error: 'Invalid link URL' }, 400);
+        }
         html = html.split(oldValue).join(newValue);
         break;
       }
