@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     ? { customer: userRow.stripe_customer_id }
     : { customer_email: userRow?.email ?? undefined };
 
-  const origin = import.meta.env.SITE ?? 'https://grappes.dev';
+  const origin = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

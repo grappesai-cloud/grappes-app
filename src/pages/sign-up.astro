@@ -3,24 +3,34 @@ import { sendWelcomeEmail } from '../lib/resend';
 import { recordReferral } from '../lib/referral';
 import { checkRateLimit, getClientIp } from '../lib/rate-limit';
 import { createAdminClient } from '../lib/supabase';
+import { verifyTurnstile, turnstileSiteKey } from '../lib/turnstile';
 
 if (Astro.locals.user) return Astro.redirect('/dashboard');
 
+const siteKey = turnstileSiteKey();
 let error = '';
 
 if (Astro.request.method === 'POST') {
   const ip = getClientIp(Astro.request);
+  const formData = await Astro.request.formData();
+  const email = formData.get('email') as string;
+  const password = formData.get('password') as string;
+  const name = formData.get('name') as string;
+  const refCode = (formData.get('referral_code') as string || '').trim().toLowerCase();
+  const turnstileToken = (formData.get('cf-turnstile-response') as string | null);
+
   if (!checkRateLimit(`signup:ip:${ip}`, 2, 30 * 86_400_000)) {
-    error = 'Prea multe conturi create de pe acest IP. Încearcă mai târziu.';
+    error = 'Too many accounts created from this IP. Please try again later.';
   }
 
   if (!error) {
-    const formData = await Astro.request.formData();
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const name = formData.get('name') as string;
-    const refCode = (formData.get('referral_code') as string || '').trim().toLowerCase();
+    const captchaOk = await verifyTurnstile(turnstileToken, ip);
+    if (!captchaOk) {
+      error = 'Captcha verification failed. Please try again.';
+    }
+  }
 
+  if (!error) {
     const { data: { user: newUser }, error: authError } = await Astro.locals.supabase.auth.signUp({
       email,
       password,
@@ -82,7 +92,7 @@ if (Astro.request.method === 'POST') {
     <meta name="twitter:image" content="https://grappes.dev/assets/grappes/og-image.png" />
     <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   </head>
   <body data-auth-bg style="--auth-bg: url('/assets/grappes/auth/sign-up.webp');">
     <!-- Header -->
@@ -150,6 +160,10 @@ if (Astro.request.method === 'POST') {
                 </div>
               </div>
 
+              {siteKey && (
+                <div class="cf-turnstile" data-sitekey={siteKey} data-theme="dark" style="margin: 0.5rem 0;"></div>
+              )}
+
               <button type="submit" class="auth-submit-btn">
                 <span>Create account</span>
                 <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
@@ -166,6 +180,10 @@ if (Astro.request.method === 'POST') {
     </main>
 
     <link rel="stylesheet" href="/assets/grappes/auth.css" />
+
+    {siteKey && (
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    )}
 
     <script is:inline>
       document.getElementById('googleBtn')?.addEventListener('click', () => {

@@ -202,7 +202,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -229,7 +229,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   .settings-card:nth-child(2) { animation-delay: 0.08s; }
   .settings-card:nth-child(3) { animation-delay: 0.16s; }
   .settings-card h2 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 0.9375rem;
     font-weight: 600;
     margin-bottom: 0.75rem;
@@ -248,12 +248,12 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     transition: border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .input:focus {
-    border-color: #9BD4D7;
-    box-shadow: 0 0 0 3px rgba(155,212,215,0.15);
+    border-color: #06bfdd;
+    box-shadow: 0 0 0 3px rgba(6,191,221,0.15);
     outline: none;
   }
   .btn-primary {
-    background: #9BD4D7;
+    background: #06bfdd;
     color: #0a0a0a;
     border: none;
     border-radius: 16px;
@@ -267,7 +267,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   .btn-primary:hover {
     background: #00e088;
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(155,212,215,0.25);
+    box-shadow: 0 8px 24px rgba(6,191,221,0.25);
   }
 
   .btn-primary.save-success {
@@ -316,7 +316,7 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     background: rgba(0,0,0,0.2); border-radius: 8px; padding: 8px 12px;
     font-family: 'Courier New', monospace; font-size: 13px;
   }
-  .dns-type { color: #9BD4D7; font-weight: 700; }
+  .dns-type { color: #06bfdd; font-weight: 700; }
   .dns-host { color: rgba(255,255,255,0.6); }
   .dns-value { color: rgba(255,255,255,0.9); }
   .dns-help { font-size: 0.8rem; color: rgba(255,255,255,0.4); line-height: 1.5; }

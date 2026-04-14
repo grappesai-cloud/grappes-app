@@ -44,7 +44,14 @@ export async function recordReferral(referredId: string, codeUsed: string, signu
   const client = createAdminClient();
   const { data: referrer } = await client
     .from('users').select('id, email').eq('referral_code', code).maybeSingle();
-  if (!referrer || referrer.id === referredId) return; // invalid or self-referral
+  if (!referrer) {
+    console.warn(`[referral] Unknown code used at signup: "${code}" (referred: ${referredId})`);
+    return;
+  }
+  if (referrer.id === referredId) {
+    console.warn(`[referral] Self-referral blocked: ${referredId}`);
+    return;
+  }
 
   // Anti-gaming: check if referrer and referred share the same email domain
   // (catches obvious alt-account self-referrals with same provider)
@@ -61,9 +68,10 @@ export async function recordReferral(referredId: string, codeUsed: string, signu
     }
   }
 
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
   // Anti-gaming: per-IP referral limit (max 3 referrals from same IP in 24h)
   if (signupIp && signupIp !== 'unknown') {
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await client
       .from('referrals')
       .select('*', { count: 'exact', head: true })
@@ -75,7 +83,20 @@ export async function recordReferral(referredId: string, codeUsed: string, signu
     }
   }
 
-  await client.from('users').update({ referred_by: code }).eq('id', referredId);
+  // IP-agnostic fallback: cap per-referrer velocity at 10 new referrals / 24h.
+  // Catches farmers who rotate IPs or hit us without the header set.
+  {
+    const { count } = await client
+      .from('referrals')
+      .select('*', { count: 'exact', head: true })
+      .eq('referrer_id', referrer.id)
+      .gte('created_at', dayAgo);
+    if ((count ?? 0) >= 10) {
+      console.warn(`[referral] Blocked per-referrer velocity: ${referrer.id} (${count} in 24h)`);
+      return;
+    }
+  }
+
   await client.from('referrals').upsert(
     {
       referrer_id: referrer.id, referred_id: referredId, code_used: code, status: 'pending',

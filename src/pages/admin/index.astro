@@ -82,7 +82,7 @@ if (isAuthed) {
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
     client.from('referral_payouts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     client.from('referral_payouts')
-      .select('id, amount, requested_at, created_at, referrer_id, users(email)')
+      .select('id, amount, created_at, referrer_id, iban, iban_holder, users(email)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false }),
     client.from('users')
@@ -115,7 +115,7 @@ if (isAuthed) {
 }
 
 function billingColor(status: string): string {
-  if (status === 'active')  return '#9BD4D7';
+  if (status === 'active')  return '#06bfdd';
   if (status === 'free')    return '#60a5fa';
   if (status === 'expired') return '#f87171';
   return '#888';
@@ -135,14 +135,15 @@ function fmt(dateStr: string | null | undefined): string {
   <title>Grappes Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/grappes/design-tokens.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #0a0a0a;
       color: #fff;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
       min-height: 100vh;
       padding: 40px 20px;
     }
@@ -155,7 +156,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: -0.05em;
       margin-bottom: 8px;
     }
-    h1 span { color: #9BD4D7; }
+    h1 span { color: #06bfdd; }
 
     .subtitle {
       color: rgba(255,255,255,0.4);
@@ -192,21 +193,21 @@ function fmt(dateStr: string | null | undefined): string {
       border-radius: 10px;
       padding: 14px 16px;
       color: #fff;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 16px;
       margin-bottom: 16px;
       outline: none;
       transition: border-color 0.2s;
     }
-    .login-card input[type="password"]:focus { border-color: #9BD4D7; }
+    .login-card input[type="password"]:focus { border-color: #06bfdd; }
     .login-card button {
       width: 100%;
-      background: #9BD4D7;
+      background: #06bfdd;
       color: #0a0a0a;
       border: none;
       border-radius: 10px;
       padding: 14px;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 16px;
       font-weight: 700;
       cursor: pointer;
@@ -241,7 +242,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: -0.04em;
       line-height: 1;
     }
-    .stat-value.green   { color: #9BD4D7; }
+    .stat-value.green   { color: #06bfdd; }
     .stat-value.blue    { color: #60a5fa; }
     .stat-value.red     { color: #f87171; }
     .stat-value.orange  { color: #fb923c; }
@@ -297,7 +298,7 @@ function fmt(dateStr: string | null | undefined): string {
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .badge-green   { background: rgba(155,212,215,0.12); color: #9BD4D7; border: 1px solid rgba(155,212,215,0.25); }
+    .badge-green   { background: rgba(6,191,221,0.12); color: #06bfdd; border: 1px solid rgba(6,191,221,0.25); }
     .badge-blue    { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
     .badge-red     { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
     .badge-orange  { background: rgba(251,146,60,0.12); color: #fb923c; border: 1px solid rgba(251,146,60,0.25); }
@@ -318,12 +319,12 @@ function fmt(dateStr: string | null | undefined): string {
 
     /* ── Mark Paid button ───────────────────────────────────────────── */
     .btn-mark-paid {
-      background: rgba(155,212,215,0.1);
-      color: #9BD4D7;
-      border: 1px solid rgba(155,212,215,0.3);
+      background: rgba(6,191,221,0.1);
+      color: #06bfdd;
+      border: 1px solid rgba(6,191,221,0.3);
       border-radius: 8px;
       padding: 6px 14px;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
@@ -331,7 +332,7 @@ function fmt(dateStr: string | null | undefined): string {
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
-    .btn-mark-paid:hover { background: rgba(155,212,215,0.2); }
+    .btn-mark-paid:hover { background: rgba(6,191,221,0.2); }
     .btn-mark-paid:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .empty-row td {
@@ -405,18 +406,22 @@ function fmt(dateStr: string | null | undefined): string {
             <tr>
               <th>Referrer Email</th>
               <th>Amount</th>
+              <th>IBAN</th>
+              <th>Holder</th>
               <th>Requested At</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {pendingPayouts.length === 0 ? (
-              <tr class="empty-row"><td colspan="4">No pending payouts.</td></tr>
+              <tr class="empty-row"><td colspan="6">No pending payouts.</td></tr>
             ) : pendingPayouts.map((p: any) => (
               <tr>
                 <td>{(p.users as any)?.email ?? p.referrer_id}</td>
-                <td><strong style="color:#9BD4D7;">{Number(p.amount).toFixed(2)}€</strong></td>
-                <td>{fmt(p.requested_at ?? p.created_at)}</td>
+                <td><strong style="color:#06bfdd;">{Number(p.amount).toFixed(2)}€</strong></td>
+                <td style="font-family:monospace;font-size:12px;">{p.iban ?? '—'}</td>
+                <td>{p.iban_holder ?? '—'}</td>
+                <td>{fmt(p.created_at)}</td>
                 <td>
                   <button
                     class="btn-mark-paid"

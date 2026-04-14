@@ -6,9 +6,6 @@ if (!user) return Astro.redirect('/sign-in');
 ---
 
 <Dashboard title="New Project">
-  <div style="position:fixed;inset:0;z-index:-1;background:url('/assets/grappes/dashboard-bg.webp') center/cover no-repeat,#0a0a0a;"></div>
-  <div style="position:fixed;inset:0;z-index:-1;background:linear-gradient(to bottom,rgba(10,10,10,0.4),rgba(10,10,10,0.6));"></div>
-  <div style="position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at center,rgba(255,255,255,0.09) 0%,rgba(255,255,255,0) 70%);"></div>
   <div class="center-wrap">
     <div class="page-header">
       <a href="/dashboard" class="back-link">← Projects</a>
@@ -86,7 +83,7 @@ if (!user) return Astro.redirect('/sign-in');
 </script>
 
 <style>
-  :global(body) { overflow: hidden; }
+  :global(html), :global(body) { overflow: hidden; height: 100%; }
   :global(main) { padding-top: 20px !important; }
 
   .center-wrap {
@@ -101,7 +98,7 @@ if (!user) return Astro.redirect('/sign-in');
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700; letter-spacing: -0.03em; color: #ffffff;
   }
@@ -121,16 +118,16 @@ if (!user) return Astro.redirect('/sign-in');
     border-radius: 12px; padding: 14px 16px; color: #ffffff; font-size: 0.9375rem;
     outline: none; transition: border-color 0.3s, box-shadow 0.3s; width: 100%; box-sizing: border-box;
   }
-  input:focus { border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.15); }
+  input:focus { border-color: #06bfdd; box-shadow: 0 0 0 3px rgba(6,191,221,0.15); }
   input::placeholder { color: rgba(255,255,255,0.3); }
   .field-hint { color: rgba(255,255,255,0.3); font-size: 0.8rem; margin-bottom: 0.5rem; text-align: left; }
   button[type="submit"] {
-    background: #9BD4D7; color: #0a0a0a; border: none; border-radius: 14px;
+    background: #06bfdd; color: #0a0a0a; border: none; border-radius: 14px;
     padding: 14px 24px; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
     margin-top: 0.75rem; transition: all 0.3s; width: 100%;
   }
   button[type="submit"]:hover:not(:disabled) {
-    background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(155,212,215,0.25);
+    background: #00e088; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(6,191,221,0.25);
   }
   button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
 

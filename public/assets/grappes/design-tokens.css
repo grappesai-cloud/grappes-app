@@ -1,0 +1,118 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Grappes design tokens — extracted from the landing page (grappes.webflow.css).
+   Single source of truth for fonts, colors, radii, spacing, shadows.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --font-sans: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  /* Heading treatment matches LP (light 300, tight tracking) */
+  --h-weight: 300;
+  --h-tracking: -0.02em;
+
+  /* ── Brand palette (from --th-* in grappes.webflow.css) ──────────────── */
+  --c-aqua-100: #06bfdd;
+  --c-aqua-80:  #37cce2;
+  --c-aqua-50:  #6ad8e9;
+
+  --c-blue-100: #6c6bf3;
+  --c-blue-80:  #8989f7;
+  --c-blue-50:  #a5a6f9;
+
+  --c-orange-100: #ff8500;
+  --c-red-100:    #ff3334;
+
+  /* ── Semantic ────────────────────────────────────────────────────────── */
+  --c-accent:        var(--c-aqua-100);
+  --c-accent-hover:  var(--c-aqua-80);
+  --c-accent-soft:   rgba(6, 191, 221, 0.12);
+  --c-accent-ring:   rgba(6, 191, 221, 0.3);
+
+  /* Dark surface (dashboard/auth/admin) */
+  --c-bg:           #0a0a0a;
+  --c-bg-soft:      #1c1c1c;
+  --c-surface:      rgba(255, 255, 255, 0.04);
+  --c-surface-hi:   rgba(255, 255, 255, 0.08);
+  --c-border:       rgba(255, 255, 255, 0.08);
+  --c-border-soft:  rgba(255, 255, 255, 0.06);
+
+  --c-text:         #ffffff;
+  --c-text-muted:   rgba(255, 255, 255, 0.6);
+  --c-text-dim:     rgba(255, 255, 255, 0.4);
+
+  /* Status colors (kept semantic, aligned with LP red/orange/aqua) */
+  --c-status-live:    var(--c-aqua-100);
+  --c-status-work:    #f6c547;
+  --c-status-deploy:  var(--c-blue-100);
+  --c-status-failed:  var(--c-red-100);
+
+  /* ── Radii (LP uses 1em cards, 100px pill buttons) ───────────────────── */
+  --r-btn:    100px;
+  --r-card:   16px;
+  --r-input:  12px;
+  --r-chip:   999px;
+
+  /* ── Shadows (LP depth) ──────────────────────────────────────────────── */
+  --shadow-card:  -1em -0.625em 2.25em rgba(0, 0, 0, 0.15);
+  --shadow-btn:   0 6px 20px rgba(6, 191, 221, 0.25);
+
+  /* ── Motion ──────────────────────────────────────────────────────────── */
+  --ease-snap: 0.2s ease;
+  --ease-soft: 0.3s ease-in-out;
+}
+
+/* ── Base type reset for pages that include this file ──────────────────── */
+/* IMPORTANT: do NOT set background on html. Dashboard uses
+   `position:fixed; z-index:-1` layers that sit between html and body —
+   painting html solid would hide the grape image backgrounds. */
+html, body {
+  font-family: var(--font-sans);
+  color: var(--c-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: var(--h-weight);
+  letter-spacing: var(--h-tracking);
+  line-height: 1.1;
+}
+
+/* LP-style CTA button — opt-in via .btn-primary / .btn-ghost */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--c-accent);
+  color: #0a0a0a;
+  border: none;
+  border-radius: var(--r-btn);
+  padding: 12px 28px;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease-snap), transform var(--ease-snap), box-shadow var(--ease-snap);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--c-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-btn);
+}
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-btn);
+  padding: 12px 22px;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ease-snap), border-color var(--ease-snap);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--c-surface-hi);
+  border-color: var(--c-accent-ring);
+}

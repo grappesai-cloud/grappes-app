@@ -32,9 +32,9 @@ const planLabel = (p: string | null) =>
         { label: 'Confirmed referrals', value: String(stats.confirmedCount), highlight: false },
         { label: 'Pending referrals', value: String(stats.pendingCount), highlight: false },
       ].map(s => (
-        <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(155,212,215,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
+        <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(6,191,221,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
           <p style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">{s.label}</p>
-          <p style={`font-size:1.75rem;font-weight:700;font-family:'Inter',sans-serif;margin:0;color:${s.highlight ? '#9BD4D7' : '#fff'};`}>{s.value}</p>
+          <p style={`font-size:1.75rem;font-weight:700;font-family:'Inter',sans-serif;margin:0;color:${s.highlight ? '#06bfdd' : '#fff'};`}>{s.value}</p>
         </div>
       ))}
     </div>
@@ -50,7 +50,7 @@ const planLabel = (p: string | null) =>
           <input id="ref-link" type="text" value={refLink} readonly
             style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;color:#fff;font-size:14px;font-family:monospace;outline:none;" />
           <button id="copy-link" onclick="navigator.clipboard.writeText(document.getElementById('ref-link').value);this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500);"
-            style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+            style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
             Copy
           </button>
         </div>
@@ -62,7 +62,7 @@ const planLabel = (p: string | null) =>
 
         <!-- Display mode -->
         <div id="code-display" style="display:flex;gap:10px;align-items:center;">
-          <div id="code-value" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#9BD4D7;">
+          <div id="code-value" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#06bfdd;">
             {stats.code.toUpperCase()}
           </div>
           <button id="copy-code"
@@ -84,7 +84,7 @@ const planLabel = (p: string | null) =>
           </div>
           <div style="display:flex;gap:8px;">
             <button id="save-code-btn"
-              style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
+              style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
               Save
             </button>
             <button id="cancel-code-btn"
@@ -116,7 +116,7 @@ const planLabel = (p: string | null) =>
           ].map(row => (
             <tr>
               <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);">{row.plan}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#9BD4D7;font-weight:700;">{row.reward}</td>
+              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#06bfdd;font-weight:700;">{row.reward}</td>
               <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);">{row.when}</td>
             </tr>
           ))}
@@ -127,19 +127,25 @@ const planLabel = (p: string | null) =>
 
     <!-- Payout request -->
     {stats.balance >= 50 && !stats.hasPendingPayout && (
-      <div style="background:rgba(155,212,215,0.06);border:1px solid rgba(155,212,215,0.2);border-radius:20px;padding:24px;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-        <div>
-          <p style="font-weight:700;color:#9BD4D7;margin:0 0 4px;">You can request a payout!</p>
-          <p style="font-size:14px;color:rgba(255,255,255,0.6);margin:0;">You have €{stats.balance.toFixed(2)} available. We'll contact you for your IBAN.</p>
+      <div id="payout-card" style="background:rgba(6,191,221,0.06);border:1px solid rgba(6,191,221,0.2);border-radius:20px;padding:24px;margin-bottom:1.5rem;">
+        <p style="font-weight:700;color:#06bfdd;margin:0 0 4px;">You can request a payout!</p>
+        <p style="font-size:14px;color:rgba(255,255,255,0.6);margin:0 0 16px;">You have €{stats.balance.toFixed(2)} available. Enter your bank details to receive the payout within 1–3 business days.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <input id="payout-iban" type="text" placeholder="IBAN (e.g. RO49AAAA1B31007593840000)" maxlength="34"
+            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;text-transform:uppercase;" />
+          <input id="payout-holder" type="text" placeholder="Account holder name" maxlength="120"
+            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;" />
         </div>
+        <p id="payout-error" style="color:#f87171;font-size:13px;margin:0 0 10px;display:none;"></p>
         <button id="payout-btn"
-          style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:12px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">Request payout</button>
+          style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:12px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">Request payout</button>
       </div>
     )}
 
     {stats.hasPendingPayout && (
       <div style="background:rgba(246,197,71,0.06);border:1px solid rgba(246,197,71,0.2);border-radius:20px;padding:20px;margin-bottom:1.5rem;">
-        <p style="color:#f6c547;font-weight:600;margin:0;">Payout in progress — we'll contact you shortly for your IBAN.</p>
+        <p style="color:#f6c547;font-weight:600;margin:0;">Payout in progress — we'll process the transfer to your provided IBAN within 1–3 business days.</p>
       </div>
     )}
 
@@ -166,11 +172,11 @@ const planLabel = (p: string | null) =>
                   {planLabel(r.plan_type)}
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}>
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(6,191,221,0.12);color:#06bfdd;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}>
                     {r.status === 'confirmed' ? 'Confirmed' : 'Pending'}
                   </span>
                 </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#9BD4D7;font-weight:700;">
+                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#06bfdd;font-weight:700;">
                   {r.amount_earned > 0 ? `+${r.amount_earned}€` : '—'}
                 </td>
               </tr>
@@ -200,7 +206,7 @@ const planLabel = (p: string | null) =>
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#fff;font-weight:700;">{p.amount.toFixed(2)}€</td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}>
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(6,191,221,0.12);color:#06bfdd;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}>
                     {p.status === 'paid' ? 'Paid' : 'Processing'}
                   </span>
                 </td>
@@ -216,23 +222,51 @@ const planLabel = (p: string | null) =>
 
 <script>
   // ── Payout request ────────────────────────────────────────────────────────
-  const payoutBtn = document.getElementById('payout-btn');
+  const payoutBtn = document.getElementById('payout-btn') as HTMLButtonElement | null;
   if (payoutBtn) {
+    const ibanInput   = document.getElementById('payout-iban')   as HTMLInputElement;
+    const holderInput = document.getElementById('payout-holder') as HTMLInputElement;
+    const errEl       = document.getElementById('payout-error')!;
+
     payoutBtn.addEventListener('click', async () => {
+      const iban   = (ibanInput?.value ?? '').trim().replace(/\s+/g, '').toUpperCase();
+      const holder = (holderInput?.value ?? '').trim();
+      errEl.style.display = 'none';
+
+      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(iban)) {
+        errEl.textContent = 'Please enter a valid IBAN.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (holder.length < 2) {
+        errEl.textContent = 'Please enter the account holder name.';
+        errEl.style.display = 'block';
+        return;
+      }
+
       payoutBtn.disabled = true;
       payoutBtn.textContent = 'Sending...';
       try {
-        const res = await fetch('/api/referral/request-payout', { method: 'POST' });
+        const res = await fetch('/api/referral/request-payout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ iban, holder }),
+        });
         if (res.ok) {
-          payoutBtn.closest('div')!.innerHTML = `<p style="color:#9BD4D7;font-weight:600;margin:0;">✓ Request sent! We'll contact you shortly for your IBAN.</p>`;
+          document.getElementById('payout-card')!.innerHTML =
+            `<p style="color:#06bfdd;font-weight:600;margin:0;">✓ Request sent. We'll transfer the amount to your IBAN within 1–3 business days.</p>`;
         } else {
           const d = await res.json();
-          payoutBtn.textContent = d.error || 'Error';
+          errEl.textContent = d.error || 'Request failed.';
+          errEl.style.display = 'block';
           payoutBtn.disabled = false;
+          payoutBtn.textContent = 'Request payout';
         }
       } catch {
-        payoutBtn.textContent = 'Network error';
+        errEl.textContent = 'Network error.';
+        errEl.style.display = 'block';
         payoutBtn.disabled = false;
+        payoutBtn.textContent = 'Request payout';
       }
     });
   }
@@ -302,7 +336,7 @@ const planLabel = (p: string | null) =>
         const d = await res.json();
         if (d.available) {
           codeStatus.textContent = '✓ Available';
-          codeStatus.style.color = '#9BD4D7';
+          codeStatus.style.color = '#06bfdd';
           isAvailable = true;
           saveBtn.disabled = false;
           saveBtn.style.opacity = '1';

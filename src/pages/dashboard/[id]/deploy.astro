@@ -241,7 +241,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   }
   .back-link:hover { color: #ffffff; }
   h1 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: clamp(1.75rem, 3vw, 2.5rem);
     font-weight: 700;
     letter-spacing: -0.03em;
@@ -271,7 +271,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
     pointer-events: none;
     background-image:
       radial-gradient(circle 2px, rgba(56,161,105,0.5) 100%, transparent 100%),
-      radial-gradient(circle 1.5px, rgba(155,212,215,0.4) 100%, transparent 100%),
+      radial-gradient(circle 1.5px, rgba(6,191,221,0.4) 100%, transparent 100%),
       radial-gradient(circle 2px, rgba(56,161,105,0.4) 100%, transparent 100%),
       radial-gradient(circle 1.5px, rgba(56,161,105,0.3) 100%, transparent 100%);
     background-position: 15% 30%, 45% 60%, 75% 25%, 90% 70%;
@@ -343,7 +343,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
     60% { transform: scale(1.1); }
     100% { transform: scale(1); }
   }
-  .pipeline-step.active .step-icon { background: rgba(155,212,215,0.12); border-color: #9BD4D7; color: #9BD4D7; animation: spinBorder 1.2s linear infinite; }
+  .pipeline-step.active .step-icon { background: rgba(6,191,221,0.12); border-color: #06bfdd; color: #06bfdd; animation: spinBorder 1.2s linear infinite; }
   .pipeline-step.failed .step-icon { background: rgba(229,62,62,0.1); border-color: #e53e3e; color: #e53e3e; }
   @keyframes spinBorder { to { border-top-color: transparent; } }
 
@@ -351,14 +351,14 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   .step-title { font-size: 0.9375rem; font-weight: 500; color: #ffffff; }
   .pipeline-step.inactive .step-title { color: rgba(255, 255, 255, 0.3); }
   .step-desc { color: rgba(255, 255, 255, 0.5); font-size: 0.8125rem; margin-top: 0.2rem; }
-  .step-link { color: #9BD4D7; font-size: 0.8125rem; text-decoration: none; margin-top: 0.2rem; display: block; }
+  .step-link { color: #06bfdd; font-size: 0.8125rem; text-decoration: none; margin-top: 0.2rem; display: block; }
   .step-link:hover { text-decoration: underline; }
   .step-error { color: #e53e3e; font-size: 0.8125rem; margin-top: 0.25rem; }
 
   /* Actions */
   .deploy-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .btn-deploy {
-    background: #9BD4D7;
+    background: #06bfdd;
     color: #ffffff;
     border: none;
     border-radius: 16px;
@@ -374,7 +374,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   .btn-deploy:hover:not(:disabled) {
     background: #00e088;
     transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(155,212,215,0.25);
+    box-shadow: 0 8px 24px rgba(6,191,221,0.25);
   }
   .btn-deploy:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-view { background: #38a169; color: #fff; border-radius: 16px; padding: 12px 24px; font-size: 0.9rem; font-weight: 600; text-decoration: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -383,7 +383,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   .success-actions { display: flex; gap: 0.75rem; align-items: center; }
 
   .deploying-indicator { display: flex; align-items: center; gap: 0.75rem; color: rgba(255, 255, 255, 0.5); font-size: 0.875rem; }
-  .spinner { width: 18px; height: 18px; border: 2px solid rgba(155,212,215,0.2); border-top-color: #9BD4D7; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .spinner { width: 18px; height: 18px; border: 2px solid rgba(6,191,221,0.2); border-top-color: #06bfdd; border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.1); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
@@ -393,7 +393,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   /* History */
   .history-card { background: rgba(255,255,255,0.04); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); border: 1px solid rgba(255,255,255,0.6); border-radius: 24px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8); }
   h2 {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 0.75rem;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.5);
@@ -404,11 +404,11 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
   .history-row { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; }
   .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .status-dot.status-queued { background: #999; }
-  .status-dot.status-building { background: #9BD4D7; }
+  .status-dot.status-building { background: #06bfdd; }
   .status-dot.status-ready { background: #38a169; }
   .status-dot.status-error { background: #e53e3e; }
   .history-status { color: rgba(255, 255, 255, 0.5); font-weight: 500; text-transform: capitalize; }
-  .history-url { color: #9BD4D7; text-decoration: none; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
+  .history-url { color: #06bfdd; text-decoration: none; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; }
   .history-time { color: rgba(255, 255, 255, 0.3); font-size: 0.8rem; flex-shrink: 0; }
   .history-meta { margin-top: 0.5rem; color: rgba(255, 255, 255, 0.5); font-size: 0.8125rem; }
   code { font-family: monospace; color: #ffffff; }
