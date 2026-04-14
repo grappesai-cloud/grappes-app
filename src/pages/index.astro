@@ -883,6 +883,37 @@ gsap.from(heroSubtitleLines.lines, {
 })
 </script>
 
+<!-- Service cards expand/collapse on click -->
+<script is:inline>
+document.addEventListener('DOMContentLoaded', function() {
+  var serviceCards = document.querySelectorAll('.card.service-card');
+  serviceCards.forEach(function(card) {
+    var textWrap = card.querySelector('.service-card_text-wrapper');
+    if (!textWrap) return;
+
+    card.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (card.classList.contains('expanded')) {
+        // Collapse
+        gsap.to(textWrap, { opacity: 0, y: 10, duration: 0.3, ease: 'power2.inOut' });
+        card.classList.remove('expanded');
+      } else {
+        // Collapse all others first
+        serviceCards.forEach(function(other) {
+          if (other !== card && other.classList.contains('expanded')) {
+            var otherText = other.querySelector('.service-card_text-wrapper');
+            if (otherText) gsap.to(otherText, { opacity: 0, y: 10, duration: 0.3, ease: 'power2.inOut' });
+            other.classList.remove('expanded');
+          }
+        });
+        // Expand this one
+        gsap.to(textWrap, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' });
+        card.classList.add('expanded');
+      }
+    });
+  });
+});
+</script>
 
 <!-- Custom preloader code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/CustomEase.min.js" is:inline></script>
