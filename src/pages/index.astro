@@ -103,6 +103,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     display: none;
   }
 }
+
+/* Infinite marquee for partner logos */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.brands-logo-row {
+  animation: marquee 25s linear infinite;
+}
+.brands-logo-row:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brands-logo-row { animation: none; }
+}
 </style></head><body><div class="site-styles w-embed"><style is:global>
 	.cursor-wrapper {
   	pointer-events: none;
