@@ -44,5 +44,19 @@ export const GET: APIRoute = async ({ request, cookies, redirect }) => {
     }
   }
 
+  // First-time users (no projects yet) → drop into project creation
+  if (data.user?.id) {
+    try {
+      const admin = createAdminClient();
+      const { count } = await admin
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', data.user.id);
+      if ((count ?? 0) === 0) return redirect('/dashboard/new');
+    } catch (e) {
+      console.warn('[auth/callback] project-count check failed:', e);
+    }
+  }
+
   return redirect('/dashboard');
 };

@@ -61,7 +61,8 @@ if (Astro.request.method === 'POST') {
       } catch (emailErr) {
         console.error('[sign-up] Welcome email failed:', emailErr);
       }
-      return Astro.redirect('/dashboard');
+      // New account → drop them straight into project creation
+      return Astro.redirect('/dashboard/new');
     }
   }
 }

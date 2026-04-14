@@ -6,6 +6,9 @@ if (!user) return Astro.redirect('/sign-in');
 ---
 
 <Dashboard title="New Project">
+  <div style="position:fixed;inset:0;z-index:-1;background:url('/assets/grappes/dashboard-bg.webp') center/cover no-repeat,#0a0a0a;"></div>
+  <div style="position:fixed;inset:0;z-index:-1;background:linear-gradient(to bottom,rgba(10,10,10,0.4),rgba(10,10,10,0.6));"></div>
+  <div style="position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse at center,rgba(255,255,255,0.09) 0%,rgba(255,255,255,0) 70%);"></div>
   <div class="center-wrap">
     <div class="page-header">
       <a href="/dashboard" class="back-link">← Projects</a>
