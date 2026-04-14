@@ -144,12 +144,15 @@ if (hasPreview) {
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .topbar-link {
-      color: rgba(255,255,255,0.5); font-size: 0.875rem; font-weight: 500;
-      padding: 6px 14px; border-radius: 8px;
+      color: rgba(255,255,255,0.65); font-size: 0.875rem; font-weight: 500;
+      padding: 6px 12px 6px 8px; border-radius: 8px;
+      display: inline-flex; align-items: center; gap: 4px;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
+    .topbar-link svg { width: 16px; height: 16px; opacity: 0.7; }
     .topbar-link:hover { color: #fff; background: rgba(255,255,255,0.08); }
-    .topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.1); }
+    .topbar-link:hover svg { opacity: 1; }
+    .topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.12); }
     .topbar-signout {
       background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
       color: rgba(255,255,255,0.5); font-size: 0.75rem; padding: 5px 12px; cursor: pointer;
@@ -163,8 +166,27 @@ if (hasPreview) {
       font-size: 0.75rem; font-weight: 600; color: #0a0a0a;
       text-transform: uppercase; flex-shrink: 0;
     }
-    .topbar-project { color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .topbar-project { color: #fff; font-size: 15px; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em; }
     .topbar-status { margin-left: 4px; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 9999px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+    .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-pill--brief    { background: rgba(155,212,215,0.12); color: #9BD4D7; border-color: rgba(155,212,215,0.25); }
+    .status-pill--brief .dot    { background: #9BD4D7; }
+    .status-pill--ready    { background: rgba(56,161,105,0.15);  color: #6ee7a3; border-color: rgba(56,161,105,0.3); }
+    .status-pill--ready .dot    { background: #6ee7a3; }
+    .status-pill--gen      { background: rgba(246,197,71,0.15);  color: #f6c547; border-color: rgba(246,197,71,0.3); }
+    .status-pill--gen .dot      { background: #f6c547; animation: statusPulse 1.4s ease-in-out infinite; }
+    .status-pill--live     { background: rgba(56,161,105,0.18);  color: #6ee7a3; border-color: rgba(56,161,105,0.35); }
+    .status-pill--live .dot     { background: #6ee7a3; }
+    .status-pill--failed   { background: rgba(239,68,68,0.15);   color: #ff8a8a; border-color: rgba(239,68,68,0.3); }
+    .status-pill--failed .dot   { background: #ff6b6b; }
+    @keyframes statusPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
     .topbar-center { display: flex; align-items: center; gap: 8px; }
     .topbar-right { display: flex; align-items: center; gap: 8px; }
@@ -189,6 +211,14 @@ if (hasPreview) {
     .topbar-btn--primary { background: #9BD4D7; color: #0a0a0a; border-color: transparent; font-weight: 600; }
     .topbar-btn--primary:hover { background: #00e088; box-shadow: 0 4px 16px -4px rgba(155,212,215,0.4); }
     .topbar-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .topbar-btn--ready {
+      animation: launchPulse 2s ease-in-out infinite;
+      box-shadow: 0 0 0 0 rgba(155,212,215,0.6);
+    }
+    @keyframes launchPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(155,212,215,0.5); }
+      50%      { box-shadow: 0 0 0 8px rgba(155,212,215,0.0); }
+    }
     .topbar-btn--upsell { background: rgba(251,191,36,0.12); color: #f6ad55; border-color: rgba(251,191,36,0.25); font-weight: 600; text-decoration: none; }
     .topbar-btn--upsell:hover { background: rgba(251,191,36,0.2); border-color: rgba(251,191,36,0.4); }
     .topbar-btn--share { cursor: pointer; text-decoration: none; }
@@ -200,7 +230,7 @@ if (hasPreview) {
 
     /* Left panel */
     .panel {
-      width: 380px; flex-shrink: 0;
+      width: 460px; flex-shrink: 0;
       display: flex; flex-direction: column;
       background: rgba(255,255,255,0.04);
       backdrop-filter: blur(80px) saturate(1.2);
@@ -210,6 +240,8 @@ if (hasPreview) {
       overflow: hidden;
       box-shadow: 0 4px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
     }
+    /* When there's no preview yet, give chat more room */
+    .main.no-preview .panel { width: clamp(460px, 56%, 640px); }
 
     /* Right preview */
     .preview {
@@ -235,10 +267,56 @@ if (hasPreview) {
     /* Empty state */
     .preview-empty {
       flex: 1; display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 16px;
+      flex-direction: column; gap: 18px; padding: 24px;
     }
-    .preview-empty-icon { font-size: 48px; opacity: 0.15; color: #fff; }
-    .preview-empty-text { font-size: 14px; color: rgba(255,255,255,0.4); max-width: 280px; text-align: center; line-height: 1.7; font-weight: 500; }
+    .preview-mockup {
+      width: 100%; max-width: 360px; aspect-ratio: 16 / 10;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    .preview-mockup__bar {
+      display: flex; gap: 6px; align-items: center;
+    }
+    .preview-mockup__bar i {
+      display: block; width: 10px; height: 10px; border-radius: 50%;
+      background: rgba(255,255,255,0.18);
+    }
+    .preview-mockup__hero {
+      flex: 1; border-radius: 8px;
+      background: linear-gradient(135deg, rgba(155,212,215,0.18), rgba(212,200,84,0.12));
+      position: relative; overflow: hidden;
+    }
+    .preview-mockup__hero::after {
+      content: ''; position: absolute; inset: 30% 18% auto 18%; height: 6px;
+      border-radius: 4px; background: rgba(255,255,255,0.35);
+      box-shadow: 0 12px 0 rgba(255,255,255,0.18), 0 24px 0 rgba(255,255,255,0.12);
+    }
+    .preview-mockup__rows { display: flex; gap: 6px; }
+    .preview-mockup__rows span {
+      flex: 1; height: 36px; border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+    }
+    .preview-empty-title {
+      font-size: 16px; font-weight: 600; color: rgba(255,255,255,0.85);
+      margin: 0; text-align: center;
+    }
+    .preview-empty-text {
+      font-size: 14px; color: rgba(255,255,255,0.5); max-width: 340px;
+      text-align: center; line-height: 1.6; font-weight: 400; margin: 0;
+    }
+    .preview-empty--loading .preview-mockup__hero {
+      background: linear-gradient(90deg, rgba(155,212,215,0.18), rgba(155,212,215,0.05), rgba(155,212,215,0.18));
+      background-size: 200% 100%;
+      animation: previewShimmer 1.6s linear infinite;
+    }
+    @keyframes previewShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
 
     /* Phase: onboarding chat */
     .phase-onboarding { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -489,11 +567,38 @@ if (hasPreview) {
     @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
     .live-url { color: #4ade80; }
 
+    /* Mobile tab toggle (chat / preview) */
+    .mobile-tabs {
+      display: none;
+      position: sticky; top: 0; z-index: 5;
+      gap: 4px; padding: 8px;
+      background: rgba(10,10,10,0.6); backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .mobile-tabs button {
+      flex: 1; padding: 8px 12px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.6); border-radius: 8px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mobile-tabs button.active {
+      background: #9BD4D7; color: #0a0a0a; border-color: #9BD4D7; font-weight: 600;
+    }
+
     /* Responsive */
+    @media (max-width: 900px) {
+      .topbar-project { max-width: 140px; font-size: 14px; }
+      .status-pill { display: none; }
+    }
     @media (max-width: 768px) {
-      .main { flex-direction: column; }
-      .panel { width: 100%; height: 50%; }
-      .topbar-center { display: none; }
+      .main { flex-direction: column; gap: 0; }
+      .panel { width: 100% !important; height: auto; flex: 1; min-height: 0; }
+      .preview { flex: 1; min-height: 0; }
+      .panel.mobile-hidden, .preview.mobile-hidden { display: none; }
+      .mobile-tabs { display: flex; }
+      .topbar-center .topbar-link span { display: none; }
+      .topbar-center .topbar-link svg { width: 18px; height: 18px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -515,17 +620,41 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-center">
-        <a href="/dashboard" class="topbar-link">Projects</a>
+        <a href="/dashboard" class="topbar-link" aria-label="Înapoi la proiecte">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          <span>Proiecte</span>
+        </a>
         <div class="topbar-sep"></div>
-        <span class="topbar-project">{project.name}</span>
+        <span class="topbar-project" title={project.name}>{project.name}</span>
+        {isOnboarding && (
+          <span class="status-pill status-pill--brief" title="Brief în lucru"><span class="dot"></span>Brief</span>
+        )}
+        {isBriefReady && (
+          <span class="status-pill status-pill--ready" title="Brief gata"><span class="dot"></span>Gata</span>
+        )}
+        {isLaunching && (
+          <span class="status-pill status-pill--gen" title="Se generează"><span class="dot"></span>Se generează</span>
+        )}
+        {isDeploying && (
+          <span class="status-pill status-pill--gen" title="Se publică"><span class="dot"></span>Se publică</span>
+        )}
+        {isGenerated && !isLive && (
+          <span class="status-pill status-pill--ready" title="Generat"><span class="dot"></span>Generat</span>
+        )}
+        {isLive && (
+          <span class="status-pill status-pill--live" title="Site live"><span class="dot"></span>Live</span>
+        )}
+        {isFailed && (
+          <span class="status-pill status-pill--failed" title="Generare eșuată"><span class="dot"></span>Eșuat</span>
+        )}
       </div>
 
       <div class="topbar-right">
         {hasPreview && project.preview_url && !project.preview_url.startsWith('/') && (
-          <a href={project.preview_url} target="_blank" class="topbar-btn">View Live ↗</a>
+          <a href={project.preview_url} target="_blank" class="topbar-btn">Vezi live ↗</a>
         )}
         {hasPreview && (
-          <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share Preview'},1500)})`}>Share Preview</button>
+          <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copiat!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
         )}
         {/* Billing status badge */}
         {isBillingActive && (
@@ -542,31 +671,37 @@ if (hasPreview) {
 
         {hasPreview && isBillingActive && (
           <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-            {isLive ? 'Re-publish' : 'Publish ✦'}
+            {isLive ? 'Republică' : 'Publică ✦'}
           </button>
         )}
         {hasPreview && !isBillingActive && (
           <>
             <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-              {isLive ? 'Re-publish' : 'Publish ✦'}
+              {isLive ? 'Republică' : 'Publică ✦'}
             </button>
-            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe & Publish</button>
+            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Activează & publică</button>
           </>
         )}
         {canLaunch && !isLaunching && !hasPreview && (
-          <button class="topbar-btn topbar-btn--primary" id="launch-btn">
-            {isFailed ? 'Retry →' : 'Generate ✦'}
+          <button class={`topbar-btn topbar-btn--primary ${isBriefReady ? 'topbar-btn--ready' : ''}`} id="launch-btn">
+            {isFailed ? 'Reîncearcă →' : 'Generează ✦'}
           </button>
         )}
         <a href="/dashboard/account" class="topbar-avatar" title="Cont">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
       </div>
     </nav>
 
+    <!-- Mobile-only tabs to switch chat / preview -->
+    <div class="mobile-tabs" role="tablist" aria-label="Comutator chat / preview">
+      <button type="button" id="mt-chat" class="active" role="tab" aria-selected="true">Chat</button>
+      <button type="button" id="mt-preview" role="tab" aria-selected="false">Preview</button>
+    </div>
+
     <!-- MAIN SPLIT -->
-    <div class="main">
+    <div class={`main ${!hasPreview ? 'no-preview' : ''}`}>
 
       <!-- LEFT PANEL -->
-      <div class="panel">
+      <div class="panel" id="panel-chat">
 
         {/* Phase: Onboarding / Chat */}
         {(isOnboarding || isBriefReady) && (
@@ -715,22 +850,36 @@ if (hasPreview) {
       </div>
 
       <!-- RIGHT PREVIEW -->
-      <div class="preview">
+      <div class="preview" id="panel-preview">
         {hasPreview ? (
           <div class="preview-wrapper" id="preview-wrapper">
             <iframe class="preview-iframe" id="preview-iframe" src={`${previewUrl}?edit`} title={project.name}></iframe>
           </div>
         ) : (
-          <div class="preview-empty" id="preview-empty">
-            <div class="preview-empty-icon">◇</div>
-            <p class="preview-empty-text">
-              {isLaunching
-                ? 'Website-ul se generează...'
-                : isFailed
-                ? 'Generarea a eșuat. Apasă "Retry" pentru a reîncerca.'
-                : 'Preview-ul va apărea aici după generare.'
-              }
-            </p>
+          <div class={`preview-empty ${isLaunching ? 'preview-empty--loading' : ''}`} id="preview-empty">
+            <div class="preview-mockup" aria-hidden="true">
+              <div class="preview-mockup__bar"><i></i><i></i><i></i></div>
+              <div class="preview-mockup__hero"></div>
+              <div class="preview-mockup__rows"><span></span><span></span><span></span></div>
+            </div>
+            {isLaunching && (
+              <>
+                <p class="preview-empty-title">Generăm website-ul tău</p>
+                <p class="preview-empty-text">Durează aproximativ 60–90 secunde. Poți să rămâi pe pagină sau să revii mai târziu — îți păstrăm starea.</p>
+              </>
+            )}
+            {isFailed && (
+              <>
+                <p class="preview-empty-title">Generarea a eșuat</p>
+                <p class="preview-empty-text">A apărut o eroare. Apasă <strong>Reîncearcă</strong> din bara de sus pentru a relua generarea.</p>
+              </>
+            )}
+            {!isLaunching && !isFailed && (
+              <>
+                <p class="preview-empty-title">Site-ul tău va apărea aici</p>
+                <p class="preview-empty-text">Continuă conversația din stânga. După ce brieful e complet, apasă <strong>Generează</strong> și creăm site-ul în &lt; 90 secunde.</p>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -2427,6 +2576,37 @@ if (hasPreview) {
         msgs.scrollTop = msgs.scrollHeight;
       }
     }
+  </script>
+  <!-- Mobile chat/preview tab toggle -->
+  <script is:inline>
+    (function() {
+      var btnChat = document.getElementById('mt-chat');
+      var btnPreview = document.getElementById('mt-preview');
+      var panel = document.getElementById('panel-chat');
+      var preview = document.getElementById('panel-preview');
+      if (!btnChat || !btnPreview || !panel || !preview) return;
+      function show(which) {
+        if (which === 'chat') {
+          panel.classList.remove('mobile-hidden');
+          preview.classList.add('mobile-hidden');
+          btnChat.classList.add('active');
+          btnChat.setAttribute('aria-selected', 'true');
+          btnPreview.classList.remove('active');
+          btnPreview.setAttribute('aria-selected', 'false');
+        } else {
+          panel.classList.add('mobile-hidden');
+          preview.classList.remove('mobile-hidden');
+          btnPreview.classList.add('active');
+          btnPreview.setAttribute('aria-selected', 'true');
+          btnChat.classList.remove('active');
+          btnChat.setAttribute('aria-selected', 'false');
+        }
+      }
+      btnChat.addEventListener('click', function() { show('chat'); });
+      btnPreview.addEventListener('click', function() { show('preview'); });
+      // Initial: chat visible on mobile
+      if (window.matchMedia('(max-width: 768px)').matches) show('chat');
+    })();
   </script>
 </body>
 </html>
