@@ -884,6 +884,12 @@ gsap.from(heroSubtitleLines.lines, {
 </script>
 
 <!-- Service cards expand/collapse on click -->
+<style is:global>
+.card.service-card { display: flex; flex-direction: column; }
+.card.service-card .service-card_text-wrapper { opacity: 0; max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+.card.service-card.expanded .service-card_text-wrapper { opacity: 1; max-height: 12em; }
+.card.service-card.expanded .service-card_labels-wrapper { position: relative; bottom: auto; left: auto; margin-top: auto; padding-top: 1.5em; }
+</style>
 <script is:inline>
 document.addEventListener('DOMContentLoaded', function() {
   var serviceCards = document.querySelectorAll('.card.service-card');
@@ -894,21 +900,20 @@ document.addEventListener('DOMContentLoaded', function() {
     card.addEventListener('click', function(e) {
       e.preventDefault();
       if (card.classList.contains('expanded')) {
-        // Collapse
-        gsap.to(textWrap, { opacity: 0, y: 10, duration: 0.3, ease: 'power2.inOut' });
         card.classList.remove('expanded');
+        gsap.to(textWrap, { opacity: 0, duration: 0.3, ease: 'power2.inOut' });
       } else {
         // Collapse all others first
         serviceCards.forEach(function(other) {
           if (other !== card && other.classList.contains('expanded')) {
             var otherText = other.querySelector('.service-card_text-wrapper');
-            if (otherText) gsap.to(otherText, { opacity: 0, y: 10, duration: 0.3, ease: 'power2.inOut' });
+            if (otherText) gsap.to(otherText, { opacity: 0, duration: 0.3, ease: 'power2.inOut' });
             other.classList.remove('expanded');
           }
         });
         // Expand this one
-        gsap.to(textWrap, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' });
         card.classList.add('expanded');
+        gsap.to(textWrap, { opacity: 1, duration: 0.4, ease: 'power2.out', delay: 0.1 });
       }
     });
   });
