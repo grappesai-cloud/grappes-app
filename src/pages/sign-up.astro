@@ -83,7 +83,7 @@ if (Astro.request.method === 'POST') {
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body data-auth-bg style="--auth-bg: url('/assets/grappes/auth/sign-up.webp');">
     <!-- Header -->
     <header class="auth-header">
       <div class="auth-container">
@@ -101,7 +101,7 @@ if (Astro.request.method === 'POST') {
     <main class="auth-main">
       <div class="auth-container auth-grid">
         <!-- Left branding -->
-        <div class="auth-brand" style="background-image:url('/assets/grappes/auth/sign-up.webp');">
+        <div class="auth-brand">
           <h1 class="auth-title">Start building</h1>
         </div>
 
