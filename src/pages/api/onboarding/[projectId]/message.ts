@@ -197,8 +197,16 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       claudeMessages.push({ role: 'user', content: syntheticMsg });
 
       let systemPrompt = HAIKU_SYSTEM_PROMPT;
-      const langLabel = langNames[browserLang] || 'English';
-      systemPrompt += `\n\nLANGUAGE: The user's browser is set to "${langLabel}" (${browserLang}). Conduct the ENTIRE conversation in ${langLabel}. All your replies MUST be in ${langLabel}. In the discovery phase, explicitly ask: "In what language would you like the website to be generated?" and store the answer in business.locale (ISO code, e.g. "ro", "en", "fr"). If the user doesn't specify, default to "${browserLang}".`;
+
+      // Resolve conversation & site locale.
+      // briefLocale  → chat language  (user selected via language picker at project start; fallback: browser)
+      // siteLocale   → generated-website language (same picker, existing slot `business.locale`)
+      const briefLocale = (brief?.data?.business?.briefLocale as string | undefined) || browserLang;
+      const siteLocale  = (brief?.data?.business?.locale      as string | undefined) || briefLocale;
+      const briefLangLabel = langNames[briefLocale] || briefLocale;
+      const siteLangLabel  = langNames[siteLocale]  || siteLocale;
+
+      systemPrompt += `\n\nCONVERSATION LANGUAGE: The user picked "${briefLangLabel}" (${briefLocale}) for the chat. Conduct the ENTIRE conversation in ${briefLangLabel}. All your replies MUST be in ${briefLangLabel}.\n\nWEBSITE LANGUAGE: The user separately picked "${siteLangLabel}" (${siteLocale}) for the generated website. This is already stored in business.locale — do NOT ask the user again what language the site should be in. Only ask if the user explicitly wants to change it.`;
       if (project.billing_status !== 'active') {
         systemPrompt += `\n\nPLAN RESTRICTION: This user is on the free plan. Multi-page websites require a separate paid plan. If the user asks for multi-page: explain it requires upgrading the plan, and recommend the landing page as the better choice anyway (faster, higher conversion rate). Do NOT set preferences.websiteType to "multi-page" for this user.`;
       }

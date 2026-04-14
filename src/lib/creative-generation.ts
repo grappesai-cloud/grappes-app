@@ -129,6 +129,16 @@ export function buildUserPrompt(
   creativePlan?: string,
   rawConversation?: string
 ): string {
+  // Website locale: explicit instruction to Sonnet so all copy comes out in the right language.
+  const siteLocale = (brief as any)?.business?.locale || 'en';
+  const localeNames: Record<string, string> = {
+    ro: 'Romanian', en: 'English', fr: 'French', de: 'German',
+    es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch',
+    pl: 'Polish', hu: 'Hungarian',
+  };
+  const siteLangLabel = localeNames[siteLocale] || siteLocale;
+  const languageDirective = `\n## Language — MANDATORY\nWrite ALL visible copy on the site (headlines, body text, nav labels, buttons, form placeholders, alt text, footer) in ${siteLangLabel}. The ONLY exceptions are: proper nouns, brand names, and any text marked [EXACT] in the sacred-content block — those stay verbatim. Do NOT mix languages.\n`;
+
   // Build asset lines for the prompt
   let assetLines = '';
   for (const asset of assets) {
@@ -234,7 +244,7 @@ Embed as an iframe or video element with explicit dimensions (width:100%;aspect-
   return `## Client Brief
 
 ${briefJson}
-${noPhotosBlock}
+${languageDirective}${noPhotosBlock}
 ${sacredBlock ? `\n## Sacred Content (use EXACTLY as written)\n\n${sacredBlock}` : ''}
 ${!noPhotos && assetLines ? `\n## Uploaded Assets\n${assetLines}` : ''}
 ${creativePlan ? `

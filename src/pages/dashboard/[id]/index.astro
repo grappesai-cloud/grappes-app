@@ -719,6 +719,8 @@ if (hasPreview) {
               initialMessages={conversation?.messages ?? []}
               initialCompleteness={brief?.completeness ?? 0}
               initialPhase={conversation?.phase ?? 'discovery'}
+              briefLocale={brief?.data?.business?.briefLocale ?? null}
+              siteLocale={brief?.data?.business?.locale ?? null}
             />
           </div>
         )}

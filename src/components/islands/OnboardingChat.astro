@@ -4,6 +4,8 @@ interface Props {
   initialMessages?: { role: 'user' | 'assistant'; content: string; timestamp: string }[];
   initialCompleteness?: number;
   initialPhase?: string;
+  briefLocale?: string | null;
+  siteLocale?: string | null;
 }
 
 const {
@@ -11,6 +13,8 @@ const {
   initialMessages = [],
   initialCompleteness = 0,
   initialPhase = 'discovery',
+  briefLocale = null,
+  siteLocale = null,
 } = Astro.props;
 
 const PHASES = ['discovery', 'content', 'branding', 'media', 'preferences', 'review'];
@@ -114,7 +118,52 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 </div><!-- end chat-container -->
 </div><!-- end chat-wrapper -->
 
-<script define:vars={{ projectId, initialCompleteness, initialPhase, PHASES, hasMessages: initialMessages.length > 0 }}>
+<!-- Language picker modal — shown on first session -->
+<div class="lang-modal" id="lang-modal" role="dialog" aria-modal="true" aria-labelledby="lang-modal-title" hidden>
+  <div class="lang-modal-backdrop"></div>
+  <div class="lang-modal-card">
+    <h2 id="lang-modal-title" class="lang-modal-title">Alege limbile pentru proiect</h2>
+    <p class="lang-modal-sub">Poți vorbi cu noi într-o limbă și genera site-ul în alta. Poți schimba oricând din setări.</p>
+    <form id="lang-form" class="lang-form">
+      <label class="lang-field">
+        <span class="lang-field-label">Limba brief-ului (chat)</span>
+        <span class="lang-field-hint">În ce limbă vrei să vorbești cu consultantul AI</span>
+        <select id="lang-brief" required>
+          <option value="ro">Română</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+          <option value="hu">Magyar</option>
+        </select>
+      </label>
+      <label class="lang-field">
+        <span class="lang-field-label">Limba website-ului</span>
+        <span class="lang-field-hint">În ce limbă vrei să fie textele de pe site</span>
+        <select id="lang-site" required>
+          <option value="ro">Română</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="nl">Nederlands</option>
+          <option value="pl">Polski</option>
+          <option value="hu">Magyar</option>
+        </select>
+      </label>
+      <button type="submit" class="lang-submit">Continuă</button>
+      <p class="lang-error" id="lang-error" hidden></p>
+    </form>
+  </div>
+</div>
+
+<script define:vars={{ projectId, initialCompleteness, initialPhase, PHASES, hasMessages: initialMessages.length > 0, briefLocale, siteLocale }}>
   // Translate phase names to Romanian
   var phaseRo = { discovery:'Descoperire', content:'Conținut', branding:'Branding', media:'Media', preferences:'Preferințe', review:'Revizuire' };
   var lang = (localStorage.getItem('i18nextLng')||'ro').split('-')[0];
@@ -507,7 +556,55 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     scrollToBottom();
   } else {
     setInputEnabled(false);
-    setTimeout(() => initSession(0), 200);
+    // If no brief language was chosen yet, show the picker first.
+    // Otherwise go straight to AI init.
+    if (!briefLocale) {
+      showLanguageModal();
+    } else {
+      setTimeout(() => initSession(0), 200);
+    }
+  }
+
+  function showLanguageModal() {
+    var modal = document.getElementById('lang-modal');
+    if (!modal) { setTimeout(() => initSession(0), 200); return; }
+    // Pre-select the best guess from browser locale
+    var browserLang = (navigator.language || 'ro').split('-')[0].toLowerCase();
+    var briefSel = document.getElementById('lang-brief');
+    var siteSel = document.getElementById('lang-site');
+    if (briefSel && [...briefSel.options].some(o => o.value === browserLang)) briefSel.value = browserLang;
+    if (siteSel  && [...siteSel.options].some(o  => o.value === browserLang)) siteSel.value  = browserLang;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    var form = document.getElementById('lang-form');
+    var errEl = document.getElementById('lang-error');
+    form?.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Salvez…';
+      errEl.hidden = true;
+      try {
+        var res = await fetch('/api/projects/' + projectId + '/language', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            briefLocale: briefSel.value,
+            siteLocale: siteSel.value,
+          }),
+        });
+        if (!res.ok) throw new Error('Save failed');
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        setTimeout(() => initSession(0), 100);
+      } catch (err) {
+        errEl.textContent = 'Nu am putut salva limbile. Reîncearcă.';
+        errEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'Continuă';
+      }
+    }, { once: false });
   }
 
   async function initSession(attempt) {
@@ -1128,4 +1225,53 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     69%      { transform: translate(-50%, -8%); }
     76%, 100%{ transform: translate(-50%, -30%); }
   }
+
+  /* ── Language picker modal ──────────────────────────────── */
+  .lang-modal {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .lang-modal[hidden] { display: none !important; }
+  .lang-modal-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(5, 5, 8, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .lang-modal-card {
+    position: relative; width: 100%; max-width: 440px;
+    background: #141417;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 28px 26px 24px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    color: #fff;
+  }
+  .lang-modal-title { margin: 0 0 6px; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .lang-modal-sub { margin: 0 0 20px; font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.5; }
+  .lang-form { display: flex; flex-direction: column; gap: 16px; }
+  .lang-field { display: flex; flex-direction: column; gap: 4px; }
+  .lang-field-label { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9); }
+  .lang-field-hint { font-size: 12px; color: rgba(255,255,255,0.45); }
+  .lang-field select {
+    margin-top: 4px;
+    background: rgba(255,255,255,0.05); color: #fff;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+    padding: 10px 12px; font: inherit; font-size: 14px;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='rgba(255,255,255,0.55)' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 32px;
+  }
+  .lang-field select:focus { outline: none; border-color: #9BD4D7; box-shadow: 0 0 0 3px rgba(155,212,215,0.2); }
+  .lang-submit {
+    margin-top: 6px; padding: 12px; border: none; border-radius: 10px;
+    background: #9BD4D7; color: #0a0a0a; font-weight: 700; font-size: 14px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .lang-submit:hover:not(:disabled) { background: #6ee7a3; }
+  .lang-submit:disabled { opacity: 0.6; cursor: wait; }
+  .lang-error { margin: 4px 0 0; font-size: 12px; color: #ff8a8a; }
 </style>
