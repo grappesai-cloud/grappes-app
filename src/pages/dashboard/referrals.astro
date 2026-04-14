@@ -10,7 +10,7 @@ const baseUrl = import.meta.env.PUBLIC_SITE_URL ?? new URL(Astro.request.url).or
 const refLink = `${baseUrl}/?ref=${stats.code}`;
 
 const planLabel = (p: string | null) =>
-  p === 'agency' ? 'Lifetime' : p === 'pro' ? 'Anual' : p === 'starter' ? 'Lunar' : '—';
+  p === 'agency' ? 'Lifetime' : p === 'pro' ? 'Annual' : p === 'starter' ? 'Monthly' : '—';
 ---
 
 <Dashboard title="Referrals">
@@ -27,13 +27,13 @@ const planLabel = (p: string | null) =>
     <!-- Stats row -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:2rem;">
       {[
-        { label: 'Sold disponibil', enLabel: 'Available balance', value: `${stats.balance.toFixed(2)}€`, highlight: stats.balance >= 50 },
-        { label: 'Total câștigat', enLabel: 'Total earned', value: `${stats.totalEarned.toFixed(2)}€`, highlight: false },
-        { label: 'Referrals confirmate', enLabel: 'Confirmed referrals', value: String(stats.confirmedCount), highlight: false },
-        { label: 'Referrals în așteptare', enLabel: 'Pending referrals', value: String(stats.pendingCount), highlight: false },
+        { label: 'Available balance', value: `${stats.balance.toFixed(2)}€`, highlight: stats.balance >= 50 },
+        { label: 'Total earned', value: `${stats.totalEarned.toFixed(2)}€`, highlight: false },
+        { label: 'Confirmed referrals', value: String(stats.confirmedCount), highlight: false },
+        { label: 'Pending referrals', value: String(stats.pendingCount), highlight: false },
       ].map(s => (
         <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(155,212,215,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
-          <p style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;" data-en={s.enLabel}>{s.label}</p>
+          <p style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">{s.label}</p>
           <p style={`font-size:1.75rem;font-weight:700;font-family:'Inter',sans-serif;margin:0;color:${s.highlight ? '#9BD4D7' : '#fff'};`}>{s.value}</p>
         </div>
       ))}
@@ -85,11 +85,11 @@ const planLabel = (p: string | null) =>
           <div style="display:flex;gap:8px;">
             <button id="save-code-btn"
               style="background:#9BD4D7;color:#0a0a0a;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
-              Salvează
+              Save
             </button>
             <button id="cancel-code-btn"
               style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 18px;font-size:13px;cursor:pointer;">
-              Anulează
+              Cancel
             </button>
           </div>
           <p id="code-error" style="font-size:12px;color:#f87171;margin:0;display:none;"></p>
@@ -110,14 +110,14 @@ const planLabel = (p: string | null) =>
         </thead>
         <tbody>
           {[
-            { plan: 'Lunar (15€/lună)', enPlan: 'Monthly (€15/mo)', reward: '15€', enReward: '€15', when: 'La fiecare 10 abonați lunari', enWhen: 'Every 10 monthly subscribers' },
-            { plan: 'Anual (100€/an)', enPlan: 'Annual (€100/yr)', reward: '10€', enReward: '€10', when: 'Per conversie', enWhen: 'Per conversion' },
-            { plan: 'Lifetime (350€)', enPlan: 'Lifetime (€350)', reward: '40€', enReward: '€40', when: 'Per conversie', enWhen: 'Per conversion' },
+            { plan: 'Monthly (€15/mo)', reward: '€15', when: 'Every 10 monthly subscribers' },
+            { plan: 'Annual (€100/yr)', reward: '€10', when: 'Per conversion' },
+            { plan: 'Lifetime (€350)', reward: '€40', when: 'Per conversion' },
           ].map(row => (
             <tr>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);" data-en={row.enPlan}>{row.plan}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#9BD4D7;font-weight:700;" data-en={row.enReward}>{row.reward}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);" data-en={row.enWhen}>{row.when}</td>
+              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);">{row.plan}</td>
+              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#9BD4D7;font-weight:700;">{row.reward}</td>
+              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);">{row.when}</td>
             </tr>
           ))}
         </tbody>
@@ -160,15 +160,14 @@ const planLabel = (p: string | null) =>
             {stats.referrals.map(r => (
               <tr>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);">
-                  {new Date(r.confirmed_at || r.created_at).toLocaleDateString('ro-RO')}
+                  {new Date(r.confirmed_at || r.created_at).toLocaleDateString('en-US')}
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);">
                   {planLabel(r.plan_type)}
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}
-                    data-en={r.status === 'confirmed' ? 'Confirmed' : 'Pending'}>
-                    {r.status === 'confirmed' ? 'Confirmat' : 'În așteptare'}
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}>
+                    {r.status === 'confirmed' ? 'Confirmed' : 'Pending'}
                   </span>
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#9BD4D7;font-weight:700;">
@@ -197,13 +196,12 @@ const planLabel = (p: string | null) =>
             {stats.payouts.map(p => (
               <tr>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);">
-                  {new Date(p.paid_at || p.created_at).toLocaleDateString('ro-RO')}
+                  {new Date(p.paid_at || p.created_at).toLocaleDateString('en-US')}
                 </td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#fff;font-weight:700;">{p.amount.toFixed(2)}€</td>
                 <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}
-                    data-en={p.status === 'paid' ? 'Paid' : 'Processing'}>
-                    {p.status === 'paid' ? 'Plătit' : 'În procesare'}
+                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(155,212,215,0.12);color:#9BD4D7;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}>
+                    {p.status === 'paid' ? 'Paid' : 'Processing'}
                   </span>
                 </td>
               </tr>
@@ -217,26 +215,23 @@ const planLabel = (p: string | null) =>
 </Dashboard>
 
 <script>
-  // ── Language detection (used by payout + save handlers) ──────────────────
-  const _isEn = (localStorage.getItem('i18nextLng') || 'en').split('-')[0] === 'en';
-
   // ── Payout request ────────────────────────────────────────────────────────
   const payoutBtn = document.getElementById('payout-btn');
   if (payoutBtn) {
     payoutBtn.addEventListener('click', async () => {
       payoutBtn.disabled = true;
-      payoutBtn.textContent = _isEn ? 'Sending...' : 'Se trimite...';
+      payoutBtn.textContent = 'Sending...';
       try {
         const res = await fetch('/api/referral/request-payout', { method: 'POST' });
         if (res.ok) {
-          payoutBtn.closest('div')!.innerHTML = `<p style="color:#9BD4D7;font-weight:600;margin:0;">✓ ${_isEn ? 'Request sent! We\'ll contact you shortly for your IBAN.' : 'Cerere trimisă! Te contactăm în curând pentru IBAN.'}</p>`;
+          payoutBtn.closest('div')!.innerHTML = `<p style="color:#9BD4D7;font-weight:600;margin:0;">✓ Request sent! We'll contact you shortly for your IBAN.</p>`;
         } else {
           const d = await res.json();
-          payoutBtn.textContent = d.error || (_isEn ? 'Error' : 'Eroare');
+          payoutBtn.textContent = d.error || 'Error';
           payoutBtn.disabled = false;
         }
       } catch {
-        payoutBtn.textContent = _isEn ? 'Network error' : 'Eroare de rețea';
+        payoutBtn.textContent = 'Network error';
         payoutBtn.disabled = false;
       }
     });
@@ -292,7 +287,7 @@ const planLabel = (p: string | null) =>
 
     if (!val || val === currentCode) return;
     if (!/^[A-Z0-9]{3,20}$/.test(val)) {
-      codeStatus.textContent = '✗ 3-20 litere/cifre';
+      codeStatus.textContent = '✗ 3-20 letters/digits';
       codeStatus.style.color = '#f87171';
       return;
     }
@@ -306,18 +301,18 @@ const planLabel = (p: string | null) =>
         const res = await fetch(`/api/referral/check-code?code=${encodeURIComponent(val.toLowerCase())}`);
         const d = await res.json();
         if (d.available) {
-          codeStatus.textContent = '✓ Disponibil';
+          codeStatus.textContent = '✓ Available';
           codeStatus.style.color = '#9BD4D7';
           isAvailable = true;
           saveBtn.disabled = false;
           saveBtn.style.opacity = '1';
         } else {
-          codeStatus.textContent = d.error ?? '✗ Indisponibil';
+          codeStatus.textContent = d.error ?? '✗ Unavailable';
           codeStatus.style.color = '#f87171';
           isAvailable = false;
         }
       } catch {
-        codeStatus.textContent = '? Eroare verificare';
+        codeStatus.textContent = '? Check failed';
         codeStatus.style.color = '#f87171';
       }
     }, 400);
@@ -327,7 +322,7 @@ const planLabel = (p: string | null) =>
     if (!isAvailable) return;
     const val = codeInput.value.trim().toLowerCase();
     saveBtn.disabled = true;
-    saveBtn.textContent = _isEn ? 'Saving…' : 'Se salvează…';
+    saveBtn.textContent = 'Saving…';
 
     try {
       const res = await fetch('/api/referral/update-code', {
@@ -349,18 +344,18 @@ const planLabel = (p: string | null) =>
         cancelBtn.click();
         codeStatus.textContent = '';
       } else {
-        codeError.textContent = d.error || (_isEn ? 'Save failed.' : 'Eroare la salvare.');
+        codeError.textContent = d.error || 'Save failed.';
         codeError.style.display = 'block';
         saveBtn.disabled = false;
         saveBtn.style.opacity = '1';
-        saveBtn.textContent = _isEn ? 'Save' : 'Salvează';
+        saveBtn.textContent = 'Save';
       }
     } catch {
-      codeError.textContent = _isEn ? 'Network error.' : 'Eroare de rețea.';
+      codeError.textContent = 'Network error.';
       codeError.style.display = 'block';
       saveBtn.disabled = false;
       saveBtn.style.opacity = '1';
-      saveBtn.textContent = _isEn ? 'Save' : 'Salvează';
+      saveBtn.textContent = 'Save';
     }
   });
 </script>

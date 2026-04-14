@@ -47,8 +47,6 @@ if (!user) return Astro.redirect('/sign-in');
   const nameLoading = document.getElementById('name-loading')!;
   const nameError = document.getElementById('name-error')!;
 
-  const _isEn = () => (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
-
   nameForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const val = (nameForm.elements.namedItem('name') as HTMLInputElement).value.trim();
@@ -68,7 +66,7 @@ if (!user) return Astro.redirect('/sign-in');
       const data = await res.json();
 
       if (!res.ok) {
-        nameError.textContent = data.error || (_isEn() ? 'Something went wrong.' : 'Ceva n-a mers.');
+        nameError.textContent = data.error || 'Something went wrong.';
         nameError.hidden = false;
         nameBtn.disabled = false;
         nameLabel.hidden = false;
@@ -78,7 +76,7 @@ if (!user) return Astro.redirect('/sign-in');
 
       window.location.href = `/dashboard/${data.project.id}`;
     } catch {
-      nameError.textContent = _isEn() ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+      nameError.textContent = 'Network error. Please try again.';
       nameError.hidden = false;
       nameBtn.disabled = false;
       nameLabel.hidden = false;

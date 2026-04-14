@@ -14,13 +14,13 @@ const totalEditsUsed = quota.used;
 const totalRemaining = Math.max(0, totalEditsAvailable - totalEditsUsed);
 const quotaDisplay = quota.limit > 0
   ? `${quota.used} / ${quota.limit}${quota.extra > 0 ? ` + ${quota.extra} extra` : ''}`
-  : `${totalRemaining} ${quota.extra > 0 ? 'extra' : ''} disponibile`.trim();
+  : `${totalRemaining} ${quota.extra > 0 ? 'extra' : ''} available`.trim();
 
 const hasMultipage         = !!dbUser?.multipage_addon;
 const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
 ---
 
-<Dashboard title="Cont">
+<Dashboard title="Account">
   <div class="page-header">
     <a href="/dashboard" class="back-link">← Dashboard</a>
     <h1>Account</h1>
@@ -130,7 +130,6 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
 
   // ── Stripe checkout helper ────────────────────────────────────────────────
   async function redirectToCheckout(endpoint: string, body: object, btnEl: HTMLButtonElement, msgEl: HTMLElement, loadingText: string) {
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     const originalHtml = btnEl.innerHTML; // preserve inner HTML (spans, etc.)
     btnEl.disabled = true;
     btnEl.textContent = loadingText;
@@ -146,14 +145,14 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
       } else {
         msgEl.hidden = false;
         msgEl.className = 'reset-msg error';
-        msgEl.textContent = data.error || (_isEn ? 'Something went wrong.' : 'Ceva n-a mers.');
+        msgEl.textContent = data.error || 'Something went wrong.';
         btnEl.disabled = false;
         btnEl.innerHTML = originalHtml;
       }
     } catch {
       msgEl.hidden = false;
       msgEl.className = 'reset-msg error';
-      msgEl.textContent = _isEn ? 'Network error. Try again.' : 'Eroare de rețea. Încearcă din nou.';
+      msgEl.textContent = 'Network error. Try again.';
       btnEl.disabled = false;
       btnEl.innerHTML = originalHtml;
     }
@@ -164,10 +163,7 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
     document.getElementById(`addon-${interval}-btn`)?.addEventListener('click', () => {
       const btn = document.getElementById(`addon-${interval}-btn`) as HTMLButtonElement;
       const msg = document.getElementById('addon-msg')!;
-      const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
-      redirectToCheckout('/api/billing/multipage-addon', { interval }, btn, msg,
-        _isEn ? 'Redirecting…' : 'Se redirecționează…'
-      );
+      redirectToCheckout('/api/billing/multipage-addon', { interval }, btn, msg, 'Redirecting…');
     });
   });
 
@@ -175,19 +171,15 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
   document.getElementById('buy-edits-btn')?.addEventListener('click', () => {
     const btn = document.getElementById('buy-edits-btn') as HTMLButtonElement;
     const msg = document.getElementById('edits-msg')!;
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
-    redirectToCheckout('/api/billing/buy-edits', {}, btn, msg,
-      _isEn ? 'Redirecting…' : 'Se redirecționează…'
-    );
+    redirectToCheckout('/api/billing/buy-edits', {}, btn, msg, 'Redirecting…');
   });
 
   // Password reset
   document.getElementById('reset-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('reset-btn') as HTMLButtonElement;
     const msg = document.getElementById('reset-msg')!;
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     btn.disabled = true;
-    btn.textContent = _isEn ? 'Sending…' : 'Se trimite…';
+    btn.textContent = 'Sending…';
 
     const email = document.querySelector<HTMLElement>('[data-user-email]')?.dataset.userEmail ?? '';
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -197,13 +189,13 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
     msg.hidden = false;
     if (error) {
       msg.className = 'reset-msg error';
-      msg.textContent = _isEn ? 'Error sending email. Please try again.' : 'Eroare la trimitere. Încearcă din nou.';
+      msg.textContent = 'Error sending email. Please try again.';
     } else {
       msg.className = 'reset-msg success';
-      msg.textContent = _isEn ? 'Email sent! Check your inbox.' : 'Email trimis! Verifică inbox-ul.';
+      msg.textContent = 'Email sent! Check your inbox.';
     }
     btn.disabled = false;
-    btn.textContent = _isEn ? 'Send reset email' : 'Trimite email de resetare';
+    btn.textContent = 'Send reset email';
   });
 
   // Language toggle
@@ -220,21 +212,16 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
 
   // Delete account
   document.getElementById('delete-account-btn')?.addEventListener('click', async () => {
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
-    const msg1 = _isEn
-      ? 'Are you sure? This will permanently delete your account, all projects, and all data. This cannot be undone.'
-      : 'Ești sigur? Aceasta va șterge permanent contul, toate proiectele și toate datele. Nu se poate anula.';
+    const msg1 = 'Are you sure? This will permanently delete your account, all projects, and all data. This cannot be undone.';
     if (!confirm(msg1)) return;
-    const msg2 = _isEn
-      ? 'Type DELETE to confirm:'
-      : 'Scrie DELETE pentru confirmare:';
+    const msg2 = 'Type DELETE to confirm:';
     const confirmation = prompt(msg2);
     if (confirmation !== 'DELETE') return;
 
     const btn = document.getElementById('delete-account-btn') as HTMLButtonElement;
     const msgEl = document.getElementById('delete-msg')!;
     btn.disabled = true;
-    btn.textContent = _isEn ? 'Deleting…' : 'Se șterge…';
+    btn.textContent = 'Deleting…';
 
     try {
       const res = await fetch('/api/account/delete', { method: 'POST' });
@@ -244,16 +231,16 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
       } else {
         msgEl.hidden = false;
         msgEl.className = 'reset-msg error';
-        msgEl.textContent = data.error || (_isEn ? 'Deletion failed.' : 'Ștergerea a eșuat.');
+        msgEl.textContent = data.error || 'Deletion failed.';
         btn.disabled = false;
-        btn.textContent = _isEn ? 'Delete my account' : 'Șterge contul meu';
+        btn.textContent = 'Delete my account';
       }
     } catch {
       msgEl.hidden = false;
       msgEl.className = 'reset-msg error';
-      msgEl.textContent = _isEn ? 'Network error.' : 'Eroare de rețea.';
+      msgEl.textContent = 'Network error.';
       btn.disabled = false;
-      btn.textContent = _isEn ? 'Delete my account' : 'Șterge contul meu';
+      btn.textContent = 'Delete my account';
     }
   });
 </script>

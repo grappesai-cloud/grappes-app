@@ -625,41 +625,41 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-center">
-        <a href="/dashboard" class="topbar-link" aria-label="Înapoi la proiecte">
+        <a href="/dashboard" class="topbar-link" aria-label="Back to projects">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          <span>Proiecte</span>
+          <span>Projects</span>
         </a>
         <div class="topbar-sep"></div>
         <span class="topbar-project" title={project.name}>{project.name}</span>
         {isOnboarding && (
-          <span class="status-pill status-pill--brief" title="Brief în lucru"><span class="dot"></span>Brief</span>
+          <span class="status-pill status-pill--brief" title="Brief in progress"><span class="dot"></span>Brief</span>
         )}
         {isBriefReady && (
-          <span class="status-pill status-pill--ready" title="Brief gata"><span class="dot"></span>Gata</span>
+          <span class="status-pill status-pill--ready" title="Brief ready"><span class="dot"></span>Ready</span>
         )}
         {isLaunching && (
-          <span class="status-pill status-pill--gen" title="Se generează"><span class="dot"></span>Se generează</span>
+          <span class="status-pill status-pill--gen" title="Generating"><span class="dot"></span>Generating</span>
         )}
         {isDeploying && (
-          <span class="status-pill status-pill--gen" title="Se publică"><span class="dot"></span>Se publică</span>
+          <span class="status-pill status-pill--gen" title="Publishing"><span class="dot"></span>Publishing</span>
         )}
         {isGenerated && !isLive && (
-          <span class="status-pill status-pill--ready" title="Generat"><span class="dot"></span>Generat</span>
+          <span class="status-pill status-pill--ready" title="Generated"><span class="dot"></span>Generated</span>
         )}
         {isLive && (
           <span class="status-pill status-pill--live" title="Site live"><span class="dot"></span>Live</span>
         )}
         {isFailed && (
-          <span class="status-pill status-pill--failed" title="Generare eșuată"><span class="dot"></span>Eșuat</span>
+          <span class="status-pill status-pill--failed" title="Generation failed"><span class="dot"></span>Failed</span>
         )}
       </div>
 
       <div class="topbar-right">
         {hasPreview && project.preview_url && !project.preview_url.startsWith('/') && (
-          <a href={project.preview_url} target="_blank" class="topbar-btn">Vezi live ↗</a>
+          <a href={project.preview_url} target="_blank" class="topbar-btn">View live ↗</a>
         )}
         {hasPreview && (
-          <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copiat!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
+          <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
         )}
         {/* Billing status badge */}
         {isBillingActive && (
@@ -676,31 +676,31 @@ if (hasPreview) {
 
         {hasPreview && isBillingActive && (
           <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-            {isLive ? 'Republică' : 'Publică ✦'}
+            {isLive ? 'Republish' : 'Publish ✦'}
           </button>
         )}
         {hasPreview && !isBillingActive && (
           <>
             <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-              {isLive ? 'Republică' : 'Publică ✦'}
+              {isLive ? 'Republish' : 'Publish ✦'}
             </button>
-            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Activează & publică</button>
+            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe &amp; publish</button>
           </>
         )}
         {canLaunch && !isLaunching && !hasPreview && (
           <button class={`topbar-btn topbar-btn--primary ${isBriefReady ? 'topbar-btn--ready' : ''}`} id="launch-btn">
-            {isFailed ? 'Reîncearcă →' : 'Generează ✦'}
+            {isFailed ? 'Retry →' : 'Generate ✦'}
           </button>
         )}
         <form method="POST" action="/api/auth/signout" style="margin:0;">
           <button type="submit" class="topbar-signout--dash"><span>Sign out</span></button>
         </form>
-        <a href="/dashboard/account" class="topbar-avatar" title="Cont">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
+        <a href="/dashboard/account" class="topbar-avatar" title="Account">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
       </div>
     </nav>
 
     <!-- Mobile-only tabs to switch chat / preview -->
-    <div class="mobile-tabs" role="tablist" aria-label="Comutator chat / preview">
+    <div class="mobile-tabs" role="tablist" aria-label="Chat / preview switcher">
       <button type="button" id="mt-chat" class="active" role="tab" aria-selected="true">Chat</button>
       <button type="button" id="mt-preview" role="tab" aria-selected="false">Preview</button>
     </div>
@@ -729,8 +729,8 @@ if (hasPreview) {
         {isLaunching && (
           <div class="phase-generating">
             <div class="gen-spinner"></div>
-            <p class="gen-title">Se generează website-ul...</p>
-            <p class="gen-sub">Durează 60-120 secunde. Nu închide pagina.</p>
+            <p class="gen-title">Generating your website...</p>
+            <p class="gen-sub">Takes 60-120 seconds. Don't close the page.</p>
           </div>
         )}
 
@@ -751,21 +751,21 @@ if (hasPreview) {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                 <span class="domain-set-name">{project.custom_domain}</span>
                 {project.domain_verified
-                  ? <span class="domain-verified-badge">✓ Verificat</span>
-                  : <span class="domain-pending-badge">⏳ Pendinte</span>
+                  ? <span class="domain-verified-badge">✓ Verified</span>
+                  : <span class="domain-pending-badge">⏳ Pending</span>
                 }
-                <button class="domain-remove-btn" id="domain-remove-btn" title="Șterge domeniu">×</button>
+                <button class="domain-remove-btn" id="domain-remove-btn" title="Remove domain">×</button>
               </div>
             ) : (
               <div class="domain-actions">
                 <button class="domain-add-btn" id="domain-add-btn">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                  Am deja domeniu
+                  I already have a domain
                 </button>
-                <span class="domain-or">sau</span>
+                <span class="domain-or">or</span>
                 <button class="domain-buy-btn" id="domain-buy-btn">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                  Cumpără domeniu nou
+                  Buy a new domain
                 </button>
               </div>
             )}
@@ -779,7 +779,7 @@ if (hasPreview) {
 
             <!-- Background edit mode toggle -->
             <div class="ve-bg-toggle">
-              <button id="ve-bg-toggle-btn" class="ve-bg-toggle-btn" title="Editare fundal secțiuni"></button>
+              <button id="ve-bg-toggle-btn" class="ve-bg-toggle-btn" title="Edit section backgrounds"></button>
               <span class="ve-bg-toggle-label">Edit section backgrounds</span>
             </div>
             <div class="ve-bg-picker" id="ve-bg-picker">
@@ -794,15 +794,15 @@ if (hasPreview) {
 
             <!-- Background image mode toggle -->
             <div class="ve-bg-toggle">
-              <button id="ve-bgimg-toggle-btn" class="ve-bg-toggle-btn" title="Editare imagini fundal"></button>
+              <button id="ve-bgimg-toggle-btn" class="ve-bg-toggle-btn" title="Edit background images"></button>
               <span class="ve-bg-toggle-label">Edit background images</span>
             </div>
             <div class="ve-bgimg-picker" id="ve-bgimg-picker">
               <div class="ve-bg-section-name" id="ve-bgimg-section-name"></div>
               <div class="ve-bgimg-preview" id="ve-bgimg-preview">
-                <span class="ve-bgimg-none" id="ve-bgimg-none">Fără imagine fundal</span>
+                <span class="ve-bgimg-none" id="ve-bgimg-none">No background image</span>
               </div>
-              <button class="img-dialog-btn img-dialog-save ve-bgimg-change" id="ve-bgimg-change">Schimbă imaginea</button>
+              <button class="img-dialog-btn img-dialog-save ve-bgimg-change" id="ve-bgimg-change">Change image</button>
               <button id="ve-section-delete-btn" class="ve-delete-btn" style="margin-top:8px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 <span>Delete section</span>
@@ -874,20 +874,20 @@ if (hasPreview) {
             </div>
             {isLaunching && (
               <>
-                <p class="preview-empty-title">Generăm website-ul tău</p>
-                <p class="preview-empty-text">Durează aproximativ 60–90 secunde. Poți să rămâi pe pagină sau să revii mai târziu — îți păstrăm starea.</p>
+                <p class="preview-empty-title">Generating your website</p>
+                <p class="preview-empty-text">Takes about 60–90 seconds. You can stay on the page or come back later — we save your state.</p>
               </>
             )}
             {isFailed && (
               <>
-                <p class="preview-empty-title">Generarea a eșuat</p>
-                <p class="preview-empty-text">A apărut o eroare. Apasă <strong>Reîncearcă</strong> din bara de sus pentru a relua generarea.</p>
+                <p class="preview-empty-title">Generation failed</p>
+                <p class="preview-empty-text">Something went wrong. Press <strong>Retry</strong> in the top bar to relaunch generation.</p>
               </>
             )}
             {!isLaunching && !isFailed && (
               <>
-                <p class="preview-empty-title">Site-ul tău va apărea aici</p>
-                <p class="preview-empty-text">Continuă conversația din stânga. După ce brieful e complet, apasă <strong>Generează</strong> și creăm site-ul în &lt; 90 secunde.</p>
+                <p class="preview-empty-title">Your site will appear here</p>
+                <p class="preview-empty-text">Continue the conversation on the left. Once the brief is complete, press <strong>Generate</strong> and we'll build the site in &lt; 90 seconds.</p>
               </>
             )}
           </div>
@@ -900,18 +900,18 @@ if (hasPreview) {
   <!-- Image upload dialog -->
   <div class="img-dialog-overlay" id="img-dialog-overlay">
     <div class="img-dialog">
-      <p class="img-dialog-title">Schimbă imaginea</p>
+      <p class="img-dialog-title">Change image</p>
       <div class="img-dialog-preview" id="img-dialog-drop">
         <img id="img-dialog-thumb" style="display:none" />
-        <span class="img-drop-text" id="img-drop-text">Click sau trage o imagine aici</span>
+        <span class="img-drop-text" id="img-drop-text">Click or drag an image here</span>
       </div>
       <input type="file" id="img-dialog-file" accept="image/*" style="display:none" />
-      <div class="img-dialog-or">sau</div>
-      <input type="text" class="img-dialog-url" id="img-dialog-url" placeholder="Lipește URL imagine..." />
-      <span class="img-dialog-uploading" id="img-dialog-uploading">Se încarcă...</span>
+      <div class="img-dialog-or">or</div>
+      <input type="text" class="img-dialog-url" id="img-dialog-url" placeholder="Paste image URL..." />
+      <span class="img-dialog-uploading" id="img-dialog-uploading">Uploading...</span>
       <div class="img-dialog-actions">
-        <button class="img-dialog-btn img-dialog-cancel" id="img-dialog-cancel">Anulează</button>
-        <button class="img-dialog-btn img-dialog-save" id="img-dialog-save" disabled>Salvează</button>
+        <button class="img-dialog-btn img-dialog-cancel" id="img-dialog-cancel">Cancel</button>
+        <button class="img-dialog-btn img-dialog-save" id="img-dialog-save" disabled>Save</button>
       </div>
     </div>
   </div>
@@ -920,68 +920,68 @@ if (hasPreview) {
   <div id="activate-modal">
     <div class="activate-backdrop" id="activate-backdrop"></div>
     <div class="activate-dialog">
-      <p class="activate-title">Activează site-ul</p>
-      <p class="activate-sub">Alege perioada — site-ul rămâne live și editabil.</p>
+      <p class="activate-title">Activate your site</p>
+      <p class="activate-sub">Choose a plan — your site stays live and editable.</p>
       <div class="activate-plans">
         <div class="activate-plan" data-billing="monthly">
           <div class="ap-left">
-            <span class="ap-name">Lunar</span>
-            <span class="ap-desc">Reînnoire automată lunară</span>
+            <span class="ap-name">Monthly</span>
+            <span class="ap-desc">Automatic monthly renewal</span>
           </div>
           <div class="ap-right">
-            <span class="ap-price">{activatePrices.monthly}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /lună</span></span>
+            <span class="ap-price">{activatePrices.monthly}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /mo</span></span>
           </div>
         </div>
         <div class="activate-plan highlight" data-billing="annual">
           <div class="ap-left">
-            <span class="ap-name">Anual ★</span>
-            <span class="ap-desc">Cel mai bun preț — un an întreg</span>
+            <span class="ap-name">Annual ★</span>
+            <span class="ap-desc">Best price — a full year</span>
           </div>
           <div class="ap-right">
-            <span class="ap-price">{activatePrices.annual}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /an</span></span>
+            <span class="ap-price">{activatePrices.annual}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /yr</span></span>
           </div>
         </div>
         <div class="activate-plan" data-billing="lifetime">
           <div class="ap-left">
             <span class="ap-name">Lifetime</span>
-            <span class="ap-desc">Plătești o singură dată, pentru totdeauna</span>
+            <span class="ap-desc">Pay once, forever</span>
           </div>
           <div class="ap-right">
             <span class="ap-price">{activatePrices.lifetime}€</span>
           </div>
         </div>
       </div>
-      <p class="activate-loading" id="activate-loading">Se redirecționează către Stripe...</p>
+      <p class="activate-loading" id="activate-loading">Redirecting to Stripe...</p>
     </div>
   </div>
 
   <!-- Activated success banner -->
-  <div id="activated-banner">✓ Site activat cu succes!</div>
+  <div id="activated-banner">✓ Site activated successfully!</div>
 
   <!-- Domain modal -->
   <div id="domain-modal">
     <div class="domain-backdrop" id="domain-backdrop"></div>
     <div class="domain-dialog">
-      <p class="domain-modal-title">Adaugă domeniu custom</p>
-      <p class="domain-modal-sub">Introdu domeniul tău (ex: <code>domeniu.com</code> sau <code>www.domeniu.com</code>).</p>
-      <input class="domain-input" id="domain-input" type="text" placeholder="domeniu.com" autocomplete="off" spellcheck="false" />
+      <p class="domain-modal-title">Add custom domain</p>
+      <p class="domain-modal-sub">Enter your domain (e.g. <code>yourdomain.com</code> or <code>www.yourdomain.com</code>).</p>
+      <input class="domain-input" id="domain-input" type="text" placeholder="yourdomain.com" autocomplete="off" spellcheck="false" />
       <div id="domain-modal-error" class="domain-modal-error" hidden></div>
-      <button class="domain-modal-btn" id="domain-modal-save">Salvează domeniu</button>
+      <button class="domain-modal-btn" id="domain-modal-save">Save domain</button>
 
       <div id="domain-ns-section" hidden>
-        <p class="domain-ns-title">Schimbă nameserverele domeniului tău la registrar:</p>
+        <p class="domain-ns-title">Change your domain's nameservers at your registrar:</p>
         <div class="domain-ns-list">
           <div class="domain-ns-item">
             <code>ns1.vercel-dns.com</code>
-            <button class="domain-ns-copy" data-value="ns1.vercel-dns.com">Copiază</button>
+            <button class="domain-ns-copy" data-value="ns1.vercel-dns.com">Copy</button>
           </div>
           <div class="domain-ns-item">
             <code>ns2.vercel-dns.com</code>
-            <button class="domain-ns-copy" data-value="ns2.vercel-dns.com">Copiază</button>
+            <button class="domain-ns-copy" data-value="ns2.vercel-dns.com">Copy</button>
           </div>
         </div>
-        <p class="domain-ns-note">După ce schimbi nameserverele, propagarea DNS poate dura 24–48h. Site-ul tău va fi accesibil pe domeniul custom odată ce Vercel verifică domeniul.</p>
-        <button class="domain-modal-close-btn" id="domain-modal-close">Am înțeles, închide</button>
+        <p class="domain-ns-note">After you change the nameservers, DNS propagation can take 24–48h. Your site will be reachable on the custom domain once Vercel verifies the domain.</p>
+        <button class="domain-modal-close-btn" id="domain-modal-close">Got it, close</button>
       </div>
     </div>
   </div>
@@ -990,12 +990,12 @@ if (hasPreview) {
   <div id="buy-domain-modal">
     <div class="buy-domain-backdrop" id="buy-domain-backdrop"></div>
     <div class="buy-domain-dialog">
-      <p class="buy-domain-title">Cumpără domeniu nou</p>
-      <p class="buy-domain-sub">Verifică disponibilitatea și cumpără direct prin platformă.</p>
+      <p class="buy-domain-title">Buy a new domain</p>
+      <p class="buy-domain-sub">Check availability and buy directly through the platform.</p>
 
       <div class="buy-domain-search">
-        <input class="buy-domain-input" id="buy-domain-input" type="text" placeholder="exemplu.com" autocomplete="off" spellcheck="false" />
-        <button class="buy-domain-check-btn" id="buy-domain-check-btn">Verifică</button>
+        <input class="buy-domain-input" id="buy-domain-input" type="text" placeholder="example.com" autocomplete="off" spellcheck="false" />
+        <button class="buy-domain-check-btn" id="buy-domain-check-btn">Check</button>
       </div>
 
       <div id="buy-domain-result" hidden>
@@ -1015,7 +1015,7 @@ if (hasPreview) {
         <div class="tour-step-indicator" id="tour-step-indicator">1 / 3</div>
         <p class="tour-text" id="tour-text"></p>
         <div class="tour-actions">
-          <button class="tour-next-btn" id="tour-next-btn">Înainte →</button>
+          <button class="tour-next-btn" id="tour-next-btn">Next →</button>
         </div>
       </div>
     </div>
@@ -1282,11 +1282,11 @@ if (hasPreview) {
   </style>
 
   <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, previewUrl, justActivated, showActivate, serverSectionIds }}>
-    // LANGUAGE
-    const _lang = (localStorage.getItem('i18nextLng') || 'en').split('-')[0];
-    document.querySelectorAll('.edit-suggestion[data-msg-ro]').forEach(btn => {
-      const msg = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo;
-      if (msg) { btn.dataset.msg = msg; btn.textContent = _lang === 'en' ? btn.dataset.msgEn : btn.dataset.msgRo; }
+    // LANGUAGE (forced to English)
+    const _lang = 'en';
+    document.querySelectorAll('.edit-suggestion[data-msg-en]').forEach(btn => {
+      const msg = btn.dataset.msgEn;
+      if (msg) { btn.dataset.msg = msg; btn.textContent = msg; }
     });
 
     // EDIT QUOTA — load on mount and update UI
@@ -1304,7 +1304,6 @@ if (hasPreview) {
     }
 
     function renderQuota(q) {
-      const isRo = _lang !== 'en';
       const remaining = q.remaining ?? 0;
 
       // Topbar pill
@@ -1312,22 +1311,18 @@ if (hasPreview) {
       const topbarLabel = document.getElementById('topbar-quota-label');
       if (topbarQuota && topbarLabel) {
         topbarQuota.className = 'topbar-quota' + (remaining <= 0 ? ' empty' : remaining <= 3 ? ' warn' : '');
-        topbarLabel.textContent = remaining <= 0
-          ? (isRo ? '0 credite' : '0 credits')
-          : (isRo ? `${remaining} credite` : `${remaining} credits`);
+        topbarLabel.textContent = remaining <= 0 ? '0 credits' : `${remaining} credits`;
       }
 
       // Inline bar (below suggestions)
       if (quotaBar && quotaLabel) {
         quotaBar.style.display = 'flex';
         if (remaining <= 0) {
-          quotaLabel.textContent = isRo ? '0 editări rămase' : '0 edits left';
+          quotaLabel.textContent = '0 edits left';
           quotaLabel.className = 'quota-label empty';
           if (buyBtn) buyBtn.style.display = 'inline';
         } else {
-          quotaLabel.textContent = isRo
-            ? `${remaining} editări rămase`
-            : `${remaining} edits left`;
+          quotaLabel.textContent = `${remaining} edits left`;
           quotaLabel.className = `quota-label${remaining <= 1 ? ' warn' : ''}`;
           if (buyBtn) buyBtn.style.display = remaining <= 2 ? 'inline' : 'none';
         }
@@ -1346,7 +1341,7 @@ if (hasPreview) {
         } catch {
           alert('Error. Try again.');
         }
-        buyBtn.textContent = '+ 10 editări / €5';
+        buyBtn.textContent = '+ 10 edits / €5';
       });
     }
 
@@ -1381,12 +1376,12 @@ if (hasPreview) {
           if (data.url) {
             window.location.href = data.url;
           } else {
-            alert(data.error || 'Eroare la creare sesiune Stripe.');
+            alert(data.error || 'Error creating Stripe session.');
             if (activateLoading) activateLoading.style.display = 'none';
             document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
           }
         } catch {
-          alert('Eroare de rețea. Încearcă din nou.');
+          alert('Network error. Please try again.');
           if (activateLoading) activateLoading.style.display = 'none';
           document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
         }
@@ -1403,7 +1398,7 @@ if (hasPreview) {
     if (new URLSearchParams(window.location.search).get('domain_purchased') === '1') {
       const b = document.createElement('div');
       b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:200;backdrop-filter:blur(10px);';
-      b.textContent = '✓ Domeniu cumpărat! Va fi activ în câteva minute.';
+      b.textContent = '✓ Domain purchased! It will be active in a few minutes.';
       document.body.appendChild(b);
       setTimeout(() => b.remove(), 5000);
       window.history.replaceState({}, '', `/dashboard/${projectId}`);
@@ -1413,16 +1408,11 @@ if (hasPreview) {
 
     // ONBOARDING TOUR
     const TOUR_KEY = 'grappes_tour_done';
-    const isEn = _lang === 'en';
 
-    const TOUR_STEPS = isEn ? [
+    const TOUR_STEPS = [
       { text: 'Select a section from the list on the left to start editing it.', anchor: '#section-list' },
-      { text: 'Describe the change you want in Romanian or English.', anchor: '#edit-input' },
+      { text: 'Describe the change you want.', anchor: '#edit-input' },
       { text: 'Publish your site with one click using the Publish button above.', anchor: '#publish-btn' },
-    ] : [
-      { text: 'Selectează o secțiune din lista din stânga pentru a o edita.', anchor: '#section-list' },
-      { text: 'Descrie modificarea dorită în română sau engleză.', anchor: '#edit-input' },
-      { text: 'Publică site-ul cu un click folosind butonul Publish de sus.', anchor: '#publish-btn' },
     ];
 
     if (hasPreview && !localStorage.getItem(TOUR_KEY)) {
@@ -1453,9 +1443,7 @@ if (hasPreview) {
         const s = TOUR_STEPS[step];
         stepInd.textContent = `${step + 1} / ${TOUR_STEPS.length}`;
         tourText.textContent = s.text;
-        nextBtn.textContent = step === TOUR_STEPS.length - 1
-          ? (isEn ? 'Got it!' : 'Am înțeles!')
-          : (isEn ? 'Next →' : 'Înainte →');
+        nextBtn.textContent = step === TOUR_STEPS.length - 1 ? 'Got it!' : 'Next →';
         positionTourTooltip(s.anchor);
       }
 
@@ -1498,18 +1486,18 @@ if (hasPreview) {
       if (!historyList) return;
       try {
         const res = await fetch(`/api/projects/${projectId}/versions`);
-        if (!res.ok) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Eroare la încărcare.</div>'; return; }
+        if (!res.ok) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Error loading.</div>'; return; }
         const { versions } = await res.json();
-        if (!versions?.length) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">' + (isEn ? 'No versions yet.' : 'Nicio versiune încă.') + '</div>'; return; }
+        if (!versions?.length) { historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">No versions yet.</div>'; return; }
 
         historyList.innerHTML = '';
         versions.forEach(v => {
-          const dt = new Date(v.created_at).toLocaleString(isEn ? 'en-GB' : 'ro-RO', { dateStyle: 'short', timeStyle: 'short' });
+          const dt = new Date(v.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
           const item = document.createElement('div');
           item.className = 'history-item';
           item.innerHTML = `
             <span class="history-item-meta">v${v.version} — ${dt}</span>
-            <button class="history-restore-btn" data-version="${v.version}">${isEn ? 'Restore' : 'Restaurează'}</button>
+            <button class="history-restore-btn" data-version="${v.version}">Restore</button>
           `;
           item.querySelector('.history-restore-btn')?.addEventListener('click', async (e) => {
             const btn = e.target;
@@ -1525,7 +1513,7 @@ if (hasPreview) {
           historyList.appendChild(item);
         });
       } catch {
-        historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Eroare.</div>';
+        historyList.innerHTML = '<div style="color:#888;font-size:12px;padding:8px 12px;">Error.</div>';
       }
     }
 
@@ -1541,7 +1529,7 @@ if (hasPreview) {
           if (issues === 0) {
             bar.innerHTML = '<span class="qa-badge ok">✓ QA OK</span>';
           } else {
-            bar.innerHTML = `<span class="qa-badge warn">⚠ ${issues} ${isEn ? 'issue' + (issues === 1 ? '' : 's') : 'problem' + (issues === 1 ? 'ă' : 'e')}</span>`;
+            bar.innerHTML = `<span class="qa-badge warn">⚠ ${issues} issue${issues === 1 ? '' : 's'}</span>`;
           }
         })
         .catch(() => {});
@@ -1571,7 +1559,7 @@ if (hasPreview) {
       const domain = domainInput?.value.trim();
       if (!domain) return;
       domainSaveBtn.disabled = true;
-      domainSaveBtn.textContent = 'Se salvează...';
+      domainSaveBtn.textContent = 'Saving...';
       if (domainErrEl) domainErrEl.hidden = true;
 
       try {
@@ -1582,7 +1570,7 @@ if (hasPreview) {
         });
         const data = await res.json();
         if (!res.ok || !data.ok) {
-          if (domainErrEl) { domainErrEl.textContent = data.error || 'Eroare. Încearcă din nou.'; domainErrEl.hidden = false; }
+          if (domainErrEl) { domainErrEl.textContent = data.error || 'Error. Please try again.'; domainErrEl.hidden = false; }
         } else {
           // Hide form, show nameservers
           domainSaveBtn.style.display = 'none';
@@ -1590,10 +1578,10 @@ if (hasPreview) {
           if (domainNsSection) domainNsSection.hidden = false;
         }
       } catch {
-        if (domainErrEl) { domainErrEl.textContent = 'Eroare de rețea. Încearcă din nou.'; domainErrEl.hidden = false; }
+        if (domainErrEl) { domainErrEl.textContent = 'Network error. Please try again.'; domainErrEl.hidden = false; }
       }
       domainSaveBtn.disabled = false;
-      domainSaveBtn.textContent = 'Salvează domeniu';
+      domainSaveBtn.textContent = 'Save domain';
     });
 
     // Copy nameserver buttons
@@ -1602,14 +1590,14 @@ if (hasPreview) {
         const val = btn.dataset.value ?? '';
         navigator.clipboard.writeText(val).then(() => {
           btn.textContent = 'Copiat ✓';
-          setTimeout(() => { btn.textContent = 'Copiază'; }, 2000);
+          setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
         });
       });
     });
 
     // Remove domain
     document.getElementById('domain-remove-btn')?.addEventListener('click', async () => {
-      if (!confirm('Ești sigur că vrei să ștergi domeniul custom?')) return;
+      if (!confirm('Are you sure you want to delete the custom domain?')) return;
       await fetch(`/api/projects/${projectId}/domain`, { method: 'DELETE' });
       window.location.reload();
     });
@@ -1645,7 +1633,7 @@ if (hasPreview) {
       if (!name) return;
       if (buyDomainError)  buyDomainError.hidden = true;
       if (buyDomainResult) { buyDomainResult.hidden = true; buyDomainResult.innerHTML = ''; }
-      if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = true; buyDomainCheckBtn.textContent = 'Se verifică...'; }
+      if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = true; buyDomainCheckBtn.textContent = 'Checking…'; }
 
       try {
         const res  = await fetch(`/api/domains/check?name=${encodeURIComponent(name)}`);
@@ -1662,7 +1650,7 @@ if (hasPreview) {
           // We'll fetch the exact charge from the buy-domain endpoint, but estimate here
           const markupEur = 5; // default; actual value from DOMAIN_MARKUP_EUR env
           const chargeEur = Math.ceil(vercelPriceUsd) + markupEur;
-          const priceText = vercelPriceUsd ? `${chargeEur}€ / an` : 'Preț indisponibil';
+          const priceText = vercelPriceUsd ? `€${chargeEur} / year` : 'Price unavailable';
           const premiumNote = data.premium ? '<span class="bdr-premium">★ Domeniu premium</span>' : '';
           buyDomainResult.innerHTML = `
             <div class="buy-domain-result-card available">
@@ -1673,7 +1661,7 @@ if (hasPreview) {
                 ${premiumNote}
               </div>
               <button class="buy-confirm-btn" id="buy-confirm-btn" data-name="${name}" data-price="${vercelPriceUsd}">
-                Cumpără
+                Buy
               </button>
             </div>
           `;
@@ -1689,9 +1677,9 @@ if (hasPreview) {
           `;
         }
       } catch {
-        showBuyError('Eroare de rețea. Încearcă din nou.');
+        showBuyError('Network error. Try again.');
       } finally {
-        if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = false; buyDomainCheckBtn.textContent = 'Verifică'; }
+        if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = false; buyDomainCheckBtn.textContent = 'Check'; }
       }
     }
 
@@ -1700,7 +1688,7 @@ if (hasPreview) {
       const name       = btn.dataset.name;
       const priceUsd   = Number(btn.dataset.price) || 0;
 
-      btn.disabled = true; btn.textContent = 'Se pregătește plata...';
+      btn.disabled = true; btn.textContent = 'Preparing payment…';
       if (buyDomainError) buyDomainError.hidden = true;
 
       try {
@@ -1712,16 +1700,16 @@ if (hasPreview) {
         const data = await res.json();
 
         if (!res.ok || !data.url) {
-          showBuyError(data.error || 'Eroare la creare sesiune de plată. Încearcă din nou.');
-          btn.disabled = false; btn.textContent = 'Cumpără';
+          showBuyError(data.error || 'Failed to create checkout session. Try again.');
+          btn.disabled = false; btn.textContent = 'Buy';
           return;
         }
 
         // Redirect to Stripe Checkout
         window.location.href = data.url;
       } catch {
-        showBuyError('Eroare de rețea. Încearcă din nou.');
-        btn.disabled = false; btn.textContent = 'Cumpără';
+        showBuyError('Network error. Try again.');
+        btn.disabled = false; btn.textContent = 'Buy';
       }
     }
 
@@ -1842,7 +1830,7 @@ if (hasPreview) {
         // Text edit: open prompt (no separate edit page needed)
         if (e.data?.type === 'wn-request-text') {
           iframe?.contentWindow?.postMessage({ type: 'wn-text-dialog-ack' }, '*');
-          var newText = prompt(_isEn ? 'Edit text:' : 'Editează textul:', e.data.text || '');
+          var newText = prompt('Edit text:', e.data.text || '');
           if (newText !== null && newText !== e.data.text) {
             iframe?.contentWindow?.postMessage({ type: 'wn-update-text', wnId: e.data.wnId, value: newText }, '*');
             fetch('/api/projects/' + projectId + '/edit-content', {
@@ -1866,7 +1854,7 @@ if (hasPreview) {
         if (wrap) {
           wrap.style.display = '';
           var span = wrap.querySelector('span');
-          if (span) span.textContent = label || (_isEn ? 'Delete element' : 'Șterge element');
+          if (span) span.textContent = label || 'Delete element';
         }
       }
       function hideDeleteBtn() {
@@ -1880,7 +1868,7 @@ if (hasPreview) {
           // Image: show only delete button
           panel.style.display = 'flex';
           panel.querySelectorAll('.ve-group, .ve-row').forEach(function(g) { g.style.display = 'none'; });
-          showDeleteBtn(_isEn ? 'Delete image' : 'Șterge imaginea');
+          showDeleteBtn('Delete image');
           document.getElementById('ve-hint').style.display = 'none';
           return;
         }
@@ -1892,7 +1880,7 @@ if (hasPreview) {
           var bgGroup = groups[groups.length - 1];
           if (bgGroup) { bgGroup.style.display = 'flex'; bgGroup.parentElement.style.display = 'flex'; }
           document.getElementById('ve-bg-color').value = rgbToHex(data.bgColor);
-          showDeleteBtn(_isEn ? 'Delete element' : 'Șterge element');
+          showDeleteBtn('Delete element');
           document.getElementById('ve-hint').style.display = 'none';
           return;
         }
@@ -1923,7 +1911,7 @@ if (hasPreview) {
         document.getElementById('ve-bg-color').value = rgbToHex(data.bgColor);
 
         document.getElementById('ve-hint').style.display = 'none';
-        showDeleteBtn(_isEn ? 'Delete element' : 'Șterge element');
+        showDeleteBtn('Delete element');
       }
 
       function hideVeControls() {
@@ -2038,7 +2026,7 @@ if (hasPreview) {
           var name = e.data.sectionId.charAt(0).toUpperCase() + e.data.sectionId.slice(1);
           activeSectionId = e.data.sectionId;
           hideVeControls();
-          showDeleteBtn(_isEn ? 'Delete section: ' + name : 'Șterge secțiunea: ' + name);
+          showDeleteBtn('Delete section: ' + name);
 
           if (bgMode) {
             bgActiveSection = e.data.sectionId;
@@ -2103,7 +2091,7 @@ if (hasPreview) {
 
       // ── Delete element / section ──────────────────────────────────────
       document.getElementById('ve-delete-btn')?.addEventListener('click', function() {
-        var confirmMsg = _isEn ? 'Are you sure you want to delete this element?' : 'Sigur vrei să ștergi acest element?';
+        var confirmMsg = 'Are you sure you want to delete this element?';
         if (!confirm(confirmMsg)) return;
 
         if (activeElement?.wnId) {
@@ -2132,7 +2120,7 @@ if (hasPreview) {
       function deleteActiveSection() {
         var sid = activeSectionId || bgActiveSection || bgImgActiveSection;
         if (!sid) return;
-        var confirmMsg = _isEn ? 'Are you sure you want to delete this section?' : 'Sigur vrei să ștergi această secțiune?';
+        var confirmMsg = 'Are you sure you want to delete this section?';
         if (!confirm(confirmMsg)) return;
         iframe?.contentWindow?.postMessage({ type: 'wn-delete-section', sectionId: sid }, '*');
         fetch('/api/projects/' + projectId + '/edit-content', {
@@ -2424,13 +2412,10 @@ if (hasPreview) {
 
           // Helper: show quota-exceeded message
           const showLimitError = (d) => {
-            const isRo = _lang !== 'en';
-            const msg = isRo
-              ? `Ai atins limita de editări a planului tău (${d.used}/${d.limit + (d.extra||0)}). Cumpără un pachet extra sau fă upgrade.`
-              : `Edit limit reached (${d.used}/${d.limit + (d.extra||0)}). Buy an extra pack or upgrade your plan.`;
+            const msg = `Edit limit reached (${d.used}/${d.limit + (d.extra||0)}). Buy an extra pack or upgrade your plan.`;
             addEditMessage('system', msg);
             if (buyBtn) buyBtn.style.display = 'inline';
-            if (quotaLabel) { quotaLabel.textContent = isRo ? '0 editări rămase' : '0 edits left'; quotaLabel.className = 'quota-label empty'; }
+            if (quotaLabel) { quotaLabel.textContent = '0 edits left'; quotaLabel.className = 'quota-label empty'; }
           };
 
           // Helper: full-page iterate (used as primary or fallback)
@@ -2525,7 +2510,7 @@ if (hasPreview) {
           } else {
             // No section selected — tell user to select one
             removePlaceholder();
-            addEditMessage('system', _lang !== 'en' ? 'Selectează o secțiune din stânga sau apasă ✦ pentru a edita tot site-ul.' : 'Select a section from the left or press ✦ to edit the whole site.');
+            addEditMessage('system', 'Select a section from the left or press ✦ to edit the whole site.');
           }
         } catch {
           addEditMessage('system', 'Error. Try again.');
@@ -2540,17 +2525,16 @@ if (hasPreview) {
       document.getElementById('edit-global')?.addEventListener('click', async () => {
         const input = document.getElementById('edit-input');
         const msg = input?.value?.trim();
-        if (!msg) { addEditMessage('system', _lang !== 'en' ? 'Scrie o instrucțiune mai întâi.' : 'Write an instruction first.'); return; }
+        if (!msg) { addEditMessage('system', 'Write an instruction first.'); return; }
 
-        const isRo = _lang !== 'en';
-        if (!confirm(isRo ? 'Editarea întregului site consumă 4 credite. Continui?' : 'Editing the entire site costs 4 credits. Continue?')) return;
+        if (!confirm('Editing the entire site costs 4 credits. Continue?')) return;
 
         input.value = '';
         addEditMessage('user', '✦ ' + msg);
         input.disabled = true;
         document.getElementById('edit-send').disabled = true;
         document.getElementById('edit-global').disabled = true;
-        addEditMessage('system', isRo ? 'Se editează tot site-ul…' : 'Editing entire site…');
+        addEditMessage('system', 'Editing entire site…');
 
         try {
           await runIterate(msg);

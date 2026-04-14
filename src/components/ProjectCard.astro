@@ -12,17 +12,6 @@ function timeAgo(dateStr: string): string {
   const m = Math.floor(diff / 60000);
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
-  if (m < 1) return 'acum';
-  if (h < 1) return `acum ${m}m`;
-  if (d < 1) return `acum ${h}h`;
-  return `acum ${d}z`;
-}
-
-function timeAgoEn(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
   if (m < 1) return 'just now';
   if (h < 1) return `${m}m ago`;
   if (d < 1) return `${h}h ago`;
@@ -63,8 +52,8 @@ const hasPreview = !!project.preview_url;
       </h3>
       <p style="font-size:15px;color:rgba(255,255,255,0.45);margin:0;">
         {hasPreview
-          ? <span data-time={project.updated_at} data-time-en={timeAgoEn(project.updated_at)}>{timeAgo(project.updated_at)}</span>
-          : <span data-en="Your first site — let's build it">Primul tău site — hai să-l construim</span>
+          ? <span data-time={project.updated_at}>{timeAgo(project.updated_at)}</span>
+          : <span>Your first site — let's build it</span>
         }
       </p>
 
@@ -80,7 +69,7 @@ const hasPreview = !!project.preview_url;
       style="position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:50%;border:none;background:rgba(0,0,0,0.4);backdrop-filter:blur(10px);color:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:all 0.25s;z-index:4;"
       data-project-id={project.id}
       data-project-name={project.name}
-      title="Șterge proiect"
+      title="Delete project"
       onclick="event.preventDefault();event.stopPropagation();"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -108,14 +97,6 @@ const hasPreview = !!project.preview_url;
 </style>
 
 <script is:inline>
-(function(){
-  var lang=(localStorage.getItem('i18nextLng')||'ro').split('-')[0];
-  if(lang!=='en') return;
-  document.addEventListener('DOMContentLoaded',function(){
-    document.querySelectorAll('[data-time-en]').forEach(function(el){el.textContent=el.getAttribute('data-time-en');});
-  });
-})();
-
 document.addEventListener('click', async function(e) {
   var btn = e.target.closest('.pc-del');
   if (!btn) return;
@@ -123,9 +104,7 @@ document.addEventListener('click', async function(e) {
   e.stopPropagation();
   var id = btn.dataset.projectId;
   var name = btn.dataset.projectName;
-  var _isEn = (localStorage.getItem('i18nextLng')||'ro').split('-')[0]==='en';
-  var confirmMsg = _isEn ? ('Delete "' + name + '"? This cannot be undone.') : ('Ștergi "' + name + '"? Această acțiune nu poate fi anulată.');
-  if (!confirm(confirmMsg)) return;
+  if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
   btn.disabled = true;
   btn.innerHTML = '…';
   try {

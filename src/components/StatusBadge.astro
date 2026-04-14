@@ -7,23 +7,6 @@ const { status } = Astro.props;
 
 const LABELS: Record<string, string> = {
   onboarding: 'Onboarding',
-  brief_ready: 'Brief gata',
-  generating: 'Generare',
-  generated: 'Generat',
-  deploying: 'Publicare',
-  live: 'Live',
-  failed: 'Eșuat',
-  archived: 'Arhivat',
-  // Deployment statuses
-  queued: 'În coadă',
-  building: 'Construire',
-  ready: 'Gata',
-  error: 'Eroare',
-  canceled: 'Anulat',
-};
-
-const EN_LABELS: Record<string, string> = {
-  onboarding: 'Onboarding',
   brief_ready: 'Brief Ready',
   generating: 'Generating',
   generated: 'Generated',
@@ -31,6 +14,7 @@ const EN_LABELS: Record<string, string> = {
   live: 'Live',
   failed: 'Failed',
   archived: 'Archived',
+  // Deployment statuses
   queued: 'Queued',
   building: 'Building',
   ready: 'Ready',
@@ -62,7 +46,7 @@ const label = LABELS[status] ?? status;
   {['live', 'ready', 'building', 'generating', 'deploying'].includes(status) && (
     <span class="dot" aria-hidden="true"></span>
   )}
-  <span data-en={EN_LABELS[status] ?? status}>{label}</span>
+  <span>{label}</span>
 </span>
 
 <style>

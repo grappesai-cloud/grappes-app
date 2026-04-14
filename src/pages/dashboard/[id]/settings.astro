@@ -90,7 +90,6 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     e.preventDefault();
     const name = new FormData(e.target).get('name');
     const btn = e.target.querySelector('.btn-primary');
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     try {
       const res = await fetch(`/api/projects/${projectId}`, {
         method: 'PATCH',
@@ -102,13 +101,13 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
         setTimeout(() => window.location.reload(), 1400);
       } else {
         const data = await res.json().catch(() => ({}));
-        btn.textContent = '⚠ ' + (data.error || (_isEn ? 'Failed' : 'Eroare'));
+        btn.textContent = '⚠ ' + (data.error || 'Failed');
         btn.style.color = '#f87171';
-        setTimeout(() => { btn.textContent = _isEn ? 'Save' : 'Salvează'; btn.style.color = ''; }, 2000);
+        setTimeout(() => { btn.textContent = 'Save'; btn.style.color = ''; }, 2000);
       }
     } catch {
-      btn.textContent = _isEn ? '⚠ Network error' : '⚠ Eroare de rețea';
-      setTimeout(() => { btn.textContent = _isEn ? 'Save' : 'Salvează'; btn.style.color = ''; }, 2000);
+      btn.textContent = '⚠ Network error';
+      setTimeout(() => { btn.textContent = 'Save'; btn.style.color = ''; }, 2000);
     }
   });
 
@@ -117,9 +116,8 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
     e.preventDefault();
     const domain = new FormData(e.target).get('custom_domain');
     const btn = e.target.querySelector('.btn-primary');
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     btn.disabled = true;
-    btn.textContent = _isEn ? 'Saving…' : 'Se salvează…';
+    btn.textContent = 'Saving…';
     try {
       const res = await fetch(`/api/projects/${projectId}/domain`, {
         method: 'POST',
@@ -128,9 +126,9 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || (_isEn ? 'Failed to save domain.' : 'Eroare la salvarea domeniului.'));
+        alert(data.error || 'Failed to save domain.');
         btn.disabled = false;
-        btn.textContent = _isEn ? 'Save' : 'Salvează';
+        btn.textContent = 'Save';
         return;
       }
       if (data.vercelError) {
@@ -139,9 +137,9 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
       flashSaveSuccess(btn);
       setTimeout(() => window.location.reload(), 1400);
     } catch {
-      alert(_isEn ? 'Network error.' : 'Eroare de rețea.');
+      alert('Network error.');
       btn.disabled = false;
-      btn.textContent = _isEn ? 'Save' : 'Salvează';
+      btn.textContent = 'Save';
     }
   });
 
@@ -149,9 +147,8 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
   document.getElementById('verify-dns-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('verify-dns-btn');
     const status = document.getElementById('dns-status');
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
     btn.disabled = true;
-    btn.textContent = _isEn ? 'Checking…' : 'Se verifică…';
+    btn.textContent = 'Checking…';
     status.style.display = 'none';
     try {
       const res = await fetch(`/api/projects/${projectId}/verify-domain`);
@@ -159,26 +156,25 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
       status.style.display = 'inline-flex';
       if (data.verified) {
         status.className = 'dns-status-badge status-ok';
-        status.textContent = _isEn ? '✓ Verified' : '✓ Verificat';
+        status.textContent = '✓ Verified';
       } else {
         status.className = 'dns-status-badge status-pending';
         status.textContent = data.status === 'failed'
-          ? (_isEn ? '✗ Not pointing to Vercel' : '✗ Nu indică spre Vercel')
-          : (_isEn ? '⏳ Pending — try again later' : '⏳ În așteptare — încearcă mai târziu');
+          ? '✗ Not pointing to Vercel'
+          : '⏳ Pending — try again later';
       }
     } catch {
       status.style.display = 'inline-flex';
       status.className = 'dns-status-badge status-pending';
-      status.textContent = _isEn ? 'Error checking' : 'Eroare verificare';
+      status.textContent = 'Error checking';
     }
     btn.disabled = false;
-    btn.textContent = _isEn ? 'Verify DNS' : 'Verifică DNS';
+    btn.textContent = 'Verify DNS';
   });
 
   // Archive
   document.getElementById('archive-btn')?.addEventListener('click', async () => {
-    const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
-    const msg = _isEn ? 'Archive this project? It will be removed from your dashboard.' : 'Arhivezi acest proiect? Va fi eliminat din panou.';
+    const msg = 'Archive this project? It will be removed from your dashboard.';
     if (!confirm(msg)) return;
     try {
       const res = await fetch(`/api/projects/${projectId}/delete`, { method: 'POST' });
@@ -186,10 +182,10 @@ if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboa
         window.location.href = '/dashboard';
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || (_isEn ? 'Failed to archive project.' : 'Nu s-a putut arhiva proiectul.'));
+        alert(data.error || 'Failed to archive project.');
       }
     } catch {
-      alert(_isEn ? 'Network error.' : 'Eroare de rețea.');
+      alert('Network error.');
     }
   });
 </script>

@@ -44,8 +44,8 @@ const isLive = project.status === 'live';
           <a href={project.preview_url} target="_blank" rel="noopener" class="view-live-btn">View Live ↗</a>
         )}
         <button class="publish-btn" id="publish-btn">
-          <span id="publish-label" data-en={isLive ? 'Re-publish' : 'Publish to Web ✦'}>
-            {isLive ? 'Re-publicare' : 'Publică pe Web ✦'}
+          <span id="publish-label">
+            {isLive ? 'Re-publish' : 'Publish to Web ✦'}
           </span>
           <span id="publish-spinner" class="spinner" style="display:none"></span>
         </button>
@@ -136,7 +136,6 @@ const isLive = project.status === 'live';
 <script define:vars={{ projectId: id, previewUrl }}>
   const iframe = document.getElementById('preview-iframe');
   const toolbar = document.getElementById('wn-toolbar');
-  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   let selectedWnId = null;
   let selectedType = null;

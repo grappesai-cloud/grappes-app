@@ -94,9 +94,8 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
             {isLive ? '✓' : isFailed ? '✕' : isDeploying ? '◌' : '3'}
           </div>
           <div class="step-body">
-            <div class="step-title"
-              data-en={isLive ? 'Deployed & Live' : isDeploying ? 'Building…' : isFailed ? 'Build Failed' : 'Deploy to Vercel'}>
-              {isLive ? 'Publicat & Live' : isDeploying ? 'Se construiește…' : isFailed ? 'Construire eșuată' : 'Publică pe Vercel'}
+            <div class="step-title">
+              {isLive ? 'Deployed & Live' : isDeploying ? 'Building…' : isFailed ? 'Build Failed' : 'Deploy to Vercel'}
             </div>
             {latestDeploy?.preview_url && (
               <a href={latestDeploy.preview_url} target="_blank" rel="noopener" class="step-link">
@@ -114,9 +113,8 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
       {/* Deploy button */}
       <div class="deploy-actions">
         {canDeploy && (
-          <button id="deploy-btn" class="btn-deploy"
-            data-en={isFailed ? 'Retry Deploy →' : 'Deploy to Vercel →'}>
-            {isFailed ? 'Reîncearcă publicarea →' : 'Publică pe Vercel →'}
+          <button id="deploy-btn" class="btn-deploy">
+            {isFailed ? 'Retry Deploy →' : 'Deploy to Vercel →'}
           </button>
         )}
 
@@ -168,13 +166,11 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
     const btn = document.getElementById('deploy-btn');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = _isEn ? 'Deploying…' : 'Se publică…';
+      btn.textContent = 'Deploying…';
     }
     const indicator = document.querySelector('.deploying-indicator');
     if (indicator) indicator.hidden = false;
   }
-
-  const _isEn = (localStorage.getItem('i18nextLng')||'en').split('-')[0]==='en';
 
   async function startDeploy() {
     const btn = document.getElementById('deploy-btn') || document.getElementById('redeploy-btn');
@@ -182,7 +178,7 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
     if (!btn) return;
 
     btn.disabled = true;
-    btn.innerHTML = '<span class="btn-spinner"></span> ' + (_isEn ? 'Pushing to GitHub…' : 'Se trimite pe GitHub…');
+    btn.innerHTML = '<span class="btn-spinner"></span> Pushing to GitHub…';
     if (errEl) errEl.hidden = true;
 
     try {
@@ -194,19 +190,19 @@ const canDeploy = ['generated', 'failed'].includes(project.status);
         window.location.reload();
       } else {
         if (errEl) {
-          errEl.textContent = data.error || (_isEn ? 'Deploy failed. Please try again.' : 'Publicarea a eșuat. Încearcă din nou.');
+          errEl.textContent = data.error || 'Deploy failed. Please try again.';
           errEl.hidden = false;
         }
         btn.disabled = false;
-        btn.textContent = _isEn ? 'Retry Deploy →' : 'Reîncearcă publicarea →';
+        btn.textContent = 'Retry Deploy →';
       }
     } catch {
       if (errEl) {
-        errEl.textContent = _isEn ? 'Network error. Please try again.' : 'Eroare de rețea. Încearcă din nou.';
+        errEl.textContent = 'Network error. Please try again.';
         errEl.hidden = false;
       }
       btn.disabled = false;
-      btn.textContent = _isEn ? 'Deploy to Vercel →' : 'Publică pe Vercel →';
+      btn.textContent = 'Deploy to Vercel →';
     }
   }
 
