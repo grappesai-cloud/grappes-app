@@ -80,17 +80,6 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 
   <!-- Input -->
   <div class="input-area">
-    <!-- Type picker — appears above input when attach button is clicked -->
-    <div class="type-picker" id="type-picker" hidden>
-      <span class="type-picker-label">What are you uploading?</span>
-      <div class="type-options">
-        <button class="type-opt" data-type="logo">🖼 Logo</button>
-        <button class="type-opt" data-type="hero">🌄 Hero image</button>
-        <button class="type-opt" data-type="og">🔗 OG / Social</button>
-        <button class="type-opt" data-type="section">📷 Other photo</button>
-      </div>
-    </div>
-
     <!-- Staged image previews (ChatGPT-style) -->
     <div class="staged-strip" id="staged-strip" hidden></div>
 
@@ -173,7 +162,6 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   const completenessValue = document.getElementById('completeness-value');
   // Declared here so setInputEnabled can reference them before the attach section runs
   const attachBtn = document.getElementById('attach-btn');
-  const typePicker = document.getElementById('type-picker');
   const quickFileInput = document.getElementById('quick-file-input');
 
   let completeness = initialCompleteness;
@@ -206,11 +194,10 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   }
 
   function renderAssistantBubble(bubble, content) {
-    // Parse the assistant text: extract Note: blocks + trailing bullet list as quick-reply chips
     var text = String(content || '');
     var lines = text.split('\n');
 
-    // Detect Note blocks (prefix "Note:" or "⚠️ ")
+    // Extract Note / warning lines (anywhere in text)
     var noteLines = [];
     var rest = [];
     for (var i = 0; i < lines.length; i++) {
@@ -219,52 +206,79 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       else rest.push(ln);
     }
 
-    // Detect trailing bullet list (consecutive lines starting with "- ") at end of text
-    var tailBullets = [];
-    while (rest.length) {
-      var last = rest[rest.length - 1];
-      if (/^\s*-\s+/.test(last)) { tailBullets.unshift(last.replace(/^\s*-\s+/, '').trim()); rest.pop(); }
-      else if (/^\s*$/.test(last) && tailBullets.length === 0) rest.pop();
-      else break;
-    }
-    // Only treat as chips if there are 2-5 short bullets (likely a choice list)
-    var useChips = tailBullets.length >= 2 && tailBullets.length <= 5 && tailBullets.every(function(b){ return b.length < 120; });
-
-    // Main text
-    var body = rest.join('\n').replace(/\s+$/,'');
-    var bodyEl = document.createElement('div');
-    bodyEl.className = 'bubble-text';
-    bodyEl.textContent = body;
-    bubble.appendChild(bodyEl);
-
-    // Note callout
-    if (noteLines.length) {
-      var note = document.createElement('div');
-      note.className = 'bubble-note';
-      note.innerHTML = '<span class="bubble-note-icon">⚠️</span><span>' + noteLines.map(escapeHtml).join('<br>') + '</span>';
-      bubble.appendChild(note);
+    // Find the FIRST contiguous bullet block (lines starting with "- ", allowing blank lines between)
+    var bulletStart = -1, bulletEnd = -1;
+    for (var j = 0; j < rest.length; j++) {
+      var isBullet = /^\s*-\s+/.test(rest[j]);
+      var isBlank  = /^\s*$/.test(rest[j]);
+      if (isBullet) {
+        if (bulletStart === -1) bulletStart = j;
+        bulletEnd = j;
+      } else if (bulletStart !== -1 && !isBlank) {
+        break; // end of bullet block
+      }
     }
 
-    // Quick-reply chips
+    var chips = [];
+    if (bulletStart !== -1 && bulletEnd > bulletStart) {
+      for (var k = bulletStart; k <= bulletEnd; k++) {
+        if (/^\s*-\s+/.test(rest[k])) chips.push(rest[k].replace(/^\s*-\s+/, '').trim());
+      }
+    }
+    var useChips = chips.length >= 2 && chips.length <= 6;
+
+    var preText  = '';
+    var postText = '';
+    if (useChips) {
+      preText  = rest.slice(0, bulletStart).join('\n').replace(/\s+$/, '');
+      postText = rest.slice(bulletEnd + 1).join('\n').replace(/^\s+|\s+$/g, '');
+    } else {
+      preText = rest.join('\n').replace(/\s+$/, '');
+    }
+
+    // Render pre-text
+    if (preText) {
+      var pre = document.createElement('div');
+      pre.className = 'bubble-text';
+      pre.textContent = preText;
+      bubble.appendChild(pre);
+    }
+
+    // Render chips
     if (useChips) {
       var chipsEl = document.createElement('div');
       chipsEl.className = 'quick-replies';
-      tailBullets.forEach(function(label) {
+      chips.forEach(function(label) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'quick-reply';
-        // Extract the short label before any "—" or "(" so users see a concise option
-        var short = label.split(/—|\(|:/)[0].trim();
-        btn.textContent = short.length && short.length < 40 ? short : label;
+        var short = label.split(/—|\(|:|,/)[0].trim();
+        var displayLabel = (short.length && short.length < 40) ? short : label;
+        btn.textContent = displayLabel;
         btn.addEventListener('click', function() {
-          input.value = short || label;
+          input.value = short || displayLabel;
           input.focus();
-          // Auto-submit for convenience
           form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
         });
         chipsEl.appendChild(btn);
       });
       bubble.appendChild(chipsEl);
+    }
+
+    // Render post-text (e.g. "Which direction feels right?")
+    if (postText) {
+      var post = document.createElement('div');
+      post.className = 'bubble-text bubble-text-post';
+      post.textContent = postText;
+      bubble.appendChild(post);
+    }
+
+    // Note callout (always at bottom, visually distinct)
+    if (noteLines.length) {
+      var note = document.createElement('div');
+      note.className = 'bubble-note';
+      note.innerHTML = '<span class="bubble-note-icon">⚠️</span><span>' + noteLines.map(escapeHtml).join('<br>') + '</span>';
+      bubble.appendChild(note);
     }
   }
 
@@ -708,33 +722,11 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   }
 
   // ── Quick attach (paperclip button) ───────────────────────────────────────
-
-  let pendingUploadType = null;
-
-  // Toggle type picker
+  // Click attach → open file picker directly. User describes in the
+  // accompanying message what each file represents (logo / hero / etc.).
   attachBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const isOpen = !typePicker.hidden;
-    typePicker.hidden = isOpen;
-    attachBtn.classList.toggle('active', !isOpen);
-  });
-
-  // Close when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!typePicker.hidden && !typePicker.contains(e.target) && e.target !== attachBtn) {
-      typePicker.hidden = true;
-      attachBtn.classList.remove('active');
-    }
-  });
-
-  // Type button clicked → open file picker
-  typePicker.querySelectorAll('.type-opt').forEach(btn => {
-    btn.addEventListener('click', () => {
-      pendingUploadType = btn.dataset.type;
-      typePicker.hidden = true;
-      attachBtn.classList.remove('active');
-      quickFileInput.click();
-    });
+    quickFileInput.click();
   });
 
   // ── Staged files (ChatGPT-style) ──────────────────────────────────────────
@@ -765,21 +757,22 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     });
   }
 
-  // File selected → stage (don't upload yet)
+  // File selected → stage (don't upload yet). Generic type; user describes intent in message.
   quickFileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files || []);
     quickFileInput.value = '';
-    if (!files.length || !pendingUploadType) return;
-
-    const type = pendingUploadType;
-    pendingUploadType = null;
+    if (!files.length) return;
 
     const remaining = MAX_STAGED - stagedFiles.length;
     files.slice(0, remaining).forEach(file => {
-      stagedFiles.push({ file, type, previewUrl: URL.createObjectURL(file) });
+      stagedFiles.push({ file, type: 'section', previewUrl: URL.createObjectURL(file) });
     });
     renderStagedStrip();
     input.focus();
+    // Prompt user (placeholder hint) if they haven't typed yet
+    if (!input.value.trim()) {
+      input.placeholder = 'Describe what these are (e.g. "this is my logo")…';
+    }
   });
 
   // ── Form submit ────────────────────────────────────────────────────────────
@@ -1021,6 +1014,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 
   .bubble { padding: 0.7rem 1rem; border-radius: 16px; font-size: 0.9rem; line-height: 1.55; word-wrap: break-word; }
   .bubble-text { white-space: pre-wrap; }
+  .bubble-text-post { margin-top: 0.65rem; }
   .user-msg .bubble {
     background: linear-gradient(135deg, #06bfdd, #6c6bf3);
     color: #0a0a0a;
