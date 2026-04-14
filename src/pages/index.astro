@@ -883,60 +883,6 @@ gsap.from(heroSubtitleLines.lines, {
 })
 </script>
 
-<!-- Service cards expand/collapse on click -->
-<style is:global>
-  /* Override the Webflow opacity:0 on text wrapper — we manage visibility via .expanded */
-  .card.service-card .service-card_text-wrapper {
-    opacity: 0 !important;
-    max-height: 0;
-    overflow: hidden;
-    transition: opacity 0.4s ease, max-height 0.4s ease;
-    padding-top: 0;
-  }
-  .card.service-card.expanded .service-card_text-wrapper {
-    opacity: 1 !important;
-    max-height: 20em;
-    padding-top: 1em;
-  }
-  .card.service-card.expanded .service-card_labels-wrapper {
-    position: relative !important;
-    bottom: auto !important;
-    left: auto !important;
-    margin-top: 1.5em;
-  }
-  .card.service-card { cursor: pointer; }
-</style>
-<script is:inline>
-(function() {
-  function initServiceCards() {
-    var serviceCards = document.querySelectorAll('.card.service-card');
-    if (serviceCards.length === 0) return;
-    serviceCards.forEach(function(card) {
-      // Remove the href so anchor navigation doesn't fire
-      if (card.tagName === 'A' && card.getAttribute('href')) {
-        card.dataset.originalHref = card.getAttribute('href');
-        card.removeAttribute('href');
-      }
-      card.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var wasExpanded = card.classList.contains('expanded');
-        // Collapse all
-        serviceCards.forEach(function(other) {
-          other.classList.remove('expanded');
-        });
-        // Expand this one if it wasn't already expanded
-        if (!wasExpanded) card.classList.add('expanded');
-      });
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initServiceCards);
-  } else {
-    initServiceCards();
-  }
-})();
-</script>
 
 <!-- Custom preloader code -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/CustomEase.min.js" is:inline></script>
