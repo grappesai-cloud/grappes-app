@@ -225,7 +225,11 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
         if (/^\s*-\s+/.test(rest[k])) chips.push(rest[k].replace(/^\s*-\s+/, '').trim());
       }
     }
-    var useChips = chips.length >= 2 && chips.length <= 6;
+    // Only render as chips if it's a CHOICE list (short labels, no "?").
+    // Question lists and open-ended prompts stay as plain bullets.
+    var looksLikeQuestions = chips.some(function(c){ return /\?\s*$/.test(c); });
+    var tooLong = chips.some(function(c){ return c.length > 60; });
+    var useChips = chips.length >= 2 && chips.length <= 6 && !looksLikeQuestions && !tooLong;
 
     var preText  = '';
     var postText = '';
