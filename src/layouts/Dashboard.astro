@@ -93,6 +93,12 @@ const inProject = !!projectId;
               <span>Deploy</span>
             </a>
           )}
+          {inProject && (
+            <a href={`/dashboard/${projectId}/inbox`}
+              style={`font-size:15px;font-weight:500;padding:8px 20px;border-radius:30px;transition:all 0.3s;${currentPath.endsWith('/inbox') ? 'color:#0a0a0a;background:#06bfdd;font-weight:700;' : 'color:rgba(255,255,255,0.6);'}`}>
+              <span>Inbox</span>
+            </a>
+          )}
         </nav>
         <div class="dash-right" style="display:flex;align-items:center;gap:14px;">
           {!inProject && (

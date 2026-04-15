@@ -1,0 +1,209 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+import { db } from '../../../lib/db';
+import { createAdminClient } from '../../../lib/supabase';
+
+const authUser = Astro.locals.user!;
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/dashboard');
+
+const project = await db.projects.findById(id);
+if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
+
+const supabase = createAdminClient();
+const { data: submissionsRaw } = await supabase
+  .from('contact_submissions')
+  .select('id, type, name, email, subject, message, source_url, status, forwarded, created_at')
+  .eq('project_id', id)
+  .neq('status', 'archived')
+  .order('created_at', { ascending: false })
+  .limit(200);
+
+const submissions = (submissionsRaw ?? []) as Array<{
+  id: string; type: string; name: string | null; email: string | null;
+  subject: string | null; message: string | null; source_url: string | null;
+  status: 'new' | 'read' | 'archived'; forwarded: boolean; created_at: string;
+}>;
+
+// Forwarded count this calendar month (free-tier indicator)
+const monthStart = new Date();
+monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+const { count: forwardedThisMonth } = await supabase
+  .from('contact_submissions')
+  .select('id', { count: 'exact', head: true })
+  .eq('project_id', id)
+  .eq('forwarded', true)
+  .gte('created_at', monthStart.toISOString());
+
+const isPaid = project.billing_status === 'active';
+const FREE_LIMIT = 50;
+const newCount = submissions.filter(s => s.status === 'new').length;
+
+function fmt(d: string): string {
+  const dt = new Date(d);
+  return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+function typeColor(t: string): string {
+  if (t === 'newsletter') return '#6c6bf3';
+  if (t === 'booking')    return '#f6c547';
+  return '#06bfdd';
+}
+---
+
+<Dashboard title={`Inbox · ${project.name}`} projectId={id}>
+  <div class="page-header">
+    <a href={`/dashboard/${id}`} class="back-link">← {project.name}</a>
+    <h1>Inbox</h1>
+    <p class="subtitle">{newCount} new {newCount === 1 ? 'message' : 'messages'} · {submissions.length} total</p>
+  </div>
+
+  {!isPaid && (
+    <div class={`forward-banner ${(forwardedThisMonth ?? 0) >= FREE_LIMIT ? 'limit-hit' : ''}`}>
+      <strong>{forwardedThisMonth ?? 0} / {FREE_LIMIT}</strong>
+      <span> emails forwarded this month (free tier).</span>
+      {(forwardedThisMonth ?? 0) >= FREE_LIMIT
+        ? <span class="banner-cta"> Forwarding paused — submissions still saved here. <a href="/dashboard/account">Upgrade for unlimited →</a></span>
+        : <span class="banner-cta"> <a href="/dashboard/account">Upgrade for unlimited forwarding →</a></span>
+      }
+    </div>
+  )}
+
+  {submissions.length === 0 ? (
+    <div class="empty">
+      <p class="empty-title">No messages yet</p>
+      <p class="empty-sub">When visitors fill out forms on your site, they'll appear here.</p>
+    </div>
+  ) : (
+    <ul class="inbox-list">
+      {submissions.map(s => (
+        <li class={`inbox-item ${s.status}`} data-id={s.id}>
+          <div class="row top">
+            <div class="meta">
+              <span class="type-badge" style={`color:${typeColor(s.type)};border-color:${typeColor(s.type)};`}>{s.type}</span>
+              {s.status === 'new' && <span class="dot-new" aria-label="Unread"></span>}
+              <span class="from">{s.name || s.email || 'Anonymous'}</span>
+              {s.email && s.name && <span class="email">&lt;{s.email}&gt;</span>}
+            </div>
+            <div class="when">
+              <span class={`forward-tag ${s.forwarded ? 'ok' : 'no'}`}>{s.forwarded ? '✓ Forwarded' : 'Not forwarded'}</span>
+              <span class="date">{fmt(s.created_at)}</span>
+            </div>
+          </div>
+          {s.subject && <p class="subject">{s.subject}</p>}
+          <p class="msg">{s.message}</p>
+          {s.source_url && <p class="src">From: <a href={s.source_url} target="_blank" rel="noopener">{s.source_url}</a></p>}
+          <div class="actions">
+            {s.status === 'new' && <button class="btn-act" data-act="read">Mark as read</button>}
+            {s.email && <a class="btn-act" href={`mailto:${s.email}${s.subject ? '?subject=' + encodeURIComponent('Re: ' + s.subject) : ''}`}>Reply</a>}
+            <button class="btn-act danger" data-act="archive">Archive</button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )}
+</Dashboard>
+
+<script define:vars={{ projectId: id }}>
+  document.querySelectorAll('.inbox-item').forEach(item => {
+    item.querySelectorAll('.btn-act[data-act]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const act = btn.dataset.act;
+        const id = item.dataset.id;
+        const status = act === 'archive' ? 'archived' : 'read';
+        btn.disabled = true;
+        const res = await fetch(`/api/projects/${projectId}/inbox/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) { btn.disabled = false; return; }
+        if (status === 'archived') {
+          item.style.transition = 'opacity 0.25s, transform 0.25s';
+          item.style.opacity = '0'; item.style.transform = 'scale(0.97)';
+          setTimeout(() => item.remove(), 260);
+        } else {
+          item.classList.remove('new');
+          item.classList.add('read');
+          btn.remove();
+          item.querySelector('.dot-new')?.remove();
+        }
+      });
+    });
+  });
+</script>
+
+<style>
+  .page-header { margin-bottom: 1.75rem; }
+  .back-link { color: rgba(255,255,255,0.5); font-size: 0.875rem; text-decoration: none; display: inline-block; margin-bottom: 0.75rem; transition: color 0.15s; }
+  .back-link:hover { color: #fff; }
+  h1 { font-family: 'DM Sans', 'Helvetica Neue', sans-serif; font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 300; letter-spacing: -0.02em; color: #fff; margin: 0; }
+  .subtitle { color: rgba(255,255,255,0.5); font-size: 0.95rem; margin-top: 6px; }
+
+  .forward-banner {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    background: rgba(6,191,221,0.06);
+    border: 1px solid rgba(6,191,221,0.2);
+    border-radius: 14px;
+    padding: 12px 18px; margin-bottom: 1.5rem;
+    font-size: 14px; color: rgba(255,255,255,0.85);
+  }
+  .forward-banner.limit-hit { background: rgba(246,197,71,0.06); border-color: rgba(246,197,71,0.25); }
+  .forward-banner strong { color: #06bfdd; }
+  .forward-banner.limit-hit strong { color: #f6c547; }
+  .banner-cta a { color: #06bfdd; text-decoration: underline; }
+
+  .empty {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 60px 24px; text-align: center;
+  }
+  .empty-title { font-size: 18px; color: #fff; margin: 0 0 6px; font-weight: 500; }
+  .empty-sub { color: rgba(255,255,255,0.5); font-size: 14px; margin: 0; }
+
+  .inbox-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .inbox-item {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 18px 20px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .inbox-item.new { border-color: rgba(6,191,221,0.3); background: rgba(6,191,221,0.04); }
+  .inbox-item:hover { border-color: rgba(6,191,221,0.35); }
+
+  .row.top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .type-badge {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 9px; border-radius: 999px; border: 1px solid;
+    background: rgba(255,255,255,0.03);
+  }
+  .dot-new { width: 8px; height: 8px; border-radius: 50%; background: #06bfdd; box-shadow: 0 0 8px #06bfdd; }
+  .from { color: #fff; font-weight: 500; font-size: 14px; }
+  .email { color: rgba(255,255,255,0.45); font-size: 12px; }
+  .when { display: flex; align-items: center; gap: 12px; }
+  .forward-tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; }
+  .forward-tag.ok { color: #6ee7a3; background: rgba(56,161,105,0.1); border: 1px solid rgba(56,161,105,0.25); }
+  .forward-tag.no { color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+  .date { font-size: 12px; color: rgba(255,255,255,0.4); }
+
+  .subject { color: #fff; font-weight: 500; margin: 4px 0 6px; font-size: 14px; }
+  .msg { color: rgba(255,255,255,0.85); font-size: 14px; line-height: 1.55; margin: 4px 0 8px; white-space: pre-wrap; word-wrap: break-word; }
+  .src { font-size: 12px; color: rgba(255,255,255,0.4); margin: 4px 0 0; }
+  .src a { color: rgba(108,107,243,0.8); text-decoration: none; }
+  .src a:hover { text-decoration: underline; }
+
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-act {
+    background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 999px;
+    padding: 6px 16px; font-size: 12px; font-weight: 500;
+    text-decoration: none; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-act:hover:not(:disabled) { background: rgba(255,255,255,0.12); color: #fff; }
+  .btn-act:disabled { opacity: 0.4; cursor: wait; }
+  .btn-act.danger { color: #ff8a8a; border-color: rgba(248,113,113,0.25); }
+  .btn-act.danger:hover { background: rgba(248,113,113,0.12); }
+</style>

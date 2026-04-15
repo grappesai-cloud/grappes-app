@@ -420,19 +420,43 @@ export function injectFormHandler(html: string, projectId: string): string {
   document.querySelectorAll('form').forEach(function(form){
     if(form.dataset.adsnowBound) return;
     form.dataset.adsnowBound = '1';
+    // Inject a hidden honeypot field — bots fill every field; real users leave it blank
+    if(!form.querySelector('input[name="_hp"]')){
+      var hp=document.createElement('input');
+      hp.type='text';hp.name='_hp';hp.tabIndex=-1;hp.autocomplete='off';
+      hp.style.cssText='position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+      hp.setAttribute('aria-hidden','true');
+      form.appendChild(hp);
+    }
     form.addEventListener('submit', function(e){
       e.preventDefault();
       var data = {};
       new FormData(form).forEach(function(v,k){ data[k]=v; });
+      // Infer type from form attribute or field names
+      if(!data.type){
+        if(form.dataset.formType) data.type = form.dataset.formType;
+        else if(Object.keys(data).length===1 && data.email) data.type='newsletter';
+        else data.type='contact';
+      }
+      var btn = form.querySelector('button[type="submit"], input[type="submit"]');
+      var origLabel = btn ? (btn.textContent || btn.value) : '';
+      if(btn){ btn.disabled=true; if(btn.textContent!==undefined) btn.textContent='Sending…'; else btn.value='Sending…'; }
       fetch('https://grappes.dev/api/forms/${projectId}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-        .then(function(r){return r.json();})
+        .then(function(r){return r.json().then(function(j){return {ok:r.ok,body:j};});})
         .then(function(res){
-          if(res.success){
+          if(res.ok && res.body.success){
             var msg = form.querySelector('[data-success]') || form;
-            var msgP=document.createElement('p');msgP.style.cssText='color:inherit;padding:12px 0';msgP.textContent=res.message||'Message sent successfully!';msg.innerHTML='';msg.appendChild(msgP);
+            var msgP=document.createElement('p');msgP.style.cssText='color:inherit;padding:12px 0';msgP.textContent=res.body.message||'Message sent successfully!';msg.innerHTML='';msg.appendChild(msgP);
+          } else {
+            if(btn){ btn.disabled=false; if(btn.textContent!==undefined) btn.textContent=origLabel; else btn.value=origLabel; }
+            var errEl=form.querySelector('[data-error]');
+            if(errEl) errEl.textContent = (res.body && res.body.error) || 'Could not send. Please try again.';
+            else alert((res.body && res.body.error) || 'Could not send. Please try again.');
           }
         })
-        .catch(function(){});
+        .catch(function(){
+          if(btn){ btn.disabled=false; if(btn.textContent!==undefined) btn.textContent=origLabel; else btn.value=origLabel; }
+        });
     });
   });
 })();
