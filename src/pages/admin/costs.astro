@@ -1,0 +1,247 @@
+---
+import { createAdminClient } from '../../lib/supabase';
+import { verifyAdminSession } from '../../lib/admin-auth';
+
+const isAuthed = verifyAdminSession(Astro.cookies.get('admin_session')?.value ?? '');
+if (!isAuthed) return Astro.redirect('/admin');
+
+const client = createAdminClient();
+
+const now = new Date();
+const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+const monthEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+const daysInMonth = (monthEnd.getTime() - monthStart.getTime()) / 86_400_000;
+const dayOfMonth  = Math.max(1, Math.floor((Date.now() - monthStart.getTime()) / 86_400_000) + 1);
+
+// Anthropic spend this month (stored in costs table)
+const { data: costsRaw } = await client
+  .from('costs')
+  .select('type, model, cost_usd, input_tokens, output_tokens, created_at')
+  .gte('created_at', monthStart.toISOString())
+  .lt('created_at', monthEnd.toISOString());
+const costs = costsRaw ?? [];
+const anthropicTotal = costs.reduce((s, c) => s + (Number(c.cost_usd) || 0), 0);
+
+// Breakdown by type
+const byType: Record<string, { calls: number; usd: number; tokens: number }> = {};
+for (const c of costs) {
+  const t = c.type ?? 'other';
+  if (!byType[t]) byType[t] = { calls: 0, usd: 0, tokens: 0 };
+  byType[t].calls++;
+  byType[t].usd += Number(c.cost_usd) || 0;
+  byType[t].tokens += (c.input_tokens ?? 0) + (c.output_tokens ?? 0);
+}
+
+// Breakdown by day
+const byDay: Record<string, number> = {};
+for (const c of costs) {
+  const d = c.created_at ? new Date(c.created_at as string).toISOString().slice(0, 10) : '?';
+  byDay[d] = (byDay[d] ?? 0) + (Number(c.cost_usd) || 0);
+}
+const dailyLabels = Object.keys(byDay).sort();
+const dailyValues = dailyLabels.map(d => byDay[d]);
+const maxDaily = Math.max(1e-6, ...dailyValues);
+
+// Projection to end of month (linear)
+const projectedAnthropic = (anthropicTotal / dayOfMonth) * daysInMonth;
+
+// Stripe activity this month — sum of active projects * price (rough estimate)
+const { data: activations } = await client
+  .from('projects')
+  .select('billing_type, activated_at')
+  .gte('activated_at', monthStart.toISOString())
+  .lt('activated_at', monthEnd.toISOString())
+  .eq('billing_status', 'active');
+const PRICES: Record<string, number> = { monthly: 5, annual: 30, lifetime: 99 };
+const grossRevenue = (activations ?? []).reduce((s, a) => s + (PRICES[a.billing_type as string] ?? 0), 0);
+const stripeFeeEstimate = grossRevenue * 0.029 + (activations?.length ?? 0) * 0.30;
+
+// Resend sends — call Resend API
+let resendSent = 0;
+let resendError = '';
+try {
+  const res = await fetch('https://api.resend.com/emails?limit=100', {
+    headers: { Authorization: `Bearer ${import.meta.env.RESEND_API_KEY}` },
+  });
+  if (res.ok) {
+    const d = await res.json();
+    resendSent = (d?.data ?? []).filter((m: any) => m.created_at && new Date(m.created_at) >= monthStart).length;
+  } else {
+    resendError = `Resend API ${res.status}`;
+  }
+} catch (e: any) {
+  resendError = e?.message ?? 'Resend fetch failed';
+}
+
+// Site-submission activity
+const { count: submissionsThisMonth } = await client
+  .from('contact_submissions')
+  .select('id', { count: 'exact', head: true })
+  .gte('created_at', monthStart.toISOString());
+
+const fmt = (n: number) => `$${n.toFixed(2)}`;
+const fmtEur = (n: number) => `€${n.toFixed(2)}`;
+
+function monthLabel(d: Date): string {
+  return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+function prettyType(t: string): string {
+  const map: Record<string, string> = { onboarding: 'Onboarding (Haiku)', generation: 'Generation (Sonnet + Opus)', fix: 'Auto-fix', validation: 'Validation' };
+  return map[t] ?? t;
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grappes Admin — Costs</title>
+  <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #fff; font-family: 'DM Sans', -apple-system, Arial, sans-serif; min-height: 100vh; padding: 32px 24px 60px; }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+    .back { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+    .back:hover { color: #fff; }
+    h1 { font-size: 36px; font-weight: 300; letter-spacing: -0.02em; }
+    h2 { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+    .subtitle { color: rgba(255,255,255,0.45); font-size: 14px; margin-top: 6px; margin-bottom: 32px; }
+
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 40px; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 22px 20px; }
+    .card-label { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .card-value { font-family: 'DM Sans', sans-serif; font-size: 32px; font-weight: 300; letter-spacing: -0.02em; color: #fff; line-height: 1.1; }
+    .card-value.aqua { color: #06bfdd; }
+    .card-value.red { color: #ff3334; }
+    .card-sub { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 6px; }
+
+    .section { margin-bottom: 40px; }
+
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .bar-row .lbl { color: rgba(255,255,255,0.7); width: 220px; flex-shrink: 0; }
+    .bar-row .bar { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+    .bar-row .bar span { display: block; height: 100%; background: linear-gradient(90deg, #06bfdd, #6c6bf3); border-radius: 4px; }
+    .bar-row .val { color: #fff; font-variant-numeric: tabular-nums; width: 90px; text-align: right; flex-shrink: 0; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.3); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    tbody td { padding: 10px 14px; color: rgba(255,255,255,0.82); border-bottom: 1px solid rgba(255,255,255,0.03); }
+
+    .note { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 8px; }
+    .warn { color: #f6c547; }
+    .bar-mini { display: flex; align-items: flex-end; gap: 3px; height: 70px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px; }
+    .bar-mini span { flex: 1; min-width: 6px; background: linear-gradient(180deg, #06bfdd, #6c6bf3); border-radius: 3px 3px 0 0; position: relative; }
+    .day-labels { display: flex; gap: 3px; font-size: 10px; color: rgba(255,255,255,0.3); padding: 0 8px; margin-top: 4px; }
+    .day-labels span { flex: 1; text-align: center; min-width: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/admin" class="back">← Admin</a>
+    <h1>Costs</h1>
+    <p class="subtitle">{monthLabel(monthStart)} · day {dayOfMonth} of {Math.round(daysInMonth)}</p>
+
+    <!-- Headline -->
+    <div class="grid">
+      <div class="card">
+        <p class="card-label">Anthropic spend</p>
+        <p class="card-value aqua">{fmt(anthropicTotal)}</p>
+        <p class="card-sub">{costs.length} API calls</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Projected EOM</p>
+        <p class="card-value">{fmt(projectedAnthropic)}</p>
+        <p class="card-sub">linear extrapolation</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Gross revenue</p>
+        <p class="card-value aqua">{fmtEur(grossRevenue)}</p>
+        <p class="card-sub">{activations?.length ?? 0} activations</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Stripe fees (est.)</p>
+        <p class="card-value">{fmtEur(stripeFeeEstimate)}</p>
+        <p class="card-sub">2.9% + €0.30/txn</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Resend sent</p>
+        <p class="card-value">{resendSent}</p>
+        <p class="card-sub">{resendError || 'last 100 events'}</p>
+      </div>
+      <div class="card">
+        <p class="card-label">Form submissions</p>
+        <p class="card-value">{submissionsThisMonth ?? 0}</p>
+        <p class="card-sub">from generated sites</p>
+      </div>
+    </div>
+
+    <!-- Breakdown by type -->
+    <div class="section">
+      <h2>Anthropic spend by type</h2>
+      {Object.keys(byType).length === 0 ? (
+        <p class="note">No API calls this month yet.</p>
+      ) : (
+        Object.entries(byType)
+          .sort(([,a], [,b]) => b.usd - a.usd)
+          .map(([t, v]) => {
+            const pct = anthropicTotal > 0 ? (v.usd / anthropicTotal) * 100 : 0;
+            return (
+              <div class="bar-row">
+                <span class="lbl">{prettyType(t)}</span>
+                <span class="bar"><span style={`width:${pct}%`}></span></span>
+                <span class="val">{fmt(v.usd)}</span>
+              </div>
+            );
+          })
+      )}
+    </div>
+
+    <!-- Daily chart -->
+    <div class="section">
+      <h2>Daily Anthropic spend</h2>
+      {dailyLabels.length === 0 ? (
+        <p class="note">No daily data yet.</p>
+      ) : (
+        <>
+          <div class="bar-mini">
+            {dailyValues.map(v => <span style={`height:${(v / maxDaily) * 100}%`} title={fmt(v)}></span>)}
+          </div>
+          <div class="day-labels">
+            {dailyLabels.map(d => <span>{d.slice(8)}</span>)}
+          </div>
+        </>
+      )}
+    </div>
+
+    <!-- Activations detail -->
+    <div class="section">
+      <h2>Activations this month</h2>
+      {!activations || activations.length === 0 ? (
+        <p class="note">No new activations this month.</p>
+      ) : (
+        <table>
+          <thead>
+            <tr><th>Billing type</th><th>Count</th><th>Revenue</th></tr>
+          </thead>
+          <tbody>
+            {(['monthly', 'annual', 'lifetime'] as const).map(b => {
+              const count = activations.filter(a => a.billing_type === b).length;
+              const rev = count * (PRICES[b] ?? 0);
+              return (
+                <tr><td style="text-transform:capitalize;">{b}</td><td>{count}</td><td>{fmtEur(rev)}</td></tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+
+    <p class="note">
+      ⚠️ <span class="warn">Note:</span> Vercel build minutes + Resend transactional costs not aggregated here — check their dashboards directly. Stripe fees are an estimate at 2.9% + €0.30/txn (actual may vary by card type/country).
+    </p>
+  </div>
+</body>
+</html>

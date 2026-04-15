@@ -341,12 +341,93 @@ function fmt(dateStr: string | null | undefined): string {
       font-style: italic;
     }
 
-    a.preview-link {
-      color: #60a5fa;
-      text-decoration: none;
-      font-size: 12px;
-    }
+    a.preview-link { color: #60a5fa; text-decoration: none; font-size: 12px; }
     a.preview-link:hover { text-decoration: underline; }
+
+    /* Admin nav */
+    .admin-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+    .admin-nav-link {
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.7);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px; padding: 8px 18px;
+      font-size: 13px; font-weight: 500; text-decoration: none;
+      transition: all 0.15s;
+    }
+    .admin-nav-link:hover { background: rgba(6,191,221,0.1); border-color: rgba(6,191,221,0.35); color: #06bfdd; }
+
+    /* User search */
+    .usearch-box { position: relative; margin-bottom: 32px; max-width: 560px; }
+    #usearch-input {
+      width: 100%; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      color: #fff; font-family: inherit; font-size: 14px;
+      padding: 14px 18px; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    #usearch-input:focus { border-color: #06bfdd; box-shadow: 0 0 0 3px rgba(6,191,221,0.18); }
+    #usearch-input::placeholder { color: rgba(255,255,255,0.35); }
+    #usearch-results {
+      position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+      background: #14141a; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; max-height: 400px; overflow-y: auto;
+      z-index: 10; box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+    }
+    #usearch-results[hidden] { display: none; }
+    .usearch-item {
+      display: block; width: 100%; text-align: left;
+      background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.05);
+      padding: 12px 16px; cursor: pointer; color: #fff;
+      font-family: inherit; transition: background 0.1s;
+    }
+    .usearch-item:hover { background: rgba(6,191,221,0.08); }
+    .usearch-item:last-child { border-bottom: none; }
+    .usearch-name { font-size: 14px; font-weight: 500; }
+    .usearch-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+    /* User drawer */
+    #user-drawer-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 800; backdrop-filter: blur(4px);
+    }
+    #user-drawer-backdrop[hidden] { display: none; }
+    #user-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 460px; max-width: 100vw;
+      background: #14141a; border-left: 1px solid rgba(255,255,255,0.08);
+      box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+      z-index: 810; overflow-y: auto;
+      transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+      padding: 24px 26px 40px;
+    }
+    #user-drawer.open { transform: translateX(0); }
+    #user-drawer .close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 20px; padding: 4px 10px; border-radius: 6px; }
+    #user-drawer .close:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    #user-drawer h2 { font-size: 22px; font-weight: 300; letter-spacing: -0.01em; margin: 10px 0 2px; }
+    #user-drawer .u-email { font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 18px; }
+    .drawer-section { padding-top: 16px; margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .drawer-section h3 { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; font-weight: 600; }
+    .kv-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; color: rgba(255,255,255,0.85); }
+    .kv-row .k { color: rgba(255,255,255,0.4); }
+    .drawer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .drawer-actions button, .drawer-actions a {
+      font-family: inherit; font-size: 12px; font-weight: 500;
+      background: rgba(6,191,221,0.1); color: #06bfdd;
+      border: 1px solid rgba(6,191,221,0.3);
+      border-radius: 999px; padding: 7px 16px; cursor: pointer;
+      text-decoration: none; transition: all 0.15s;
+    }
+    .drawer-actions button:hover, .drawer-actions a:hover { background: rgba(6,191,221,0.2); }
+    .drawer-actions button:disabled { opacity: 0.5; cursor: wait; }
+    .proj-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; }
+    .proj-item:last-child { border-bottom: none; }
+    .proj-name { color: #fff; font-weight: 500; }
+    .proj-meta { color: rgba(255,255,255,0.4); font-size: 11px; margin-top: 2px; }
+    #drawer-msg { font-size: 12px; padding: 8px 12px; border-radius: 8px; margin-top: 10px; }
+    #drawer-msg.success { background: rgba(110,231,163,0.1); color: #6ee7a3; border: 1px solid rgba(110,231,163,0.3); }
+    #drawer-msg.error   { background: rgba(255,123,123,0.1); color: #ff7b7b; border: 1px solid rgba(255,123,123,0.3); }
+    #drawer-msg[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -368,6 +449,19 @@ function fmt(dateStr: string | null | undefined): string {
   <div class="container">
     <h1>Grappes <span>Admin</span></h1>
     <p class="subtitle">Last loaded: {new Date().toUTCString()}</p>
+
+    <!-- Nav -->
+    <div class="admin-nav">
+      <a href="/admin/support" class="admin-nav-link">Support inbox</a>
+      <a href="/admin/costs" class="admin-nav-link">Costs</a>
+      <a href="/admin/email-log" class="admin-nav-link">Email log</a>
+    </div>
+
+    <!-- User search -->
+    <div class="usearch-box">
+      <input id="usearch-input" type="text" placeholder="Search users by email or name…" autocomplete="off" />
+      <div id="usearch-results" hidden></div>
+    </div>
 
     <!-- Stats row -->
     <div class="stats-grid">
@@ -528,17 +622,21 @@ function fmt(dateStr: string | null | undefined): string {
               <th>User ID</th>
               <th>Created At</th>
               <th>Status</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
             {failedProjects.length === 0 ? (
-              <tr class="empty-row"><td colspan="4">No failed projects.</td></tr>
+              <tr class="empty-row"><td colspan="5">No failed projects.</td></tr>
             ) : failedProjects.map((p: any) => (
               <tr>
                 <td style="font-weight:600;">{p.name ?? '—'}</td>
                 <td style="font-size:11px;color:rgba(255,255,255,0.5);font-family:monospace;">{p.user_id}</td>
                 <td>{fmt(p.created_at)}</td>
                 <td><span class="needs-attention">Needs Attention</span></td>
+                <td>
+                  <button class="btn-mark-paid" onclick={`adminRetry('${p.id}', this)`}>Retry generation</button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -547,6 +645,181 @@ function fmt(dateStr: string | null | undefined): string {
     </div>
   </div>
 )}
+
+<!-- User drawer -->
+<div id="user-drawer-backdrop" hidden></div>
+<aside id="user-drawer" aria-hidden="true">
+  <button class="close" onclick="closeDrawer()" aria-label="Close">×</button>
+  <div id="drawer-content">Loading…</div>
+</aside>
+
+<script is:inline>
+  // ── User search ─────────────────────────────────────────────────────────
+  (function () {
+    var input = document.getElementById('usearch-input');
+    var results = document.getElementById('usearch-results');
+    if (!input || !results) return;
+    var t;
+    input.addEventListener('input', function () {
+      clearTimeout(t);
+      var q = input.value.trim();
+      if (q.length < 2) { results.hidden = true; results.innerHTML = ''; return; }
+      t = setTimeout(async function () {
+        try {
+          var res = await fetch('/api/admin/users/search?q=' + encodeURIComponent(q));
+          if (!res.ok) return;
+          var data = await res.json();
+          if (!data.users || data.users.length === 0) {
+            results.innerHTML = '<div class="usearch-item" style="color:rgba(255,255,255,0.4);">No results</div>';
+            results.hidden = false;
+            return;
+          }
+          results.innerHTML = data.users.map(function (u) {
+            return '<button class="usearch-item" onclick="openUser(\\'' + u.id + '\\')">'
+              + '<div class="usearch-name">' + (u.name || u.email) + '</div>'
+              + '<div class="usearch-sub">' + u.email + ' · ' + (u.plan || 'free') + '</div>'
+              + '</button>';
+          }).join('');
+          results.hidden = false;
+        } catch (e) { /* silently */ }
+      }, 220);
+    });
+    document.addEventListener('click', function (e) {
+      if (!input.contains(e.target) && !results.contains(e.target)) {
+        results.hidden = true;
+      }
+    });
+  })();
+
+  // ── User drawer ─────────────────────────────────────────────────────────
+  window.closeDrawer = function () {
+    var d = document.getElementById('user-drawer');
+    var b = document.getElementById('user-drawer-backdrop');
+    if (d) d.classList.remove('open');
+    if (b) b.hidden = true;
+    setTimeout(function () { if (d) d.setAttribute('aria-hidden', 'true'); }, 300);
+  };
+
+  window.openUser = async function (userId) {
+    var d = document.getElementById('user-drawer');
+    var b = document.getElementById('user-drawer-backdrop');
+    var content = document.getElementById('drawer-content');
+    b.hidden = false;
+    setTimeout(function () { d.classList.add('open'); }, 10);
+    d.setAttribute('aria-hidden', 'false');
+    content.innerHTML = 'Loading…';
+    try {
+      var res = await fetch('/api/admin/users/' + userId);
+      if (!res.ok) { content.innerHTML = '<p style="color:#ff7b7b">Failed to load user.</p>'; return; }
+      var data = await res.json();
+      var u = data.user;
+      var ps = data.projects || [];
+      var r = data.referrals || {};
+      var projectsHtml = ps.length === 0
+        ? '<p style="color:rgba(255,255,255,0.4);font-size:12px;">No projects</p>'
+        : ps.map(function (p) {
+            return '<div class="proj-item">'
+              + '<div class="proj-name">' + (p.name || '—') + '</div>'
+              + '<div class="proj-meta">' + p.status + ' · ' + (p.billing_status || 'free') + ' · <code>' + p.id.slice(0, 8) + '</code>'
+              + (p.status === 'failed' ? ' <button onclick="adminRetry(\\''+p.id+'\\', this)" style="margin-left:6px;background:rgba(246,197,71,0.15);color:#f6c547;border:1px solid rgba(246,197,71,0.3);font-size:10px;padding:2px 8px;border-radius:999px;cursor:pointer;">Retry</button>' : '')
+              + '</div>'
+              + '</div>';
+          }).join('');
+      content.innerHTML =
+        '<h2>' + (u.name || u.email) + '</h2>'
+        + '<p class="u-email">' + u.email + '</p>'
+        + '<div class="drawer-section"><h3>Account</h3>'
+          + '<div class="kv-row"><span class="k">Plan</span><span>' + (u.plan || 'free') + '</span></div>'
+          + '<div class="kv-row"><span class="k">Projects limit</span><span>' + u.projects_limit + '</span></div>'
+          + '<div class="kv-row"><span class="k">Edits used</span><span>' + (u.edits_used ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Extra edits</span><span>' + (u.extra_edits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Referral balance</span><span>€' + Number(u.referral_balance ?? 0).toFixed(2) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Multipage lifetime</span><span>' + (u.multipage_addon_lifetime ? 'Yes' : 'No') + '</span></div>'
+        + '</div>'
+        + '<div class="drawer-section"><h3>Quick actions</h3>'
+          + '<div class="drawer-actions">'
+            + '<button onclick="grantEdits(\\''+userId+'\\', 10)">+10 edits</button>'
+            + '<button onclick="grantEdits(\\''+userId+'\\', 50)">+50 edits</button>'
+            + '<button onclick="extendTrial(\\''+userId+'\\', 7)">+7 days trial</button>'
+            + '<button onclick="extendTrial(\\''+userId+'\\', 30)">+30 days trial</button>'
+            + '<button onclick="impersonate(\\''+userId+'\\')">Impersonate</button>'
+            + '<a href="mailto:' + u.email + '">Email user</a>'
+          + '</div>'
+          + '<div id="drawer-msg" hidden></div>'
+        + '</div>'
+        + '<div class="drawer-section"><h3>Projects (' + ps.length + ')</h3>' + projectsHtml + '</div>'
+        + '<div class="drawer-section"><h3>Referrals</h3>'
+          + '<div class="kv-row"><span class="k">Total invited</span><span>' + (r.total || 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Confirmed</span><span>' + (r.confirmed || 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Lifetime earned</span><span>€' + Number(r.earned ?? 0).toFixed(2) + '</span></div>'
+        + '</div>';
+    } catch (e) {
+      content.innerHTML = '<p style="color:#ff7b7b">Error: ' + e.message + '</p>';
+    }
+  };
+
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'user-drawer-backdrop') window.closeDrawer();
+  });
+
+  function drawerMsg(text, kind) {
+    var m = document.getElementById('drawer-msg');
+    if (!m) return;
+    m.hidden = false;
+    m.className = kind;
+    m.textContent = text;
+    setTimeout(function () { m.hidden = true; }, 5000);
+  }
+
+  window.grantEdits = async function (userId, amount) {
+    var res = await fetch('/api/admin/users/' + userId + '/grant-edits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: amount }),
+    });
+    var d = await res.json();
+    if (res.ok) drawerMsg('✓ Edits updated → ' + d.extra_edits + ' extra', 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
+
+  window.extendTrial = async function (userId, days) {
+    var res = await fetch('/api/admin/users/' + userId + '/extend-trial', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: days }),
+    });
+    var d = await res.json();
+    if (res.ok) drawerMsg('✓ Extended ' + d.updated + ' project(s) by ' + days + ' days', 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
+
+  window.impersonate = async function (userId) {
+    var res = await fetch('/api/admin/users/' + userId + '/impersonate', { method: 'POST' });
+    var d = await res.json();
+    if (res.ok) {
+      var copy = confirm('Magic link generated for ' + d.email + '.\\n\\nClick OK to copy the link. Open it in an incognito window.');
+      if (copy) navigator.clipboard?.writeText(d.url).then(function () { drawerMsg('✓ Link copied', 'success'); });
+    } else {
+      drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+    }
+  };
+
+  window.adminRetry = async function (projectId, btn) {
+    if (!confirm('Retry generation for this project?')) return;
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+      var res = await fetch('/api/admin/projects/' + projectId + '/retry', { method: 'POST' });
+      if (res.ok) {
+        if (btn) { btn.textContent = '✓ Queued'; btn.style.background = 'rgba(110,231,163,0.15)'; btn.style.color = '#6ee7a3'; }
+      } else {
+        var d = await res.json();
+        alert('Retry failed: ' + (d.error || 'unknown'));
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry generation'; }
+      }
+    } catch (e) {
+      alert('Network error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Retry generation'; }
+    }
+  };
+</script>
 
 <script>
   async function markPaid(btn, payoutId) {
