@@ -761,7 +761,17 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     });
   }
 
-  // File selected → stage (don't upload yet). Generic type; user describes intent in message.
+  // Pick a compatible asset type from the file. Server validates MIME per type,
+  // so we must match: SVG → logo, video → video, font → font, image → section.
+  function inferAssetType(file) {
+    var t = (file.type || '').toLowerCase();
+    if (t === 'image/svg+xml') return 'logo';
+    if (t.startsWith('video/')) return 'video';
+    if (t.startsWith('font/') || /\.(woff2?|ttf|otf)$/i.test(file.name)) return 'font';
+    return 'section';
+  }
+
+  // File selected → stage (don't upload yet). User describes intent in message.
   quickFileInput.addEventListener('change', (e) => {
     const files = Array.from(e.target.files || []);
     quickFileInput.value = '';
@@ -769,11 +779,10 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 
     const remaining = MAX_STAGED - stagedFiles.length;
     files.slice(0, remaining).forEach(file => {
-      stagedFiles.push({ file, type: 'section', previewUrl: URL.createObjectURL(file) });
+      stagedFiles.push({ file, type: inferAssetType(file), previewUrl: URL.createObjectURL(file) });
     });
     renderStagedStrip();
     input.focus();
-    // Prompt user (placeholder hint) if they haven't typed yet
     if (!input.value.trim()) {
       input.placeholder = 'Describe what these are (e.g. "this is my logo")…';
     }
