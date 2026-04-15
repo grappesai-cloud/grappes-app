@@ -100,7 +100,7 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
       "media-src 'self' https: blob:",
-      "connect-src 'self' https://grappes.dev https://www.google-analytics.com",
+      "connect-src 'self' https://grappes.dev https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com",
       "frame-ancestors 'self'",
     ].join('; ');
 
