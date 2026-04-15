@@ -103,6 +103,17 @@ These runtime functions are auto-injected if you call them. Using zero is fine �
 - For icons use inline SVGs or Unicode — no external icon library needed.
 - Sections must not visually bleed into each other by accident. If you use position:absolute or oversized elements, ensure they stay within their section's bounds (overflow:hidden or clip). Intentional overlap between sections is fine — accidental overlap is a bug.
 
+## Images — NEVER CROP USER-UPLOADED PHOTOS
+
+User-provided photos (logos, hero images, portfolio, team, gallery, any asset URL we hand you) MUST be displayed whole. The user picked a specific framing and we do not override it.
+
+- Default to \`object-fit: contain\` on every <img>. NEVER use \`object-fit: cover\` on user assets.
+- For hero sections: make the image container adapt to the image's aspect-ratio (use CSS \`aspect-ratio\`, \`height: auto\`, or flex layout) instead of forcing a fixed 16:9 frame that crops the photo.
+- Logos: always \`object-fit: contain\` with generous padding. Never clip.
+- Do NOT use \`background-image\` with \`background-size: cover\` on user assets — that crops by default. If you must use background-image, use \`background-size: contain\` and \`background-position: center\` with a matching \`aspect-ratio\`.
+- Galleries and grids: let cards grow to the photo's natural ratio (masonry / flex wrap) rather than squeezing every photo into a uniform square that crops it.
+- The ONE exception: purely decorative full-bleed background patterns we generate ourselves (gradients, abstract textures) — those may cover. But anything the USER uploaded is sacred framing — show it all.
+
 ## Complexity
 
 essential = tight, few moments. complete = rich journey. showcase = epic experience. Default: complete.
