@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { anthropic, createMessage, HAIKU_MODEL, HAIKU_SYSTEM_PROMPT, INPUT_COST_PER_TOKEN, OUTPUT_COST_PER_TOKEN } from '../../../../lib/anthropic';
+import { sectionLibraryAsPrompt } from '../../../../lib/section-library';
 import { checkRateLimit } from '../../../../lib/rate-limit';
 import { parseHaikuResponse, calculateCompleteness, compressHistory, applySmartDefaults } from '../../../../lib/onboarding';
 import type { ConversationPhase } from '../../../../lib/db';
@@ -10,6 +11,22 @@ const langNames: Record<string, string> = { ro: 'Romanian', en: 'English', fr: '
 
 
 /** Build a human-readable summary of collected fields so Haiku can't miss them */
+function buildDepthAndSectionsBlock(depth: string, selectedSections: string[] | undefined): string {
+  const d = (['quick', 'standard', 'deep'].includes(depth) ? depth : 'standard') as 'quick' | 'standard' | 'deep';
+  const depthRules: Record<typeof d, string> = {
+    quick:    'QUICK MODE: cap onboarding at ~5 questions total. Auto-pick sections (hero, about, services, contact) — do NOT propose a section list, do NOT ask the user to confirm sections. Skip testimonials/portfolio/team/pricing/etc unless the user volunteers them.',
+    standard: 'STANDARD MODE: aim for ~10 questions total. After learning business name + industry + core offering, propose 4-7 section keys from the library that fit the business and ask the user to confirm or edit. Then ask 1 brief question per chosen section.',
+    deep:     'DEEP MODE: aim for 15-20 questions. After business discovery, propose 6-10 sections, then ask 1-2 detail questions per section (sample work, copy preferences, mood, social proof). Cover SEO keywords, target audience, brand voice in detail.',
+  };
+  let block = `\n\nONBOARDING DEPTH: ${d.toUpperCase()}\n${depthRules[d]}`;
+  block += `\n\nUNIVERSAL SECTION LIBRARY (use these KEYS exactly when you save business.selectedSections):\n${sectionLibraryAsPrompt()}`;
+  block += `\n\nSECTION SELECTION FLOW (skip in QUICK mode):\n1. After learning business name + industry + core offering, briefly summarize them.\n2. Propose 4-10 section keys that fit (e.g. "I'd suggest: hero, about, services, portfolio, testimonials, contact"). Use the keys above, comma-separated, lowercase.\n3. Ask the user to confirm or edit (add/remove). Then save the final array to business.selectedSections.\n4. After confirmation, ask 1 (standard) or 2 (deep) brief content questions per selected section, in order.`;
+  if (selectedSections && selectedSections.length > 0) {
+    block += `\n\nSECTIONS ALREADY CONFIRMED for this site: [${selectedSections.join(', ')}]. Do NOT re-propose a section list. Continue asking content questions for these sections in order.`;
+  }
+  return block;
+}
+
 function buildCollectedSummary(data: Record<string, any>): string {
   const lines: string[] = [];
   const get = (path: string) => path.split('.').reduce((o, k) => o?.[k], data);
@@ -207,6 +224,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       const siteLangLabel  = langNames[siteLocale]  || siteLocale;
 
       systemPrompt += `\n\nCONVERSATION LANGUAGE: The user picked "${briefLangLabel}" (${briefLocale}) for the chat. Conduct the ENTIRE conversation in ${briefLangLabel}. All your replies MUST be in ${briefLangLabel}.\n\nWEBSITE LANGUAGE: The user separately picked "${siteLangLabel}" (${siteLocale}) for the generated website. This is already stored in business.locale — do NOT ask the user again what language the site should be in. Only ask if the user explicitly wants to change it.`;
+      systemPrompt += buildDepthAndSectionsBlock((brief?.data?.business?.depth as string | undefined) || 'standard', brief?.data?.business?.selectedSections as string[] | undefined);
       if (project.billing_status !== 'active') {
         systemPrompt += `\n\nPLAN RESTRICTION: This user is on the free plan. Multi-page websites require a separate paid plan. If the user asks for multi-page: explain it requires upgrading the plan, and recommend the landing page as the better choice anyway (faster, higher conversion rate). Do NOT set preferences.websiteType to "multi-page" for this user.`;
       }
@@ -307,8 +325,11 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     }
 
     let systemPrompt = HAIKU_SYSTEM_PROMPT;
-    const langLabel2 = langNames[browserLang] || 'English'; // reuse langNames from media path
-    systemPrompt += `\n\nLANGUAGE: The user's language is set to "${langLabel2}" (${browserLang}). Conduct the ENTIRE conversation in ${langLabel2}. ALL your replies MUST be in ${langLabel2} — no exceptions.`;
+    // Prefer the explicit briefLocale chosen at project start; fall back to browser hint.
+    const chatLocale = (brief?.data?.business?.briefLocale as string | undefined) || browserLang;
+    const langLabel2 = langNames[chatLocale] || 'English';
+    systemPrompt += `\n\nLANGUAGE: The user's language is set to "${langLabel2}" (${chatLocale}). Conduct the ENTIRE conversation in ${langLabel2}. ALL your replies MUST be in ${langLabel2} — no exceptions.`;
+    systemPrompt += buildDepthAndSectionsBlock((brief?.data?.business?.depth as string | undefined) || 'standard', brief?.data?.business?.selectedSections as string[] | undefined);
     if (project.billing_status !== 'active') {
       systemPrompt += `\n\nPLAN RESTRICTION: This user is on the free plan. Multi-page websites require a separate paid plan. If the user asks for multi-page: explain it requires upgrading the plan, and recommend the landing page as the better choice anyway (faster, higher conversion rate). Do NOT set preferences.websiteType to "multi-page" for this user.`;
     }

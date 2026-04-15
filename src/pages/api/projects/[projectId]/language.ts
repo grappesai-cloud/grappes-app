@@ -27,19 +27,20 @@ export const POST: APIRoute = async ({ request, params, locals }) => {
 
   const briefLocale = (body?.briefLocale ?? '').toString().toLowerCase().slice(0, 5);
   const siteLocale  = (body?.siteLocale  ?? '').toString().toLowerCase().slice(0, 5);
+  const depthRaw    = (body?.depth ?? 'standard').toString().toLowerCase();
+  const depth = (['quick', 'standard', 'deep'].includes(depthRaw) ? depthRaw : 'standard') as 'quick' | 'standard' | 'deep';
 
   if (!SUPPORTED.has(briefLocale) || !SUPPORTED.has(siteLocale)) {
     return json({ error: 'Unsupported locale' }, 400);
   }
 
   try {
-    // Merge into briefs.data.business — briefLocale is chat-only,
-    // locale (==siteLocale) is the existing slot the generator already reads.
     await db.briefs.merge(projectId, {
       'business.briefLocale': briefLocale,
       'business.locale':      siteLocale,
+      'business.depth':       depth,
     });
-    return json({ ok: true, briefLocale, siteLocale });
+    return json({ ok: true, briefLocale, siteLocale, depth });
   } catch (e: any) {
     console.error('[language POST]', e);
     return json({ error: 'Failed to save language' }, 500);

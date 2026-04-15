@@ -147,6 +147,36 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
           <option value="hu">Magyar</option>
         </select>
       </label>
+      <div class="lang-field">
+        <span class="lang-field-label">How detailed should this be?</span>
+        <span class="lang-field-hint">Pick a depth — more detail = better site, longer chat</span>
+        <div class="depth-options" role="radiogroup" aria-label="Onboarding depth">
+          <label class="depth-opt">
+            <input type="radio" name="depth" value="quick" />
+            <span class="depth-opt-inner">
+              <span class="depth-opt-title">Quick</span>
+              <span class="depth-opt-meta">~2 min · 5 questions</span>
+              <span class="depth-opt-desc">Basics only — name, industry, 1 color, logo</span>
+            </span>
+          </label>
+          <label class="depth-opt">
+            <input type="radio" name="depth" value="standard" checked />
+            <span class="depth-opt-inner">
+              <span class="depth-opt-title">Standard</span>
+              <span class="depth-opt-meta">~5 min · ~10 questions</span>
+              <span class="depth-opt-desc">Above + tone, hero, 2-3 sections, tagline</span>
+            </span>
+          </label>
+          <label class="depth-opt">
+            <input type="radio" name="depth" value="deep" />
+            <span class="depth-opt-inner">
+              <span class="depth-opt-title">Deep</span>
+              <span class="depth-opt-meta">~10 min · 15+ questions</span>
+              <span class="depth-opt-desc">Full brief — testimonials, portfolio, audience, SEO</span>
+            </span>
+          </label>
+        </div>
+      </div>
       <button type="submit" class="lang-submit">Continue</button>
       <p class="lang-error" id="lang-error" hidden></p>
     </form>
@@ -678,12 +708,15 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       btn.textContent = 'Saving…';
       errEl.hidden = true;
       try {
+        var depthInput = form.querySelector('input[name="depth"]:checked');
+        var depthVal = depthInput ? depthInput.value : 'standard';
         var res = await fetch('/api/projects/' + projectId + '/language', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             briefLocale: briefSel.value,
             siteLocale: siteSel.value,
+            depth: depthVal,
           }),
         });
         if (!res.ok) throw new Error('Save failed');
@@ -1417,4 +1450,31 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   .lang-submit:hover:not(:disabled) { background: #6ee7a3; }
   .lang-submit:disabled { opacity: 0.6; cursor: wait; }
   .lang-error { margin: 4px 0 0; font-size: 12px; color: #ff8a8a; }
+
+  /* Depth radio cards */
+  .depth-options { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .depth-opt { display: block; cursor: pointer; }
+  .depth-opt input[type="radio"] {
+    position: absolute; opacity: 0; pointer-events: none;
+  }
+  .depth-opt-inner {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    transition: all 0.15s;
+  }
+  .depth-opt:hover .depth-opt-inner {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(6,191,221,0.3);
+  }
+  .depth-opt input[type="radio"]:checked + .depth-opt-inner {
+    background: rgba(6,191,221,0.1);
+    border-color: #06bfdd;
+    box-shadow: 0 0 0 2px rgba(6,191,221,0.2);
+  }
+  .depth-opt-title { font-size: 14px; font-weight: 700; color: #fff; }
+  .depth-opt-meta { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.04em; }
+  .depth-opt-desc { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 2px; line-height: 1.4; }
 </style>
