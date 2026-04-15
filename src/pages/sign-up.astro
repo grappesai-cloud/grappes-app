@@ -67,7 +67,7 @@ if (Astro.request.method === 'POST') {
         }
       }
       try {
-        await sendWelcomeEmail({ to: email, name: name || undefined });
+        await sendWelcomeEmail({ to: email, name: name || undefined, userId: newUser?.id });
       } catch (emailErr) {
         console.error('[sign-up] Welcome email failed:', emailErr);
       }

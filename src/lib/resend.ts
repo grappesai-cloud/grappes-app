@@ -1,6 +1,9 @@
 // ─── Resend Email Client ─────────────────────────────────────────────────────
 // Sends form submission emails to site owners when visitors submit contact forms.
 
+import { createHmac } from 'node:crypto';
+import { checkRateLimit } from './rate-limit';
+
 const RESEND_API = 'https://api.resend.com/emails';
 const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
@@ -21,6 +24,45 @@ function sanitizeHeader(s: string): string {
 /** Validate email format (basic RFC 5322) */
 function isValidEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
+}
+
+/** Generate unsubscribe token for marketing emails */
+function generateUnsubToken(userId: string): string {
+  const secret = import.meta.env.UNSUB_SECRET || 'default-unsub-secret';
+  return createHmac('sha256', secret).update(userId).digest('hex');
+}
+
+/**
+ * Check if an email is suppressed.
+ */
+export async function isEmailSuppressed(email: string): Promise<boolean> {
+  try {
+    const { createAdminClient } = await import('./supabase');
+    const client = createAdminClient();
+    const { data } = await client
+      .from('suppressed_emails')
+      .select('email')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Suppress an email address with an optional reason.
+ */
+export async function suppressEmail(email: string, reason: string): Promise<void> {
+  try {
+    const { createAdminClient } = await import('./supabase');
+    const client = createAdminClient();
+    await client
+      .from('suppressed_emails')
+      .upsert({ email: email.toLowerCase(), reason }, { onConflict: 'email' });
+  } catch (e) {
+    console.error('[resend] Failed to suppress email:', e);
+  }
 }
 
 export interface FormSubmission {
@@ -53,6 +95,11 @@ export async function sendFormEmail(params: {
     ${siteUrl ? `<p style="margin:20px 0 0;font-size:13px;color:#c0c0c0;">Trimis de pe <a href="${escapeHtml(siteUrl)}" style="color:#6b7280;text-decoration:none;">${escapeHtml(siteUrl)}</a></p>` : ''}
   `);
 
+  const text = `New form submission${submission.name ? ` from ${submission.name}` : ''}:\n\n${Object.entries(submission)
+    .filter(([_, v]) => v && v.trim())
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('\n')}${siteUrl ? `\n\nSubmitted from: ${siteUrl}` : ''}`;
+
   const safeSiteName = sanitizeHeader(siteName);
   const subject = submission.subject
     ? `[${safeSiteName}] ${sanitizeHeader(submission.subject)}`
@@ -73,6 +120,7 @@ export async function sendFormEmail(params: {
         to,
         subject,
         html,
+        text,
         reply_to: replyTo,
       }),
     });
@@ -105,6 +153,9 @@ export async function sendPlatformEmailInternal(params: {
   to: string;
   subject: string;
   html: string;
+  reply_to?: string;
+  text?: string;
+  headers?: Record<string, string>;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   return sendPlatformEmail(params);
 }
@@ -113,20 +164,52 @@ async function sendPlatformEmail(params: {
   to: string;
   subject: string;
   html: string;
+  reply_to?: string;
+  text?: string;
+  headers?: Record<string, string>;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   try {
+    // Check if email is suppressed
+    const suppressed = await isEmailSuppressed(params.to);
+    if (suppressed) {
+      console.log(`[resend] Email to ${params.to} is suppressed`);
+      return { success: false, error: 'Email suppressed' };
+    }
+
+    // Check per-user rate limit (5 emails per hour per user)
+    const rateLimitKey = `email:user:${params.to}`;
+    const limited = await checkRateLimit(rateLimitKey, 5, 3_600_000);
+    if (!limited) {
+      console.warn(`[resend] Rate limit exceeded for ${params.to}`);
+      return { success: false, error: 'Rate limit exceeded' };
+    }
+
+    const body: any = {
+      from: 'Grappes <noreply@grappes.dev>',
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    };
+
+    if (params.text) {
+      body.text = params.text;
+    }
+
+    if (params.reply_to) {
+      body.reply_to = params.reply_to;
+    }
+
+    if (params.headers) {
+      body.headers = params.headers;
+    }
+
     const response = await fetch(RESEND_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${getApiKey()}`,
       },
-      body: JSON.stringify({
-        from: 'Grappes <noreply@grappes.dev>',
-        to: params.to,
-        subject: params.subject,
-        html: params.html,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -147,7 +230,7 @@ function wrapEmail(title: string, body: string): string {
   return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;margin:0;padding:0;">
 <tr><td align="center" bgcolor="#ffffff" style="background-color:#ffffff;padding:48px 24px;">
-<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;font-family:'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif;">
 
   <tr><td style="padding:0 0 40px;">
     <img src="${LOGO_URL}" alt="Grappes" width="120" height="27" style="display:block;border:0;" />
@@ -170,7 +253,7 @@ function wrapEmail(title: string, body: string): string {
   </td></tr>
 
   <tr><td style="padding:20px 0 0;font-size:12px;color:#c0c0c0;letter-spacing:0.02em;">
-    Grappes · <a href="${SITE_URL}" style="color:#c0c0c0;text-decoration:none;">grappes.dev</a>
+    Grappes · <a href="${SITE_URL}" style="color:#c0c0c0;text-decoration:none;">grappes.dev</a> · <a href="${SITE_URL}/dashboard/account" style="color:#c0c0c0;text-decoration:none;">Manage notifications</a>
   </td></tr>
 
 </table>
@@ -183,7 +266,7 @@ function wrapFormEmail(siteName: string, body: string): string {
   return `
 <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;margin:0;padding:0;">
 <tr><td align="center" bgcolor="#ffffff" style="background-color:#ffffff;padding:48px 24px;">
-<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<table width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;font-family:'DM Sans','Helvetica Neue',Helvetica,Arial,sans-serif;">
 
   <tr><td style="padding:0 0 16px;">
     <h1 style="margin:0;font-size:26px;font-weight:600;color:#0a0a0a;letter-spacing:-0.03em;line-height:1.3;">Mesaj nou</h1>
@@ -220,6 +303,7 @@ function emailBtn(href: string, text: string): string {
 export async function sendWelcomeEmail(params: {
   to: string;
   name?: string;
+  userId?: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const greeting = params.name ? `Welcome, ${escapeHtml(params.name)}.` : 'Welcome.';
   const html = wrapEmail(greeting, `
@@ -233,10 +317,22 @@ export async function sendWelcomeEmail(params: {
     ${emailBtn(`${SITE_URL}/dashboard`, 'Open dashboard →')}
   `);
 
+  const text = `Welcome to Grappes!\n\nYour account is active. You can now generate a complete website with AI in minutes.\n\nWhat you can do:\n- Describe what you want and get a complete site\n- Edit any section by describing the change\n- Publish to your domain in one click\n\nOpen your dashboard: ${SITE_URL}/dashboard`;
+
+  const headers: Record<string, string> = {};
+  if (params.userId) {
+    const token = generateUnsubToken(params.userId);
+    headers['List-Unsubscribe'] = `<https://grappes.dev/api/unsubscribe?token=${token}&uid=${params.userId}>`;
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  }
+
   return sendPlatformEmail({
     to: params.to,
     subject: 'Welcome to Grappes! 🚀',
     html,
+    text,
+    reply_to: 'support@grappes.dev',
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
   });
 }
 
@@ -256,10 +352,14 @@ export async function sendSiteLiveEmail(params: {
     <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">You can edit it anytime from your dashboard.</p>
   `);
 
+  const text = `Your site is live!\n\n${params.siteName} has been published and is now live.\n\nURL: ${params.siteUrl}\n\nYou can edit it anytime from your dashboard.\n\nOpen dashboard: ${SITE_URL}/dashboard`;
+
   return sendPlatformEmail({
     to: params.to,
     subject: `✦ ${params.siteName} is live!`,
     html,
+    text,
+    reply_to: 'support@grappes.dev',
   });
 }
 
@@ -279,7 +379,15 @@ export async function sendReferralPayoutAlert(params: {
     <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:500;">${escapeHtml(params.referrerEmail)}</span> has accumulated <span style="color:#0a0a0a;font-weight:700;">${params.amount.toFixed(2)}€</span> in referral earnings.</p>
     <p style="margin:0;">Reach out to them and request their IBAN to process the payout.</p>
   `);
-  return sendPlatformEmail({ to: adminEmail, subject: `Referral payout — ${params.amount.toFixed(2)}€ for ${params.referrerEmail}`, html });
+
+  const text = `Referral payout to process\n\n${params.referrerEmail} has accumulated ${params.amount.toFixed(2)}€ in referral earnings.\n\nReach out to them and request their IBAN to process the payout.`;
+
+  return sendPlatformEmail({
+    to: adminEmail,
+    subject: `Referral payout — ${params.amount.toFixed(2)}€ for ${params.referrerEmail}`,
+    html,
+    text,
+  });
 }
 
 /**
@@ -287,6 +395,7 @@ export async function sendReferralPayoutAlert(params: {
  */
 export async function sendReferralEarnedEmail(params: {
   to: string;
+  userId?: string;
   amount: number;
   newBalance: number;
   plan: string;
@@ -307,7 +416,24 @@ export async function sendReferralEarnedEmail(params: {
     ${params.newBalance >= 50 ? `<p style="margin:0 0 4px;font-size:14px;color:#059669;font-weight:500;">You've reached the 50€ minimum — we'll contact you to process payout.</p>` : `<p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">Once you reach 50€ we'll process a bank payout.</p>`}
     ${emailBtn(`${SITE_URL}/dashboard/referrals`, 'View stats →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `+${params.amount}€ earned from Grappes referral`, html });
+
+  const text = `+${params.amount}€ referral earned\n\nSomeone you referred just purchased the ${planLabel} plan.\n\nEarned now: +${params.amount}€\nBalance: ${params.newBalance.toFixed(2)}€\n\n${params.newBalance >= 50 ? "You've reached the 50€ minimum — we'll contact you to process payout." : 'Once you reach 50€ we\'ll process a bank payout.'}\n\nView your referral stats: ${SITE_URL}/dashboard/referrals`;
+
+  const headers: Record<string, string> = {};
+  if (params.userId) {
+    const token = generateUnsubToken(params.userId);
+    headers['List-Unsubscribe'] = `<https://grappes.dev/api/unsubscribe?token=${token}&uid=${params.userId}>`;
+    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
+  }
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `+${params.amount}€ earned from Grappes referral`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
+  });
 }
 
 /**
@@ -322,7 +448,16 @@ export async function sendSubscriptionCancelledEmail(params: {
     <p style="margin:0 0 4px;">You can reactivate anytime from your dashboard.</p>
     ${emailBtn(`${SITE_URL}/dashboard`, 'Reactivate →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — subscription cancelled`, html });
+
+  const text = `Subscription cancelled\n\nThe subscription for ${params.siteName} has been cancelled. The site is no longer active.\n\nYou can reactivate anytime from your dashboard.\n\nOpen dashboard: ${SITE_URL}/dashboard`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `${params.siteName} — subscription cancelled`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
 }
 
 /**
@@ -339,7 +474,16 @@ export async function sendDeploymentFailedEmail(params: {
     <p style="margin:0 0 4px;">Retry from your dashboard or contact support.</p>
     ${emailBtn(`${SITE_URL}/dashboard`, 'Open dashboard →')}
   `);
-  return sendPlatformEmail({ to: params.to, subject: `${params.siteName} — deployment failed`, html });
+
+  const text = `Deployment failed\n\nThe deployment of ${params.siteName} failed.${params.error ? `\n\nError: ${params.error}` : ''}\n\nRetry from your dashboard or contact support.\n\nOpen dashboard: ${SITE_URL}/dashboard`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `${params.siteName} — deployment failed`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
 }
 
 /**
@@ -358,7 +502,15 @@ export async function sendDomainPurchaseFailedEmail(params: {
     <p style="margin:0 0 4px;font-size:13px;color:#9ca3af;">Project: ${escapeHtml(params.projectId)}</p>
     <p style="margin:0;font-size:13px;color:#9ca3af;">Error: ${escapeHtml(params.error)}</p>
   `);
-  return sendPlatformEmail({ to: adminEmail, subject: `⚠ Domain failed: ${params.domain}`, html });
+
+  const text = `Domain purchase failed\n\nThe purchase of the domain ${params.domain} failed after payment.\n\nProject: ${params.projectId}\nError: ${params.error}`;
+
+  return sendPlatformEmail({
+    to: adminEmail,
+    subject: `⚠ Domain failed: ${params.domain}`,
+    html,
+    text,
+  });
 }
 
 /**
@@ -384,9 +536,34 @@ export async function sendPaymentConfirmedEmail(params: {
     ${emailBtn(`${SITE_URL}/dashboard`, 'Continue editing →')}
   `);
 
+  const text = `Payment confirmed\n\nWe've added +${params.editsAdded} edits to your account.\n\nEdits added: +${params.editsAdded}\nTotal edits remaining: ${params.totalExtra}\n\nContinue editing: ${SITE_URL}/dashboard`;
+
   return sendPlatformEmail({
     to: params.to,
     subject: `+${params.editsAdded} edits added to your account`,
     html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
+ * Transactional email when a user's password is changed.
+ */
+export async function sendPasswordChangedEmail(params: {
+  to: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const html = wrapEmail('Password changed', `
+    <p style="margin:0 0 24px;">Your password was just changed. If this wasn't you, reset it immediately.</p>
+    ${emailBtn(`${SITE_URL}/forgot-password`, 'Reset password →')}
+  `);
+
+  const text = `Password changed\n\nYour password was just changed. If this wasn't you, reset it immediately.\n\nReset password: ${SITE_URL}/forgot-password`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: 'Your Grappes password was changed',
+    html,
+    text,
   });
 }

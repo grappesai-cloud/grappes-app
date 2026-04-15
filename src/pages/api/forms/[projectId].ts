@@ -40,6 +40,10 @@ export const POST: APIRoute = async ({ params, request }) => {
   if (!checkRateLimit(`form:ip:${ip}`, 20, 3_600_000)) {
     return jsonCors({ error: 'Too many submissions. Please try again later.' }, 429);
   }
+  // Per-project daily cap: 200/day (defense-in-depth against sustained abuse)
+  if (!checkRateLimit(`form:daily:${projectId}`, 200, 86_400_000)) {
+    return jsonCors({ error: 'This form has reached its daily limit. Please try again tomorrow.' }, 429);
+  }
 
   try {
     // Accept JSON or form-encoded body
