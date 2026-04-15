@@ -34,7 +34,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   <!-- Progress -->
   <div class="progress-section">
     <div class="progress-header">
-      <label class="progress-label" for="progress-fill">Brief <span id="completeness-value">{Math.round(initialCompleteness * 100)}%</span> complete</label>
+      <span class="progress-label">Brief <span id="completeness-value">{Math.round(initialCompleteness * 100)}%</span> complete</span>
     </div>
     <div class="progress-bar" role="progressbar" aria-label="Brief progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={Math.round(initialCompleteness * 100)}>
       <div class="progress-fill" id="progress-fill" style={`width: ${initialCompleteness * 100}%`}></div>

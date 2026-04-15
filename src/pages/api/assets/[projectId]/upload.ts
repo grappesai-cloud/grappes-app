@@ -311,11 +311,13 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
       size_bytes: convertedBuffer.length,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     });
-  } catch (e) {
+  } catch (e: any) {
     // Rollback storage upload
     await supabase.storage.from(BUCKET).remove([storagePath]);
-    console.error('[upload] DB error:', e);
-    return json({ error: 'Failed to save asset record' }, 500);
+    const details = e?.message || (typeof e === 'string' ? e : JSON.stringify(e));
+    const code    = e?.code || e?.details || null;
+    console.error('[upload] DB error:', code, details, e);
+    return json({ error: `DB save failed: ${details}${code ? ` (code ${code})` : ''}` }, 500);
   }
 
   // Enrich brief (non-fatal)

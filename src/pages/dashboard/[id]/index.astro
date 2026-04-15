@@ -1123,9 +1123,13 @@ if (hasPreview) {
               <div class="bb-row" data-field="colors">
                 <span class="bb-key">Colors</span>
                 <span class="bb-val bb-colors" id="bb-colors">
-                  {brief?.data?.branding?.primaryColor ? <i style={`background:${brief.data.branding.primaryColor}`}></i> : <i class="bb-empty-dot"></i>}
-                  {brief?.data?.branding?.secondaryColor ? <i style={`background:${brief.data.branding.secondaryColor}`}></i> : <i class="bb-empty-dot"></i>}
-                  <span class="bb-colors-text">{brief?.data?.branding?.primaryColor || 'to be picked'}</span>
+                  {(brief?.data?.branding?.colors?.primary || brief?.data?.branding?.primaryColor)
+                    ? <i style={`background:${brief.data.branding.colors?.primary ?? brief.data.branding.primaryColor}`}></i>
+                    : <i class="bb-empty-dot"></i>}
+                  {(brief?.data?.branding?.colors?.secondary || brief?.data?.branding?.secondaryColor)
+                    ? <i style={`background:${brief.data.branding.colors?.secondary ?? brief.data.branding.secondaryColor}`}></i>
+                    : <i class="bb-empty-dot"></i>}
+                  <span class="bb-colors-text">{brief?.data?.branding?.colors?.primary ?? brief?.data?.branding?.primaryColor ?? 'to be picked'}</span>
                 </span>
               </div>
               <div class="bb-row" data-field="logo">
@@ -2908,11 +2912,11 @@ if (hasPreview) {
           }
         });
 
-        // Colors
+        // Colors — Haiku stores under branding.colors.{primary,secondary,accent}
         var colorsEl = document.getElementById('bb-colors');
         if (colorsEl) {
-          var primary = branding.primaryColor || '';
-          var secondary = branding.secondaryColor || '';
+          var primary   = (branding.colors && branding.colors.primary)   || branding.primaryColor   || '';
+          var secondary = (branding.colors && branding.colors.secondary) || branding.secondaryColor || '';
           var newHtml = '';
           if (primary)   newHtml += '<i style="background:' + primary   + '"></i>';
           else           newHtml += '<i class="bb-empty-dot"></i>';
