@@ -15,7 +15,7 @@ export const POST: APIRoute = async ({ request }) => {
   const apiKey = import.meta.env.RESEND_API_KEY;
   if (!apiKey) return json({ error: 'Email service not configured' }, 500);
 
-  const adminEmail = import.meta.env.ADMIN_EMAIL || 'hello@grappes.ai';
+  const adminEmail = import.meta.env.ADMIN_EMAIL || 'hello@grappes.dev';
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request }) => {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Grappes <noreply@grappes.ai>',
+        from: 'Grappes <noreply@grappes.dev>',
         to: adminEmail,
         subject: `[Grappes] New contact: ${name}`,
         html,

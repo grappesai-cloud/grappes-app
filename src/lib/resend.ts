@@ -69,7 +69,7 @@ export async function sendFormEmail(params: {
         'Authorization': `Bearer ${getApiKey()}`,
       },
       body: JSON.stringify({
-        from: `${safeSiteName} <noreply@grappes.ai>`,
+        from: `${safeSiteName} <noreply@grappes.dev>`,
         to,
         subject,
         html,
@@ -122,7 +122,7 @@ async function sendPlatformEmail(params: {
         'Authorization': `Bearer ${getApiKey()}`,
       },
       body: JSON.stringify({
-        from: 'Grappes <noreply@grappes.ai>',
+        from: 'Grappes <noreply@grappes.dev>',
         to: params.to,
         subject: params.subject,
         html: params.html,
