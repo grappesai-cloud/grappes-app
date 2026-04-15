@@ -821,7 +821,13 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
         ${text ? `<div class="ub-text">${escapeHtml(text)}</div>` : ''}
         <div class="ub-status">Uploading...</div>`;
       wrapper.appendChild(bubble);
-      messagesEl.appendChild(wrapper);
+      // Insert before typing indicator so subsequent messages stay BELOW this bubble
+      var typingIndicator = document.getElementById('typing-indicator');
+      if (typingIndicator && typingIndicator.parentElement === messagesEl) {
+        messagesEl.insertBefore(wrapper, typingIndicator);
+      } else {
+        messagesEl.appendChild(wrapper);
+      }
       wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
       // Upload all in parallel
