@@ -1,0 +1,157 @@
+---
+import { createAdminClient } from '../../../lib/supabase';
+import { timingSafeEqual, createHmac } from 'node:crypto';
+
+const ADMIN_SECRET = import.meta.env.ADMIN_SECRET ?? '';
+function verifyAdminSession(token: string): boolean {
+  if (!ADMIN_SECRET || !token) return false;
+  const dot = token.indexOf('.');
+  if (dot === -1) return false;
+  const nonce = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  if (!nonce || !sig) return false;
+  const expected = createHmac('sha256', ADMIN_SECRET).update(nonce).digest('hex');
+  if (sig.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
+const isAuthed = verifyAdminSession(Astro.cookies.get('admin_session')?.value ?? '');
+if (!isAuthed) return Astro.redirect('/admin');
+
+const client = createAdminClient();
+const { data: threadsRaw } = await client
+  .from('support_threads')
+  .select('id, user_id, project_id, status, last_message_at, unread_for_admin, created_at, users(email, name, plan)')
+  .order('unread_for_admin', { ascending: false })
+  .order('last_message_at', { ascending: false })
+  .limit(200);
+
+const threads = (threadsRaw ?? []) as any[];
+const openCount = threads.filter(t => t.status === 'open').length;
+const unreadCount = threads.filter(t => t.unread_for_admin).length;
+
+// Fetch last message per thread for preview
+const threadIds = threads.map(t => t.id);
+let previewByThread: Record<string, { content: string; sender: string; created_at: string }> = {};
+if (threadIds.length > 0) {
+  const { data: msgs } = await client
+    .from('support_messages')
+    .select('thread_id, sender, content, created_at')
+    .in('thread_id', threadIds)
+    .order('created_at', { ascending: false });
+  (msgs ?? []).forEach(m => {
+    if (!previewByThread[m.thread_id]) {
+      previewByThread[m.thread_id] = { content: m.content, sender: m.sender, created_at: m.created_at };
+    }
+  });
+}
+
+function fmt(d: string): string {
+  const dt = new Date(d);
+  const diff = (Date.now() - dt.getTime()) / 1000;
+  if (diff < 60) return 'now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grappes Admin — Support</title>
+  <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #fff; font-family: 'DM Sans', -apple-system, Arial, sans-serif; min-height: 100vh; padding: 32px 24px 60px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .back { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+    .back:hover { color: #fff; }
+    h1 { font-size: 36px; font-weight: 300; letter-spacing: -0.02em; }
+    .subtitle { color: rgba(255,255,255,0.45); font-size: 14px; margin-top: 6px; }
+    .stats { display: flex; gap: 12px; margin: 20px 0 30px; }
+    .stat { padding: 10px 16px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; font-size: 13px; color: rgba(255,255,255,0.8); }
+    .stat strong { color: #06bfdd; font-size: 16px; margin-right: 4px; }
+    ul.threads { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .thread {
+      display: grid; grid-template-columns: auto 1fr auto;
+      gap: 14px; align-items: center;
+      padding: 14px 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      text-decoration: none; color: inherit;
+      transition: all 0.15s;
+    }
+    .thread:hover { border-color: rgba(6,191,221,0.35); background: rgba(255,255,255,0.06); }
+    .thread.unread { border-color: rgba(6,191,221,0.4); background: rgba(6,191,221,0.05); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.15); }
+    .thread.unread .dot { background: #06bfdd; box-shadow: 0 0 10px #06bfdd; }
+    .from { font-size: 14px; color: #fff; font-weight: 500; }
+    .email { font-size: 12px; color: rgba(255,255,255,0.4); margin-left: 6px; }
+    .plan-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; border: 1px solid; margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .plan-free   { color: rgba(255,255,255,0.5); border-color: rgba(255,255,255,0.2); }
+    .plan-pro    { color: #6c6bf3; border-color: rgba(108,107,243,0.4); background: rgba(108,107,243,0.08); }
+    .plan-agency { color: #fb923c; border-color: rgba(251,146,60,0.4); background: rgba(251,146,60,0.08); }
+    .preview { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 560px; }
+    .preview .sender-tag { color: rgba(255,255,255,0.35); margin-right: 4px; }
+    .when { font-size: 12px; color: rgba(255,255,255,0.35); }
+    .status-pill { font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .status-open   { color: #06bfdd; border: 1px solid rgba(6,191,221,0.35); }
+    .status-closed { color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.12); }
+    .empty { text-align: center; color: rgba(255,255,255,0.4); padding: 80px 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a href="/admin" class="back">← Admin</a>
+    <h1>Support inbox</h1>
+    <p class="subtitle">Conversations between users and the Grappes team.</p>
+
+    <div class="stats">
+      <div class="stat"><strong>{unreadCount}</strong>unread</div>
+      <div class="stat"><strong>{openCount}</strong>open</div>
+      <div class="stat"><strong>{threads.length}</strong>total</div>
+    </div>
+
+    {threads.length === 0 ? (
+      <p class="empty">No support threads yet.</p>
+    ) : (
+      <ul class="threads">
+        {threads.map(t => {
+          const u = (t.users || {}) as any;
+          const plan = u.plan || 'free';
+          const planCls = plan === 'agency' ? 'plan-agency' : plan === 'pro' ? 'plan-pro' : 'plan-free';
+          const preview = previewByThread[t.id];
+          return (
+            <li>
+              <a href={`/admin/support/${t.id}`} class={`thread ${t.unread_for_admin ? 'unread' : ''}`}>
+                <span class="dot" aria-hidden="true"></span>
+                <div>
+                  <div>
+                    <span class="from">{u.name || u.email || t.user_id}</span>
+                    {u.email && u.name && <span class="email">&lt;{u.email}&gt;</span>}
+                    <span class={`plan-badge ${planCls}`}>{plan}</span>
+                    <span class={`status-pill status-${t.status}`}>{t.status}</span>
+                  </div>
+                  {preview && (
+                    <p class="preview">
+                      <span class="sender-tag">{preview.sender === 'admin' ? 'You:' : 'User:'}</span>
+                      {preview.content}
+                    </p>
+                  )}
+                </div>
+                <span class="when">{fmt(t.last_message_at)}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    )}
+  </div>
+</body>
+</html>

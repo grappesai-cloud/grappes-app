@@ -1,0 +1,266 @@
+---
+import { createAdminClient } from '../../../lib/supabase';
+import { timingSafeEqual, createHmac } from 'node:crypto';
+
+const ADMIN_SECRET = import.meta.env.ADMIN_SECRET ?? '';
+function verifyAdminSession(token: string): boolean {
+  if (!ADMIN_SECRET || !token) return false;
+  const dot = token.indexOf('.');
+  if (dot === -1) return false;
+  const nonce = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  if (!nonce || !sig) return false;
+  const expected = createHmac('sha256', ADMIN_SECRET).update(nonce).digest('hex');
+  if (sig.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
+const isAuthed = verifyAdminSession(Astro.cookies.get('admin_session')?.value ?? '');
+if (!isAuthed) return Astro.redirect('/admin');
+
+const threadId = Astro.params.threadId;
+if (!threadId) return Astro.redirect('/admin/support');
+
+const client = createAdminClient();
+const { data: thread } = await client
+  .from('support_threads')
+  .select('id, user_id, project_id, status, last_message_at, created_at, users(email, name, plan, referral_balance)')
+  .eq('id', threadId)
+  .maybeSingle();
+if (!thread) return Astro.redirect('/admin/support');
+
+const { data: messages } = await client
+  .from('support_messages')
+  .select('id, sender, content, created_at')
+  .eq('thread_id', threadId)
+  .order('created_at', { ascending: true });
+
+// Mark thread read for admin
+await client.from('support_threads').update({ unread_for_admin: false }).eq('id', threadId);
+
+// Pull latest project for context
+let project: any = null;
+if (thread.project_id) {
+  const { data: p } = await client.from('projects').select('id, name, status, billing_status, expires_at').eq('id', thread.project_id).maybeSingle();
+  project = p;
+}
+
+const user = thread.users as any;
+
+function fmt(d: string): string {
+  const dt = new Date(d);
+  return dt.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thread — {user?.name || user?.email || thread.id}</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #fff; font-family: 'DM Sans', -apple-system, Arial, sans-serif; min-height: 100vh; padding: 24px 24px 40px; }
+    .wrap { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+    @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+    .back { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; display: inline-block; margin-bottom: 14px; }
+    .back:hover { color: #fff; }
+    h1 { font-size: 26px; font-weight: 300; letter-spacing: -0.01em; margin-bottom: 4px; }
+    .u-meta { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 18px; }
+
+    .conversation {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 20px; margin-bottom: 16px;
+      max-height: 520px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .bubble {
+      max-width: 80%; padding: 10px 14px; border-radius: 14px;
+      font-size: 13.5px; line-height: 1.55; white-space: pre-wrap;
+    }
+    .bubble.user  { align-self: flex-start; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-bottom-left-radius: 4px; }
+    .bubble.admin { align-self: flex-end; background: linear-gradient(135deg, #06bfdd, #6c6bf3); color: #0a0a0a; font-weight: 500; border-bottom-right-radius: 4px; }
+    .meta-ts { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 4px; }
+
+    .reply-box {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .reply-box textarea {
+      width: 100%; min-height: 110px; max-height: 280px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color: #fff; font-family: inherit; font-size: 14px; line-height: 1.55;
+      padding: 12px 14px; resize: vertical; outline: none;
+    }
+    .reply-box textarea:focus { border-color: #06bfdd; box-shadow: 0 0 0 3px rgba(6,191,221,0.2); }
+    .reply-actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+    .btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 10px 22px; border-radius: 999px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s; }
+    .btn-primary { background: #06bfdd; color: #0a0a0a; }
+    .btn-primary:hover:not(:disabled) { background: #37cce2; }
+    .btn-ghost { background: transparent; color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.15); }
+    .btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.05); color: #fff; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #closeChk { margin-right: auto; font-size: 12px; color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
+
+    aside {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    aside h3 { font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; font-weight: 600; }
+    .ctx-row { font-size: 13px; color: rgba(255,255,255,0.85); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .ctx-row:last-child { border-bottom: none; }
+    .ctx-row .k { color: rgba(255,255,255,0.4); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+
+    .suggest-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .suggest-hdr h3 { margin: 0; }
+    #btn-suggest { font-size: 11px; padding: 4px 10px; background: rgba(6,191,221,0.1); border: 1px solid rgba(6,191,221,0.3); color: #06bfdd; border-radius: 999px; cursor: pointer; }
+    #btn-suggest:hover:not(:disabled) { background: rgba(6,191,221,0.2); }
+    #btn-suggest:disabled { opacity: 0.5; cursor: wait; }
+    .suggestions { display: flex; flex-direction: column; gap: 8px; }
+    .sugg {
+      text-align: left; font-family: inherit; font-size: 13px; line-height: 1.5;
+      padding: 10px 12px;
+      background: rgba(6,191,221,0.06);
+      border: 1px solid rgba(6,191,221,0.25);
+      border-radius: 10px;
+      color: rgba(255,255,255,0.92); cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sugg:hover { background: rgba(6,191,221,0.14); border-color: rgba(6,191,221,0.5); }
+    .sugg-empty { font-size: 12px; color: rgba(255,255,255,0.3); padding: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section>
+      <a href="/admin/support" class="back">← All threads</a>
+      <h1>{user?.name || user?.email || 'Unknown user'}</h1>
+      <p class="u-meta">{user?.email} · {user?.plan ?? 'free'} · Thread opened {fmt(thread.created_at)}</p>
+
+      <div class="conversation" id="conv">
+        {(messages ?? []).map(m => (
+          <div>
+            <div class={`bubble ${m.sender}`}>{m.content}</div>
+            <p class="meta-ts" style={m.sender === 'admin' ? 'text-align:right;' : ''}>{fmt(m.created_at)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="reply-box">
+        <textarea id="reply" placeholder="Write a reply… (Haiku suggestions on the right)" data-thread-id={thread.id}></textarea>
+        <div class="reply-actions">
+          <label id="closeChk"><input type="checkbox" id="close-after" /> Close thread after sending</label>
+          <button type="button" class="btn btn-ghost" id="btn-clear">Clear</button>
+          <button type="button" class="btn btn-primary" id="btn-send">Send reply</button>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <h3>User context</h3>
+      <div class="ctx-row"><span class="k">Plan</span>{user?.plan ?? 'free'}</div>
+      <div class="ctx-row"><span class="k">Referral balance</span>€{Number(user?.referral_balance ?? 0).toFixed(2)}</div>
+      {project && (
+        <>
+          <div class="ctx-row"><span class="k">Project</span>{project.name}</div>
+          <div class="ctx-row"><span class="k">Project status</span>{project.status} · {project.billing_status ?? 'free'}</div>
+        </>
+      )}
+
+      <div style="height: 20px;"></div>
+
+      <div class="suggest-hdr">
+        <h3>Haiku suggestions</h3>
+        <button type="button" id="btn-suggest">Generate</button>
+      </div>
+      <div class="suggestions" id="suggestions">
+        <p class="sugg-empty">Click Generate for 3 reply options.</p>
+      </div>
+    </aside>
+  </div>
+
+  <script is:inline define:vars={{ threadId }}>
+    var reply = document.getElementById('reply');
+    var btnSend = document.getElementById('btn-send');
+    var btnClear = document.getElementById('btn-clear');
+    var btnSuggest = document.getElementById('btn-suggest');
+    var suggestionsEl = document.getElementById('suggestions');
+    var closeChk = document.getElementById('close-after');
+
+    btnClear.addEventListener('click', function () { reply.value = ''; reply.focus(); });
+
+    btnSend.addEventListener('click', async function () {
+      var content = reply.value.trim();
+      if (!content) { reply.focus(); return; }
+      btnSend.disabled = true;
+      btnSend.textContent = 'Sending…';
+      try {
+        var res = await fetch('/api/admin/support/' + threadId + '/reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: content, closeAfter: closeChk.checked })
+        });
+        if (res.ok) { window.location.reload(); return; }
+        var err = await res.json().catch(function () { return {}; });
+        alert(err.error || 'Reply failed.');
+        btnSend.disabled = false; btnSend.textContent = 'Send reply';
+      } catch {
+        alert('Network error.');
+        btnSend.disabled = false; btnSend.textContent = 'Send reply';
+      }
+    });
+
+    btnSuggest.addEventListener('click', async function () {
+      btnSuggest.disabled = true;
+      btnSuggest.textContent = 'Thinking…';
+      suggestionsEl.innerHTML = '<p class="sugg-empty">Generating…</p>';
+      try {
+        var res = await fetch('/api/admin/support/' + threadId + '/suggest', { method: 'POST' });
+        if (!res.ok) {
+          var e = await res.json().catch(function () { return {}; });
+          suggestionsEl.innerHTML = '<p class="sugg-empty">' + (e.error || 'Failed') + '</p>';
+          return;
+        }
+        var data = await res.json();
+        var suggs = data.suggestions || [];
+        if (suggs.length === 0) {
+          suggestionsEl.innerHTML = '<p class="sugg-empty">No suggestions — try writing your own.</p>';
+          return;
+        }
+        suggestionsEl.innerHTML = '';
+        suggs.forEach(function (s) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'sugg';
+          b.textContent = s;
+          b.addEventListener('click', function () {
+            reply.value = s;
+            reply.focus();
+            reply.setSelectionRange(reply.value.length, reply.value.length);
+          });
+          suggestionsEl.appendChild(b);
+        });
+      } catch {
+        suggestionsEl.innerHTML = '<p class="sugg-empty">Network error.</p>';
+      } finally {
+        btnSuggest.disabled = false;
+        btnSuggest.textContent = 'Regenerate';
+      }
+    });
+
+    // Scroll conversation to bottom on load
+    var conv = document.getElementById('conv');
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  </script>
+</body>
+</html>
