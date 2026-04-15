@@ -143,6 +143,65 @@ export async function pollDeploymentUntilDone(
   return (await getDeploymentById(deploymentId)) ?? { id: deploymentId, state: 'ERROR', url: '', createdAt: Date.now() };
 }
 
+/**
+ * Replace the production deployment with a tiny static page that 302s to the
+ * Grappes expiration landing. Called by the cron when a free site expires.
+ * Keeps the Vercel project intact (user can un-expire by paying — we just
+ * redeploy the real HTML from our stored files).
+ */
+export async function deployExpiredPlaceholder(
+  vercelProjectId: string,
+  projectName: string,
+  redirectUrl: string,
+  brandName: string
+): Promise<{ ok: boolean; error?: string }> {
+  const safeName = escapeHtmlMinimal(brandName || 'your site');
+  const safeUrl  = redirectUrl.replace(/"/g, '&quot;');
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="refresh" content="0;url=${safeUrl}">
+<meta name="robots" content="noindex">
+<title>${safeName} — expired</title>
+</head>
+<body style="margin:0;background:#0a0a0a;color:#fff;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+<noscript>This site has expired. <a href="${safeUrl}" style="color:#06bfdd">Renew here</a>.</noscript>
+<script>window.location.replace(${JSON.stringify(redirectUrl)});</script>
+</body>
+</html>`;
+
+  const body = {
+    name: projectName,
+    project: vercelProjectId,
+    target: 'production',
+    files: [
+      {
+        file: 'index.html',
+        data: Buffer.from(html, 'utf-8').toString('base64'),
+        encoding: 'base64',
+      },
+    ],
+    projectSettings: { framework: null },
+  };
+
+  const res = await vercel(`/v13/deployments${qs()}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error('[Vercel deployExpiredPlaceholder]', err);
+    return { ok: false, error: err?.error?.message || `HTTP ${res.status}` };
+  }
+  return { ok: true };
+}
+
+function escapeHtmlMinimal(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Get the production domain (alias) for a Vercel project — e.g. "adsnow.vercel.app"
 export async function getProjectProductionUrl(vercelProjectId: string): Promise<string | null> {
   const res = await vercel(`/v9/projects/${encodeURIComponent(vercelProjectId)}${qs()}`);

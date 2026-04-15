@@ -25,16 +25,17 @@ export const GET: APIRoute = async ({ request }) => {
 
   const client = createAdminClient();
   const now = new Date().toISOString();
+  const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 
   // Single atomic UPDATE — no select-then-update, no pagination issues.
-  // Returns the updated rows so we can log IDs.
+  // Returns the updated rows so we can deploy the expired placeholder.
   const { data: expired, error } = await client
     .from('projects')
     .update({ billing_status: 'expired', updated_at: now })
     .in('billing_status', ['free', 'active'])
     .lt('expires_at', now)
     .not('expires_at', 'is', null)
-    .select('id');
+    .select('id, name, vercel_project_id');
 
   if (error) {
     console.error('[cron/expire-sites] Update error:', error);
@@ -46,6 +47,27 @@ export const GET: APIRoute = async ({ request }) => {
     console.log('[cron/expire-sites] No sites to expire');
   } else {
     console.log(`[cron/expire-sites] Expired ${count} site(s):`, expired!.map(p => p.id));
+
+    // Swap each expired site's production deployment for a redirect to
+    // grappes.dev/expired?site=<id>. Keeps the Vercel project intact so the
+    // real HTML can be redeployed when the user pays.
+    const { deployExpiredPlaceholder } = await import('../../../lib/vercel-api');
+    const results = await Promise.allSettled(
+      expired!.map(async (p: any) => {
+        if (!p.vercel_project_id) return { id: p.id, ok: false, error: 'no_vercel_project_id' };
+        const redirectUrl = `${siteUrl}/expired?site=${encodeURIComponent(p.id)}`;
+        const projectNameSafe = (p.name || 'grappes-site').toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52) || 'grappes-site';
+        const res = await deployExpiredPlaceholder(p.vercel_project_id, projectNameSafe, redirectUrl, p.name || 'site');
+        return { id: p.id, ...res };
+      })
+    );
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled' && !r.value.ok) {
+        console.warn('[cron/expire-sites] Placeholder deploy failed for', expired![i].id, ':', r.value.error);
+      } else if (r.status === 'rejected') {
+        console.warn('[cron/expire-sites] Placeholder deploy threw for', expired![i].id, ':', r.reason);
+      }
+    });
   }
 
   // Cleanup stale rate_limits entries (older than 24 hours)

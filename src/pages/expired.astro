@@ -1,0 +1,154 @@
+---
+// Landing page shown to visitors of an expired Grappes site.
+// Deployed by the cron (`/api/cron/expire-sites`) when a free 7-day site
+// hits its expiration date — the Vercel deployment is swapped for a
+// redirect that lands here.
+
+import { db } from '../lib/db';
+
+const url = new URL(Astro.request.url);
+const projectId = url.searchParams.get('site') || '';
+
+let projectName: string | null = null;
+let ownerIsViewer = false;
+if (projectId) {
+  try {
+    const project = await db.projects.findById(projectId);
+    if (project) {
+      projectName = project.name;
+      if (Astro.locals.user && project.user_id === Astro.locals.user.id) {
+        ownerIsViewer = true;
+      }
+    }
+  } catch (e) {
+    console.warn('[expired] project lookup failed:', e);
+  }
+}
+
+const renewHref = projectId && ownerIsViewer
+  ? `/dashboard/${projectId}/deploy?renew=1`
+  : '/dashboard';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{projectName ? `${projectName} — expired` : 'Site expired'}</title>
+    <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; overflow: hidden; }
+      body {
+        background: #0a0a0a;
+        color: #fff;
+        font-family: 'DM Sans', -apple-system, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        display: flex; flex-direction: column;
+      }
+      .blobs {
+        position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+      }
+      .blob {
+        position: absolute; width: 480px; height: 480px; border-radius: 50%;
+        filter: blur(110px); opacity: 0.3;
+      }
+      .blob-a { background: #06bfdd; top: -140px; left: -80px; animation: drift1 22s ease-in-out infinite; }
+      .blob-b { background: #6c6bf3; bottom: -160px; right: -80px; animation: drift2 26s ease-in-out infinite; }
+      @keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(100px, 140px) scale(1.15); } }
+      @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-120px,-100px) scale(1.1); } }
+
+      .wrap {
+        position: relative; z-index: 1;
+        flex: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 40px 24px; text-align: center;
+      }
+      .logo {
+        width: 48px; height: 48px; margin-bottom: 32px;
+      }
+      .label {
+        font-size: 12px; font-weight: 600;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: #06bfdd; margin-bottom: 16px;
+      }
+      h1 {
+        font-size: clamp(32px, 5vw, 48px);
+        font-weight: 300; letter-spacing: -0.02em;
+        margin-bottom: 16px; max-width: 640px;
+      }
+      .site-name { color: #06bfdd; font-weight: 400; }
+      p.lead {
+        font-size: 16px; color: rgba(255,255,255,0.65);
+        max-width: 520px; line-height: 1.6; margin-bottom: 32px;
+      }
+      .cta {
+        display: inline-flex; align-items: center; gap: 10px;
+        background: #06bfdd; color: #0a0a0a;
+        font-family: inherit; font-size: 15px; font-weight: 600;
+        padding: 14px 32px; border-radius: 999px;
+        text-decoration: none;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .cta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 30px rgba(6,191,221,0.3);
+      }
+      .secondary {
+        font-size: 13px; color: rgba(255,255,255,0.4);
+        margin-top: 20px;
+      }
+      .secondary a { color: #06bfdd; text-decoration: none; }
+      .secondary a:hover { text-decoration: underline; }
+      footer {
+        text-align: center; padding: 20px;
+        font-size: 12px; color: rgba(255,255,255,0.3);
+        position: relative; z-index: 1;
+      }
+      footer a { color: rgba(255,255,255,0.5); text-decoration: none; }
+      footer a:hover { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <div class="blobs" aria-hidden="true">
+      <span class="blob blob-a"></span>
+      <span class="blob blob-b"></span>
+    </div>
+
+    <main class="wrap">
+      <img class="logo" src="/assets/grappes/logo.png" alt="Grappes" />
+      <p class="label">Site expired</p>
+      <h1>
+        {projectName
+          ? <>The free trial for <span class="site-name">{projectName}</span> has ended.</>
+          : <>This site's free trial has ended.</>
+        }
+      </h1>
+      <p class="lead">
+        {ownerIsViewer
+          ? "This is your site. Renew it to bring it back online in seconds — your content, images, and domain are preserved."
+          : "The owner hasn't renewed it yet. If this is your site, sign in to bring it back."
+        }
+      </p>
+      <a class="cta" href={renewHref}>
+        <span>{ownerIsViewer ? 'Renew site' : 'Sign in to renew'}</span>
+        <svg width="18" height="18" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/>
+          <rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/>
+          <rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/>
+          <rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/>
+        </svg>
+      </a>
+      <p class="secondary">
+        Not yours? <a href="https://grappes.dev">Create your own site with Grappes →</a>
+      </p>
+    </main>
+
+    <footer>
+      <a href="https://grappes.dev">grappes.dev</a> · AI website builder
+    </footer>
+  </body>
+</html>
