@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '../../../lib/db';
 import type { DeploymentStatus } from '../../../lib/db';
-import { sendSiteLiveEmail, sendDeploymentFailedEmail } from '../../../lib/resend';
+import { sendSiteLiveEmail, sendDeploymentFailedEmail, sendTrialStartedEmail } from '../../../lib/resend';
 import { log } from '../../../lib/logger';
 import { json } from '../../../lib/api-utils';
 
@@ -102,6 +102,16 @@ export const POST: APIRoute = async ({ request }) => {
               siteName: fullProject.name ?? 'Site-ul tău',
               siteUrl: deploymentUrl,
             });
+            // Send trial-started email for free deployments
+            if (project.billing_status === 'free') {
+              const { getFreeExpiresAt } = await import('../../../lib/site-billing');
+              await sendTrialStartedEmail({
+                to: userRow.email,
+                siteName: fullProject.name ?? 'Site-ul tău',
+                siteUrl: deploymentUrl,
+                expiresAt: getFreeExpiresAt(),
+              });
+            }
           }
         }
       } catch (emailErr) {

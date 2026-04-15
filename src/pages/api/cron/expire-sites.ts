@@ -6,6 +6,7 @@
 import type { APIRoute } from 'astro';
 import { timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '../../../lib/supabase';
+import { sendTrialExpiredEmail } from '../../../lib/resend';
 
 function safeCompare(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -35,7 +36,7 @@ export const GET: APIRoute = async ({ request }) => {
     .in('billing_status', ['free', 'active'])
     .lt('expires_at', now)
     .not('expires_at', 'is', null)
-    .select('id, name, vercel_project_id');
+    .select('id, name, vercel_project_id, user_id');
 
   if (error) {
     console.error('[cron/expire-sites] Update error:', error);
@@ -68,6 +69,26 @@ export const GET: APIRoute = async ({ request }) => {
         console.warn('[cron/expire-sites] Placeholder deploy threw for', expired![i].id, ':', r.reason);
       }
     });
+
+    // Send "trial expired" notification emails
+    for (const p of expired!) {
+      try {
+        if (!p.user_id) continue;
+        const { data: userRow } = await client
+          .from('users')
+          .select('email')
+          .eq('id', p.user_id)
+          .maybeSingle();
+        if (userRow?.email) {
+          await sendTrialExpiredEmail({
+            to: userRow.email,
+            siteName: p.name ?? 'Site-ul tău',
+          });
+        }
+      } catch (e) {
+        console.error(`[cron/expire-sites] Expired email failed for project ${p.id}:`, e);
+      }
+    }
   }
 
   // Cleanup stale rate_limits entries (older than 24 hours)

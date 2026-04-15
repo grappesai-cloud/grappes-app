@@ -567,3 +567,140 @@ export async function sendPasswordChangedEmail(params: {
     text,
   });
 }
+
+// ─── Trial lifecycle emails ──────────────────────────────────────────────────
+
+/**
+ * Email sent when a free site goes live — informs user of the 7-day trial.
+ */
+export async function sendTrialStartedEmail(params: {
+  to: string;
+  siteName: string;
+  siteUrl: string;
+  expiresAt: string; // ISO timestamp
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const expiryDate = new Date(params.expiresAt).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const html = wrapEmail(`${escapeHtml(params.siteName)} is live — 7-day trial`, `
+    <p style="margin:0 0 24px;">Your site is now live and looking great! You have <span style="color:#0a0a0a;font-weight:700;">7 days</span> to try it out for free.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 24px;background:#f9fafb;border-radius:8px;">
+      <tr>
+        <td style="padding:16px 20px;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Site</td>
+        <td style="padding:16px 20px;color:#0a0a0a;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;"><a href="${escapeHtml(params.siteUrl)}" style="color:#0a0a0a;text-decoration:underline;">${escapeHtml(params.siteName)}</a></td>
+      </tr>
+      <tr>
+        <td style="padding:16px 20px;color:#9ca3af;">Trial expires</td>
+        <td style="padding:16px 20px;color:#0a0a0a;font-weight:600;text-align:right;">${expiryDate}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 24px;">After the trial, your site will be taken offline and you'll need an active plan to keep it live or create new sites.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Plans start at €15/month</p>
+    <p style="margin:0 0 4px;font-size:14px;">Activate now to keep your site live permanently.</p>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Activate your site →')}
+  `);
+
+  const text = `Your site is live — 7-day trial\n\n${params.siteName} is now live! You have 7 days to try it out for free.\n\nSite: ${params.siteUrl}\nTrial expires: ${expiryDate}\n\nAfter the trial, your site will be taken offline and you'll need an active plan to keep it live or create new sites.\n\nPlans start at €15/month. Activate now: ${SITE_URL}/dashboard`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `${params.siteName} is live — your 7-day free trial has started`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
+ * Reminder email sent ~3-4 days into the trial.
+ */
+export async function sendTrialReminderEmail(params: {
+  to: string;
+  siteName: string;
+  siteUrl: string;
+  daysLeft: number;
+  expiresAt: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const expiryDate = new Date(params.expiresAt).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const html = wrapEmail(`${params.daysLeft} days left on your trial`, `
+    <p style="margin:0 0 24px;">Your free trial for <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> expires on <span style="color:#0a0a0a;font-weight:600;">${expiryDate}</span>.</p>
+    <p style="margin:0 0 24px;">After that, your site will be taken offline and the content will be deleted. You'll need to activate a plan to create or publish sites again.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Don't lose your site</p>
+    <p style="margin:0 0 4px;font-size:14px;">Activate a plan now to keep ${escapeHtml(params.siteName)} live.</p>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Keep my site live →')}
+  `);
+
+  const text = `${params.daysLeft} days left on your trial\n\nYour free trial for ${params.siteName} expires on ${expiryDate}.\n\nAfter that, your site will be taken offline and the content will be deleted. You'll need to activate a plan to create or publish sites again.\n\nActivate now: ${SITE_URL}/dashboard`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `${params.daysLeft} days left — ${params.siteName} trial is ending soon`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
+ * Final warning email sent 1 day before trial expiry.
+ */
+export async function sendTrialFinalWarningEmail(params: {
+  to: string;
+  siteName: string;
+  siteUrl: string;
+  expiresAt: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const expiryDate = new Date(params.expiresAt).toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+  const html = wrapEmail('Last chance — your site goes offline tomorrow', `
+    <p style="margin:0 0 24px;font-size:16px;color:#0a0a0a;font-weight:500;">Your free trial for <span style="font-weight:700;">${escapeHtml(params.siteName)}</span> expires <span style="color:#dc2626;font-weight:700;">tomorrow</span>.</p>
+    <p style="margin:0 0 24px;">Once expired, your site will be taken offline and all generated content will be deleted. To publish or create sites in the future, you'll need an active plan.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 24px;background:#fef2f2;border-radius:8px;border:1px solid #fecaca;">
+      <tr>
+        <td style="padding:16px 20px;color:#991b1b;">
+          <strong>Action required:</strong> Activate before ${expiryDate} to keep your site live.
+        </td>
+      </tr>
+    </table>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Activate now — keep my site →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €15/month. Cancel anytime.</p>
+  `);
+
+  const text = `Last chance — your site goes offline tomorrow\n\nYour free trial for ${params.siteName} expires tomorrow (${expiryDate}).\n\nOnce expired, your site will be taken offline and all generated content will be deleted. To publish or create sites in the future, you'll need an active plan.\n\nActivate now: ${SITE_URL}/dashboard\n\nPlans start at €15/month. Cancel anytime.`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `⚠ Last day — ${params.siteName} goes offline tomorrow`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
+ * Email sent when a trial site actually expires.
+ */
+export async function sendTrialExpiredEmail(params: {
+  to: string;
+  siteName: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const html = wrapEmail(`${escapeHtml(params.siteName)} has been taken offline`, `
+    <p style="margin:0 0 24px;">Your 7-day free trial has ended and <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> is no longer live.</p>
+    <p style="margin:0 0 24px;">To bring your site back or create new ones, activate a paid plan. Your site content may still be recoverable if you act soon.</p>
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Reactivate my site →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €15/month.</p>
+  `);
+
+  const text = `Your trial has ended\n\n${params.siteName} has been taken offline after the 7-day free trial.\n\nTo bring your site back or create new ones, activate a paid plan.\n\nReactivate: ${SITE_URL}/dashboard`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `${params.siteName} has been taken offline — trial ended`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
