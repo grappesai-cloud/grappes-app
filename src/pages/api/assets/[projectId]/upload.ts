@@ -160,7 +160,16 @@ async function generateResponsiveVariants(
   return variants;
 }
 
-export const POST: APIRoute = async ({ params, locals, request }) => {
+export const POST: APIRoute = async (ctx) => {
+  try {
+    return await handleUpload(ctx);
+  } catch (e: any) {
+    console.error('[upload] UNEXPECTED:', e?.stack || e?.message || e);
+    return json({ error: `Upload failed: ${e?.message || 'unknown'}` }, 500);
+  }
+};
+
+async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]): Promise<Response> {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
@@ -313,7 +322,7 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   await enrichBrief(params.projectId!, type, publicUrl, metadata, variantUrls);
 
   return json({ asset, converted: wasConverted, variants: variantUrls }, 201);
-};
+}
 
 async function enrichBrief(
   projectId: string,
