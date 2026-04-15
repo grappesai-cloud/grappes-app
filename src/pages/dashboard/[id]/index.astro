@@ -923,7 +923,7 @@ if (hasPreview) {
           <div class="phase-generating">
             <div class="gen-spinner"></div>
             <p class="gen-title">Generating your website...</p>
-            <p class="gen-sub">Takes 60-120 seconds. Don't close the page.</p>
+            <p class="gen-sub">Takes 5–15 minutes. Feel free to close the tab — we'll save your progress.</p>
           </div>
         )}
 
@@ -1072,7 +1072,7 @@ if (hasPreview) {
           <div class="gen-theater" id="gen-theater">
             <div class="gen-header">
               <p class="gen-title">Generating your website</p>
-              <p class="gen-sub" id="gen-sub">This usually takes 60–120 seconds. You can safely close this tab.</p>
+              <p class="gen-sub" id="gen-sub">This usually takes 5–15 minutes. You can safely close this tab — we'll keep working in the background.</p>
               <div class="gen-progress"><div class="gen-progress-fill" id="gen-progress-fill"></div></div>
               <p class="gen-pct" id="gen-pct">0%</p>
             </div>
@@ -2991,7 +2991,7 @@ if (hasPreview) {
         { label: 'Final polish & QA',                  weight:  8 },
       ];
       var totalWeight = stages.reduce(function(s,x){ return s+x.weight; }, 0);
-      var TOTAL_MS = 110_000;
+      var TOTAL_MS = 600_000; // 10 minutes — midpoint of real 5-15 min range
       var eventsPool = [
         'Drafted hero headline',
         'Picked accent palette: #06bfdd on #0a0a0a',
@@ -3044,8 +3044,8 @@ if (hasPreview) {
         if (fill) fill.style.width = pct.toFixed(1) + '%';
         if (pctEl) pctEl.textContent = Math.round(pct) + '%';
         setStage(currentStage(elapsed));
-        if (elapsed > TOTAL_MS * 1.2 && subEl) {
-          subEl.textContent = 'Wrapping up… final adjustments are taking a bit longer than usual.';
+        if (elapsed > TOTAL_MS * 1.5 && subEl) {
+          subEl.textContent = 'Still working — complex briefs sometimes take up to 20 minutes. You can safely close this tab.';
         }
       }
 
