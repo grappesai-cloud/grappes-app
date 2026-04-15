@@ -171,7 +171,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   // ── Auto-resize textarea ────────────────────────────────────────────────
   function autoResize() {
     input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+    input.style.height = Math.min(input.scrollHeight, 96) + 'px';
   }
   input.addEventListener('input', autoResize);
 
@@ -941,6 +941,10 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   .chat-wrapper {
     max-width: 720px; margin: 0 auto; width: 100%;
     position: relative;
+    display: flex; flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
   }
   .chat-container {
     display: flex; flex-direction: column;
@@ -953,7 +957,6 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     border-radius: 16px; overflow: hidden;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
-  .chat-wrapper { height: 100%; }
 
   /* Progress */
   .progress-section { padding: 1rem 1.25rem 0.875rem; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
