@@ -198,6 +198,42 @@ export async function deployExpiredPlaceholder(
   return { ok: true };
 }
 
+/**
+ * Redeploy a project's real HTML (from generated_files) as the production
+ * deployment. Used after payment when a site was previously expired and
+ * overwritten with the redirect placeholder.
+ */
+export async function deployHtml(
+  vercelProjectId: string,
+  projectName: string,
+  files: Record<string, string>
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const filePayload = Object.entries(files).map(([path, content]) => ({
+    file: path,
+    data: Buffer.from(content, 'utf-8').toString('base64'),
+    encoding: 'base64',
+  }));
+
+  const res = await vercel(`/v13/deployments${qs()}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      name: projectName,
+      project: vercelProjectId,
+      target: 'production',
+      files: filePayload,
+      projectSettings: { framework: null },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error('[Vercel deployHtml]', err);
+    return { ok: false, error: err?.error?.message || `HTTP ${res.status}` };
+  }
+  const body = await res.json();
+  return { ok: true, url: body?.url ? `https://${body.url}` : undefined };
+}
+
 function escapeHtmlMinimal(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

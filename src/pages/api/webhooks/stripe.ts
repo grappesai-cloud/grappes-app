@@ -98,6 +98,10 @@ export const POST: APIRoute = async ({ request }) => {
           const subId       = typeof session.subscription === 'string' ? session.subscription : null;
           const piId        = typeof session.payment_intent === 'string' ? session.payment_intent : null;
 
+          // Check status BEFORE update so we know if this is a renew (was expired)
+          const projectBeforeActivation = await db.projects.findById(projectId);
+          const wasExpired = projectBeforeActivation?.billing_status === 'expired';
+
           await db.projects.updateBilling(projectId, {
             billing_type:            billingType,
             billing_status:          'active',
@@ -115,6 +119,34 @@ export const POST: APIRoute = async ({ request }) => {
               .eq('id', session.metadata.user_id);
           }
           console.log(`[Stripe webhook] Site ${projectId} activated — ${billingType}`);
+
+          // If this was a renew of a previously expired site, the Vercel
+          // deployment is still showing the /expired redirect placeholder.
+          // Restore the real HTML from generated_files so the site is live again.
+          if (wasExpired && projectBeforeActivation?.vercel_project_id) {
+            try {
+              const latest = await db.generatedFiles.findLatest(projectId);
+              if (latest?.files && Object.keys(latest.files).length > 0) {
+                const { deployHtml } = await import('../../../lib/vercel-api');
+                const projectNameSafe = (projectBeforeActivation.name || 'grappes-site')
+                  .toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52) || 'grappes-site';
+                const result = await deployHtml(
+                  projectBeforeActivation.vercel_project_id,
+                  projectNameSafe,
+                  latest.files as Record<string, string>,
+                );
+                if (result.ok) {
+                  console.log(`[Stripe webhook] Restored real HTML for renewed site ${projectId}`);
+                } else {
+                  console.warn(`[Stripe webhook] HTML restore failed for ${projectId}:`, result.error);
+                }
+              } else {
+                console.warn(`[Stripe webhook] No generated_files found for renewed site ${projectId}`);
+              }
+            } catch (restoreErr) {
+              console.error('[Stripe webhook] HTML restore threw:', restoreErr);
+            }
+          }
 
           // Process referral reward for first site activation
           if (session.metadata?.user_id) {

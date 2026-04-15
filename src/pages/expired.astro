@@ -26,8 +26,10 @@ if (projectId) {
 }
 
 const renewHref = projectId && ownerIsViewer
-  ? `/dashboard/${projectId}/deploy?renew=1`
-  : '/dashboard';
+  ? `/dashboard/${projectId}?renew=1`
+  : projectId
+    ? `/sign-in?next=${encodeURIComponent(`/dashboard/${projectId}?renew=1`)}`
+    : '/dashboard';
 ---
 
 <!DOCTYPE html>

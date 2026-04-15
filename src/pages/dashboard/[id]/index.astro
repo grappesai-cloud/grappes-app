@@ -1621,6 +1621,14 @@ if (hasPreview) {
     document.getElementById('activate-btn')?.addEventListener('click', () => {
       if (activateModal) { activateModal.style.display = 'flex'; activateModal.classList.add('open'); }
     });
+
+    // Auto-open activation modal when arriving from /expired (?renew=1)
+    if (new URLSearchParams(window.location.search).get('renew') === '1' && activateModal) {
+      activateModal.style.display = 'flex';
+      activateModal.classList.add('open');
+      // clean the URL so a refresh doesn't reopen it
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     activateBackdrop?.addEventListener('click', () => {
       if (activateModal) { activateModal.style.display = 'none'; activateModal.classList.remove('open'); }
     });
