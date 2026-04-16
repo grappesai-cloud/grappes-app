@@ -101,6 +101,9 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
   const editCss = `
     * { box-sizing: border-box; }
 
+    /* Force native scroll in edit mode — Lenis sets overflow:hidden which breaks iframe */
+    html, body { overflow: auto !important; scroll-behavior: auto !important; }
+
     /* Hover highlight */
     #__wn_highlight__ {
       position: fixed; pointer-events: none; z-index: 99998;
@@ -141,6 +144,14 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
 
   const editScript = `
   (function(){
+    // Kill Lenis smooth scroll in edit mode — it breaks iframe scrolling
+    if(window.lenis){try{window.lenis.destroy();}catch(e){}}
+    document.documentElement.style.setProperty('overflow','auto','important');
+    document.body.style.setProperty('overflow','auto','important');
+    // Also catch late Lenis init
+    var _origLenis=window.Lenis;
+    if(_origLenis){window.Lenis=function(){var inst=new _origLenis(...arguments);setTimeout(function(){try{inst.destroy();}catch(e){}document.documentElement.style.setProperty('overflow','auto','important');document.body.style.setProperty('overflow','auto','important');},100);return inst;};}
+
     var TEXT_TAGS = {h1:1,h2:1,h3:1,h4:1,h5:1,h6:1,p:1,a:1,button:1,li:1,label:1,blockquote:1,figcaption:1,td:1,th:1,span:1,small:1,strong:1,em:1,b:1,i:1,u:1,mark:1,cite:1,time:1,address:1,dt:1,dd:1,caption:1,legend:1,summary:1,div:1};
     var editing = false;
     var editingEl = null;
