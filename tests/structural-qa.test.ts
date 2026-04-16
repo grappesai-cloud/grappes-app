@@ -11,9 +11,15 @@ describe('runStructuralQA', () => {
   <meta name="description" content="This is a test site with a description that is long enough to pass the minimum character requirement for meta descriptions." />
   <meta property="og:title" content="Test Site" />
   <meta property="og:description" content="OG description here" />
+  <style>
+    @media (max-width: 768px) { .mobile-menu { display: block; } }
+  </style>
 </head>
 <body>
-  <h1>Welcome to Test Site</h1>
+  <nav><button class="hamburger">Menu</button></nav>
+  <!-- SECTION:hero --><div data-section="hero"><h1>Welcome to Test Site</h1></div><!-- /SECTION:hero -->
+  <!-- SECTION:about --><div data-section="about"><p>About us section with enough content to pass the check.</p></div><!-- /SECTION:about -->
+  <!-- SECTION:services --><div data-section="services"><p>Services section with enough content to pass the check.</p></div><!-- /SECTION:services -->
   <img src="hero.jpg" alt="Hero image" />
 </body>
 </html>`;

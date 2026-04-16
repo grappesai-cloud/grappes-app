@@ -64,6 +64,11 @@ export interface Project {
   created_at: string;
   updated_at: string;
   deployed_at?: string | null;
+  integrations?: ProjectIntegrations;
+}
+
+export interface ProjectIntegrations {
+  [key: string]: any;
 }
 
 export interface Brief {

@@ -92,15 +92,17 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
       }
       html = injectEditModeIntoFullPage(html);
     }
-    // CSP: allow inline styles/scripts (AI-generated HTML), CDN resources, and images
+    // CSP: allow inline styles/scripts (AI-generated HTML), CDN resources, images,
+    // + third-party integrations (analytics providers, booking widgets, audio embeds).
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://www.googletagmanager.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://www.googletagmanager.com https://plausible.io https://cdn.usefathom.com https://app.cal.com https://assets.calendly.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://assets.calendly.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
       "media-src 'self' https: blob:",
-      "connect-src 'self' https://grappes.dev https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com",
+      "connect-src 'self' https://grappes.dev https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com https://plausible.io https://cdn.usefathom.com https://api.cal.com https://calendly.com",
+      "frame-src 'self' https://cal.com https://app.cal.com https://calendly.com https://open.spotify.com https://www.youtube.com https://youtube.com https://w.soundcloud.com https://embed.music.apple.com",
       "frame-ancestors 'self'",
     ].join('; ');
 

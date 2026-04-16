@@ -42,6 +42,12 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim();
     if (body.custom_domain !== undefined) updates.custom_domain = body.custom_domain || null;
 
+    // Integrations config — merge new values into existing object (do NOT nuke other providers)
+    if (body.integrations && typeof body.integrations === 'object') {
+      const current = (project.integrations ?? {}) as Record<string, any>;
+      updates.integrations = { ...current, ...body.integrations };
+    }
+
     if (Object.keys(updates).length === 0) return json({ error: 'No valid fields to update' }, 400);
 
     const updated = await db.projects.update(params.id!, updates as any);

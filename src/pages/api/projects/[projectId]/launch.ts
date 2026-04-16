@@ -8,6 +8,7 @@ import {
   grammarCheckHtml,
   injectEffectRuntimes,
   injectAnalytics,
+  injectBookingWidget,
   injectBacklink,
   injectFormHandler,
   applyBriefContent,
@@ -124,6 +125,13 @@ export const POST: APIRoute = async ({ params, locals }) => {
     return json({ error: 'Multi-page websites require an active plan. Please upgrade.' }, 403);
   }
 
+  // Brief completeness gate — very thin briefs produce mediocre output
+  if (brief && (brief.completeness ?? 0) < 0.3) {
+    return json({
+      error: `Your site brief is only ${Math.round((brief.completeness ?? 0) * 100)}% complete. Please answer more onboarding questions before generating.`,
+    }, 422);
+  }
+
   // Atomic status transition — prevents double generation race condition
   const { createAdminClient } = await import('../../../../lib/supabase');
   const supabase = createAdminClient();
@@ -143,8 +151,9 @@ export const POST: APIRoute = async ({ params, locals }) => {
   }
 
   // ── Run pipeline synchronously (Vercel Fluid Compute — up to 800s) ──────
+  let pipelineWarnings: string[] = [];
   try {
-    await runPipeline(params.projectId!);
+    pipelineWarnings = await runPipeline(params.projectId!);
   } catch (e: any) {
     const errMsg = (e?.message || String(e)).slice(0, 200);
     const isAnthropicRateLimit = e?.status === 429 || e?.error?.error?.type === 'rate_limit_error';
@@ -166,7 +175,11 @@ export const POST: APIRoute = async ({ params, locals }) => {
     await recordPersistentRateLimit(launchRateKey);
   }
 
-  return json({ started: true, status: 'generated' });
+  return json({
+    started: true,
+    status: 'generated',
+    warnings: pipelineWarnings.length > 0 ? pipelineWarnings : undefined,
+  });
 };
 
 // ── Pipeline ───────────────────────────────────────────────────────────────────
@@ -265,6 +278,10 @@ async function runPipeline(projectId: string) {
   let totalCost = 0;
   const generationWarnings: string[] = [];
 
+  if ((freshBrief.completeness ?? 0) < 0.5) {
+    generationWarnings.push(`Brief is only ${Math.round((freshBrief.completeness ?? 0) * 100)}% complete — site may lack personality and detail.`);
+  }
+
   try {
     if (isMultiPage) {
       // Generate ALL pages in this pipeline call — no frontend dependency, no /launch/continue needed.
@@ -297,6 +314,7 @@ async function runPipeline(projectId: string) {
           pageHtml = pageBriefResult.html;
           pageHtml = injectEffectRuntimes(pageHtml);
           pageHtml = injectAnalytics(pageHtml, freshBrief.data, projectId);
+          pageHtml = injectBookingWidget(pageHtml, freshBrief.data);
           pageHtml = injectBacklink(pageHtml);
           pageHtml = injectFormHandler(pageHtml, projectId);
 
@@ -366,6 +384,7 @@ async function runPipeline(projectId: string) {
     }
     html = injectEffectRuntimes(html);
     html = injectAnalytics(html, freshBrief.data, projectId);
+    html = injectBookingWidget(html, freshBrief.data);
     html = injectBacklink(html);
     html = injectFormHandler(html, projectId);
   }
@@ -459,4 +478,6 @@ async function runPipeline(projectId: string) {
   });
   await db.projects.updateStatus(projectId, 'generated');
   await sub(null);
+
+  return generationWarnings;
 }

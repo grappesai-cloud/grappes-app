@@ -20,11 +20,11 @@ describe('calculateCompleteness', () => {
 
   it('returns 1.0 for fully complete brief', () => {
     const full = {
-      preferences: { websiteType: 'landing' },
-      business: { name: 'Test', industry: 'tech', description: 'desc', tagline: 'tag' },
+      preferences: { websiteType: 'landing', primary_goal: 'contact' },
+      business: { name: 'Test', industry: 'tech', description: 'desc', tagline: 'tag', entity_type: 'organization' },
       target_audience: { primary: 'devs' },
-      content: { headline: 'H', about: 'A', services: ['S1'] },
-      branding: { colors: { primary: '#000', secondary: '#fff' }, fonts: { heading: 'Inter' }, style: 'modern', logo: 'url' },
+      content: { headline: 'H', about: 'A', services: ['S1'], copy_ownership: 'generate' },
+      branding: { colors: { primary: '#000', secondary: '#fff' }, fonts: { heading: 'Inter' }, style: 'modern', logo: 'url', voice: { traits: ['modern','direct'] } },
       contact: { email: 'a@b.com' },
       media: { has_logo: true, heroImage: 'url' },
       features: { contact_form: true },

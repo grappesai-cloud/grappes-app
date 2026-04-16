@@ -71,11 +71,17 @@ export function autoFix(html: string, projectId?: string): AutoFixResult {
       for (const wght of wghtMatches) {
         const weights = wght.replace('wght@', '').split(';').filter(Boolean);
         if (weights.length > 4) {
-          // Keep first 3 weights only
-          const reduced = weights.slice(0, 3).join(';');
+          const priority = ['400', '500', '600', '700', '300', '800', '900', '100', '200'];
+          const sorted = [...weights].sort((a, b) => {
+            const ai = priority.indexOf(a);
+            const bi = priority.indexOf(b);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+          });
+          const kept = sorted.slice(0, 3).sort((a, b) => Number(a) - Number(b));
+          const reduced = kept.join(';');
           const newUrl = url.replace(wght, `wght@${reduced}`);
           fixed = fixed.replace(url, newUrl);
-          fixes.push(`Reduced font weights from ${weights.length} to 3`);
+          fixes.push(`Reduced font weights from ${weights.length} to 3 (kept: ${kept.join(',')})`);
         }
       }
     }
@@ -97,8 +103,9 @@ export function autoFix(html: string, projectId?: string): AutoFixResult {
   const hasGuard = /__gsapGuardApplied/.test(fixed);
   if (hasDomReady && !hasGuard) {
     const guard = `window.__gsapGuardApplied=true;`
-      + `if(window.ScrollTrigger){var _stC=ScrollTrigger.create.bind(ScrollTrigger);ScrollTrigger.create=function(v){if(!v||v.trigger==null)return null;return _stC(v);};}`
-      + `if(window.gsap){['to','from','fromTo','set'].forEach(function(fn){var _o=gsap[fn].bind(gsap);gsap[fn]=function(){if(arguments[0]==null)return null;return _o.apply(gsap,arguments);};});}`;
+      + `var _noop={progress:function(){return _noop;},kill:function(){},pause:function(){return _noop;},play:function(){return _noop;},reverse:function(){return _noop;},restart:function(){return _noop;},duration:function(){return 0;},scrollTrigger:null};`
+      + `if(window.ScrollTrigger){var _stC=ScrollTrigger.create.bind(ScrollTrigger);ScrollTrigger.create=function(v){if(!v||v.trigger==null)return _noop;return _stC(v);};}`
+      + `if(window.gsap){['to','from','fromTo','set'].forEach(function(fn){var _o=gsap[fn].bind(gsap);gsap[fn]=function(){if(arguments[0]==null)return _noop;return _o.apply(gsap,arguments);};});}`;
     fixed = fixed.replace(
       /document\.addEventListener\(['"]DOMContentLoaded['"],\s*function\s*\(\)\s*\{/,
       `document.addEventListener('DOMContentLoaded', function () {\n  ${guard}`
@@ -106,33 +113,34 @@ export function autoFix(html: string, projectId?: string): AutoFixResult {
     fixes.push('Injected GSAP null-target guard');
   }
 
-  // ── 7. Fix ALL CSS opacity:0 that GSAP would animate ───────────────────
-  // If CSS sets opacity:0 on ANY element that GSAP animates, the element stays
-  // invisible forever. Remove ALL opacity:0 from <style> blocks — GSAP handles initial state.
-  // Only keep opacity:0 on elements that are clearly meant to be hidden (modals, menus, etc.)
-  let revealFixCount = 0;
+  // ── 7. Safety reveal for broken GSAP animations ───────────────────────
+  // Don't remove CSS opacity:0 — Sonnet uses it as initial state for reveal animations.
+  // Instead, inject a fallback that reveals elements still stuck at opacity:0 after 5s.
   const hasGsap = /gsap\b/.test(fixed);
-  if (hasGsap) {
-    const styleMatches = [...fixed.matchAll(/<style[\s\S]*?<\/style>/gi)];
-    for (const styleMatch of styleMatches) {
-      const originalStyle = styleMatch[0];
-      // Remove opacity:0 from CSS rules, except for known UI elements (menu, modal, cursor, overlay)
-      const cleanedStyle = originalStyle.replace(
-        /((?:(?!mobile|menu|modal|overlay|cursor|hamburger|mob-menu|mob\b|hidden)[^\{])*\{[^}]*?)opacity\s*:\s*0\s*;?/gi,
-        function(match, prefix) {
-          // Skip if it's inside a UI-related selector
-          if (/mobile|menu|modal|overlay|cursor|hamburger|mob|hidden|\.mob\b/i.test(prefix)) return match;
-          revealFixCount++;
-          return match.replace(/opacity\s*:\s*0\s*;?/i, '/* opacity:0 removed — GSAP handles */');
-        }
-      );
-      if (cleanedStyle !== originalStyle) {
-        fixed = fixed.replace(originalStyle, cleanedStyle);
+  if (hasGsap && !fixed.includes('__safetyReveal')) {
+    const safetyScript = `
+<script>
+/* [auto-fix] __safetyReveal */
+(function(){
+  var t=setTimeout(function(){
+    var skip=/mobile|menu|modal|overlay|cursor|hamburger|hidden|hp/i;
+    document.querySelectorAll('[data-section] h1,[data-section] h2,[data-section] h3,[data-section] p,[data-section] img,[data-section] a,[data-section] li,[data-section] div').forEach(function(el){
+      if(getComputedStyle(el).opacity==='0'&&!skip.test(el.className||'')&&!skip.test(el.id||'')){
+        el.style.transition='opacity 0.6s ease';el.style.opacity='1';
       }
+    });
+    document.querySelectorAll('[data-section]').forEach(function(s){
+      if(getComputedStyle(s).opacity==='0'){s.style.transition='opacity 0.6s ease';s.style.opacity='1';}
+    });
+  },5000);
+  window.addEventListener('beforeunload',function(){clearTimeout(t);});
+})();
+</script>`;
+    const bodyCloseReveal = fixed.lastIndexOf('</body>');
+    if (bodyCloseReveal !== -1) {
+      fixed = fixed.slice(0, bodyCloseReveal) + safetyScript + '\n' + fixed.slice(bodyCloseReveal);
+      fixes.push('Injected safety-reveal fallback (catches broken GSAP animations after 5s)');
     }
-  }
-  if (revealFixCount > 0) {
-    fixes.push(`Removed CSS opacity:0 from ${revealFixCount} rule(s) — GSAP handles initial state`);
   }
 
   // ── 8. Ensure Lenis → ScrollTrigger connection ────────────────────────
@@ -179,37 +187,30 @@ export function autoFix(html: string, projectId?: string): AutoFixResult {
 
   // ── 11. Ensure mobile menu has pointer-events:none when closed ──────
   // If mobile menu CSS uses opacity transition but no pointer-events, it blocks clicks
-  const menuOverlay = fixed.match(/\.(mobile-menu|mob-menu|mob|nav-overlay|mobile-nav|sidebar-menu|hamburger-menu|nav-menu|slide-menu|offcanvas)\s*\{([^}]*)\}/i);
-  if (menuOverlay && !menuOverlay[2].includes('pointer-events')) {
-    fixed = fixed.replace(
-      menuOverlay[0],
-      menuOverlay[0].replace('{', '{ pointer-events: none; ')
-    );
-    fixes.push('Added pointer-events:none to closed mobile menu');
-  }
-  // And ensure .open state has pointer-events:all
-  const menuOpen = fixed.match(/\.(mobile-menu|mob-menu|mob|nav-overlay|mobile-nav|sidebar-menu|hamburger-menu|nav-menu|slide-menu|offcanvas)\.open\s*\{([^}]*)\}/i);
-  if (menuOpen && !menuOpen[2].includes('pointer-events')) {
-    fixed = fixed.replace(menuOpen[0], menuOpen[0].replace('{', '{ pointer-events: all; '));
-    fixes.push('Added pointer-events:all to open mobile menu');
-  }
-
-  // ── 12. Ensure sections clip their overflow ─────────────────────────
-  // Sonnet uses position:absolute or oversized elements that bleed into
-  // neighbouring sections, creating ugly overlaps. Add overflow:hidden
-  // to data-section containers (except hero, which may intentionally bleed).
-  const hasSections = /data-section=/.test(fixed);
-  if (hasSections) {
-    const styleEnd = fixed.match(/<\/style>/i);
-    if (styleEnd && styleEnd.index !== undefined) {
-      const sectionClip = `\n/* [auto-fix] Prevent section overlap */\n[data-section] { overflow: hidden; position: relative; }\n[data-section="hero"], [data-section="nav"] { overflow: visible; }\n`;
-      // Only inject if not already present
-      if (!fixed.includes('[data-section] { overflow: hidden')) {
-        fixed = fixed.slice(0, styleEnd.index) + sectionClip + fixed.slice(styleEnd.index);
-        fixes.push('Added overflow:hidden to data-section containers (prevents inter-section overlap)');
-      }
+  // Use global replace to patch ALL matching CSS rules, not just the first
+  const menuClassPattern = /\.(mobile-menu|mob-menu|mob|nav-overlay|mobile-nav|sidebar-menu|hamburger-menu|nav-menu|slide-menu|offcanvas)\s*\{([^}]*)\}/gi;
+  fixed = fixed.replace(menuClassPattern, function(match, _cls, body) {
+    if (!body.includes('pointer-events')) {
+      fixes.push('Added pointer-events:none to closed mobile menu');
+      return match.replace('{', '{ pointer-events: none; ');
     }
-  }
+    return match;
+  });
+  // And ensure .open state has pointer-events:all (global)
+  const menuOpenPattern = /\.(mobile-menu|mob-menu|mob|nav-overlay|mobile-nav|sidebar-menu|hamburger-menu|nav-menu|slide-menu|offcanvas)\.open\s*\{([^}]*)\}/gi;
+  fixed = fixed.replace(menuOpenPattern, function(match, _cls, body) {
+    if (!body.includes('pointer-events')) {
+      fixes.push('Added pointer-events:all to open mobile menu');
+      return match.replace('{', '{ pointer-events: all; ');
+    }
+    return match;
+  });
+
+  // ── 12. (Removed) Section overflow clipping ────────────────────────
+  // Previously added overflow:hidden to all [data-section] containers,
+  // but this destroyed intentional creative bleeds (parallax, oversized
+  // typography, cross-section animations). The system prompt now instructs
+  // Sonnet to manage overflow per-section when needed.
 
   // ── 13. Deduplicate section IDs ────────────────────────────────────
   // Sonnet sometimes generates duplicate section comment markers.

@@ -118,6 +118,28 @@ User-provided photos (logos, hero images, portfolio, team, gallery, any asset UR
 
 essential = tight, few moments. complete = rich journey. showcase = epic experience. Default: complete.
 
+## BANNED PATTERNS — instant quality failure
+
+These patterns appear on every template site. Using them = generic output.
+
+Layout bans:
+- Three equal-width cards in a row for features/services — use staggered, timeline, accordion, horizontal scroll, overlapping, or full-width blocks instead
+- Hero: centered text with semi-transparent dark overlay on image — the #1 template cliché. Use split layouts, asymmetric type, text-as-architecture, or image-as-full-bleed instead
+- Uniform grid of identical team/portfolio cards — use masonry, varied sizes, or editorial layouts
+- Footer with 3-4 equal columns of links — make it minimal or integrate it into the experience
+
+Animation bans:
+- fadeIn from bottom as the ONLY scroll animation — pair with scale, clip-path, rotation, or position shift
+- All elements animating identically — stagger timing, vary easing, make each reveal unique
+- Generic hover: scale(1.05) + box-shadow — create hover states that relate to the content
+
+Visual bans:
+- Dark gradient overlays on hero images for text readability — use text-shadow, knockout text, separate text area, or blend modes
+- Gray placeholder boxes or "Image goes here" — design without images using typography and color
+- Icon + title + paragraph card repeated 3-6 times — find a unique layout for each service/feature
+
+Think: "What would a creative agency with a $50K budget design?" Not three cards in a row.
+
 ## Critical
 
 - Output ONLY the complete HTML. No explanation.
@@ -131,6 +153,39 @@ essential = tight, few moments. complete = rich journey. showcase = epic experie
 // that anchor it to the same 12 sites every time.
 
 // Creative seed, art direction, and brand narrative replaced by Opus Creative Plan
+
+// ─── Creative Anchors (diversity system) ────────────────────────────────
+// Each generation picks a random style anchor so sites don't converge
+// on the same patterns. Opus incorporates the anchor into its creative plan.
+
+const CREATIVE_ANCHORS = [
+  { name: 'Brutalist Typography', directive: 'Oversized type (120px+) as architectural elements. Raw, confrontational layouts. Heavy sans-serifs. Content bleeds edge-to-edge. Visible grid lines. Anti-decoration.' },
+  { name: 'Editorial Magazine', directive: 'Think Kinfolk/Cereal magazine. Extreme whitespace. Serif headlines with wide letter-spacing. Asymmetric photo-text compositions. Pull quotes as design anchors. Elegant restraint.' },
+  { name: 'Cinematic Scroll', directive: 'Full-viewport sections. Each scroll position is a scene change. Dramatic scale transitions. Parallax at 3+ depth layers. Letterbox framing. Slow, deliberate reveals.' },
+  { name: 'Swiss Precision', directive: 'Strict grid. Helvetica or geometric sans. Mathematical spacing ratios. Monochrome + one accent color. Clean, authoritative, timeless. Information hierarchy through scale alone.' },
+  { name: 'Organic Flow', directive: 'No straight lines or sharp corners. Border-radius everywhere. Blob shapes as dividers. Gentle wave animations. Colors shift like a sunset as you scroll. Soft, alive, natural.' },
+  { name: 'Deconstructed Grid', directive: 'Break the grid intentionally. Overlapping elements. Text running off-screen. Images at unexpected angles. Controlled chaos that still reads clearly.' },
+  { name: 'Monochrome Luxury', directive: 'Pure black and white (or one deep color + white). No gradients. Contrast through scale — whisper-small labels next to billboard headlines. Extreme restraint = extreme sophistication.' },
+  { name: 'Dimensional Layers', directive: 'Z-axis depth: background texture layer, middle content layer, foreground floating elements. Scroll reveals layers at different speeds. Sticky elements create parallax depth.' },
+  { name: 'Type as Image', directive: 'Typography IS the visual. Oversized letters as backgrounds. Text clipped to reveal images. Character-level scroll animations. Variable font weight responding to scroll. Words ARE the design.' },
+  { name: 'Horizontal Journey', directive: 'At least one section uses horizontal scroll. Content moves left-to-right like a timeline or film strip. Vertical sections bookend the horizontal moment. Memorable rhythm break.' },
+];
+
+function pickCreativeAnchor(): { name: string; directive: string } {
+  return CREATIVE_ANCHORS[Math.floor(Math.random() * CREATIVE_ANCHORS.length)];
+}
+
+function generateCreativeSeed(brief: BriefData): string {
+  const anchor = pickCreativeAnchor();
+  const businessName = brief?.business?.name || 'the brand';
+  const industry = brief?.business?.industry || 'business';
+  return `## Creative Direction (auto-generated — Opus was unavailable)
+
+**Style anchor: ${anchor.name}**
+${anchor.directive}
+
+Apply this aesthetic to "${businessName}" (${industry}). Every interaction must be unique to this specific brand — the style anchor is your starting point, not your constraint. Think in MOMENTS, not sections. Create one "impossible moment" that makes developers ask "how did they do that?" Content flows — elements overlap, images bleed, text floats.`;
+}
 
 // ─── Build User Prompt ───────────────────────────────────────────────────────
 
@@ -238,7 +293,118 @@ Embed as an iframe or video element with explicit dimensions (width:100%;aspect-
     sacredParts.push('[EXACT] Team members:\n' +
       team.map(m => `- ${m.name}${m.role ? ', ' + m.role : ''}${m.bio ? ': ' + m.bio : ''}`).join('\n'));
   }
+  const collaborators = brief?.content?.collaborators as Array<{name: string; role?: string; brand?: string}> | undefined;
+  if (collaborators && collaborators.length > 0) {
+    sacredParts.push('[EXACT] Collaborators (featured artists, producers, directors, guest performers — render in a dedicated "Credits" or "Collaborators" section, NOT as team):\n' +
+      collaborators.map(c => `- ${c.name}${c.role ? ', ' + c.role : ''}${c.brand ? ' (' + c.brand + ')' : ''}`).join('\n'));
+  }
+  const pressMentions = brief?.content?.press_mentions as Array<{name: string; url?: string; year?: string}> | undefined;
+  if (pressMentions && pressMentions.length > 0) {
+    sacredParts.push('[EXACT] Press mentions (render as a "Press" or "Featured in" section — horizontal logo row or typographic list):\n' +
+      pressMentions.map(p => `- ${p.name}${p.year ? ' (' + p.year + ')' : ''}${p.url ? ' — ' + p.url : ''}`).join('\n'));
+  }
+  const awards = brief?.content?.awards as Array<{name: string; year?: string; issuer?: string}> | undefined;
+  if (awards && awards.length > 0) {
+    sacredParts.push('[EXACT] Awards & recognition:\n' +
+      awards.map(a => `- ${a.name}${a.issuer ? ' (' + a.issuer + ')' : ''}${a.year ? ' — ' + a.year : ''}`).join('\n'));
+  }
   const sacredBlock = sacredParts.join('\n\n');
+
+  // Brand voice + entity type — influences copy tone
+  const voiceTraits = brief?.branding?.voice?.traits as string[] | undefined;
+  const voiceAvoid = brief?.branding?.voice?.avoid as string[] | undefined;
+  const voiceFormality = brief?.branding?.voice?.formality as string | undefined;
+  const entityType = brief?.business?.entity_type as string | undefined;
+  const voiceParts: string[] = [];
+  if (voiceTraits && voiceTraits.length > 0) voiceParts.push(`Voice traits: ${voiceTraits.join(', ')}`);
+  if (voiceAvoid && voiceAvoid.length > 0) voiceParts.push(`MUST NOT sound: ${voiceAvoid.join(', ')}`);
+  if (voiceFormality) voiceParts.push(`Formality: ${voiceFormality}`);
+  if (entityType === 'person') {
+    voiceParts.push(`Entity: personal brand — use first-person ("I", "my") voice for bio/about. Write as the person themselves, not about them.`);
+  } else if (entityType === 'organization') {
+    voiceParts.push(`Entity: organization — use "we/our" or third-person voice. Talk as the company/team.`);
+  }
+  const voiceBlock = voiceParts.length > 0 ? voiceParts.join('\n') : '';
+
+  // Copy ownership — who writes the content
+  const copyOwnership = brief?.content?.copy_ownership as string | undefined;
+  let copyBlock = '';
+  if (copyOwnership === 'user') {
+    copyBlock = `Copy approach: CLIENT-PROVIDED. The client will supply all copy. For sections without sacred content, write clear structural placeholders: "[Your service description here]", "[Client testimonial]". Do NOT write polished marketing copy for empty sections — write minimal placeholder text that signals the client needs to fill it in.`;
+  } else if (copyOwnership === 'hybrid') {
+    copyBlock = `Copy approach: HYBRID. Write polished hero headlines, CTAs, and short section intros. For detailed service descriptions, bios, case studies, and testimonials, use structural placeholders like "[Describe your process here]" unless the client provided that content in the brief.`;
+  }
+
+  // Primary goal — drives hero CTA
+  const primaryGoal = brief?.preferences?.primary_goal as string | undefined;
+  const goalBlock = primaryGoal ? `Primary conversion: "${primaryGoal}". The hero CTA and subsequent CTAs must funnel toward this action. Make the primary CTA visually dominant (size, color, motion). Suggested CTA copy:
+- "book" → "Book a session" / "Reserve your spot"
+- "listen" → "Listen now" / "Stream on Spotify"
+- "inquire" → "Start a conversation" / "Request a quote"
+- "buy" → "Shop now" / "Get yours"
+- "subscribe" → "Join the list" / "Subscribe"
+- "contact" → "Get in touch"
+- "download" → "Download now"` : '';
+
+  // Pricing rendering directive
+  const pricingMode = brief?.content?.pricing_mode as string | undefined;
+  const pricingItems = brief?.content?.pricing_items as Array<{name: string; price: string; note?: string}> | undefined;
+  let pricingBlock = '';
+  if (pricingMode === 'inquire') {
+    pricingBlock = `Pricing: "inquire only" — do NOT display specific numbers. Add a section with CTA like "Inquire for rates" → contact form. Common for high-end/luxury creative brands.`;
+  } else if (pricingMode === 'list' && pricingItems && pricingItems.length > 0) {
+    pricingBlock = `Pricing (LIST mode — editorial typography, NEVER SaaS checkmark table):
+${pricingItems.map(p => `- ${p.name}: ${p.price}${p.note ? ' (' + p.note + ')' : ''}`).join('\n')}
+
+Render as a typographic list: large service name, price aligned right or below, minimal separators. Think editorial magazine pricing, not tech pricing card with checkmarks.`;
+  } else if (pricingMode === 'tiered' && pricingItems && pricingItems.length > 0) {
+    pricingBlock = `Pricing (TIERED packages — 2-3 distinct tiers, each gets its own card but use THIS brand's visual language, NOT generic SaaS green-checkmark):
+${pricingItems.map(p => `- ${p.name}: ${p.price}${p.note ? ' (' + p.note + ')' : ''}`).join('\n')}`;
+  }
+
+  // Audio embeds — musicians, bands, DJs, podcasters
+  const audioEmbeds = brief?.media?.audio_embeds as string[] | undefined;
+  let audioBlock = '';
+  if (audioEmbeds && audioEmbeds.length > 0) {
+    audioBlock = `Audio embeds — render a dedicated "Music" / "Listen" section with iframes for each platform. Do NOT hide in a sidebar — make it a HEADLINE moment.
+URLs:
+${audioEmbeds.map(u => `- ${u}`).join('\n')}
+
+Embed patterns:
+- Spotify artist/track URL (open.spotify.com/artist/ID or /track/ID) → convert to https://open.spotify.com/embed/artist/ID or /embed/track/ID, iframe height 380
+- YouTube (youtu.be/ID or youtube.com/watch?v=ID) → <iframe src="https://www.youtube.com/embed/ID" allowfullscreen>, aspect-ratio 16/9
+- SoundCloud track URL → <iframe src="https://w.soundcloud.com/player/?url=ENCODED_URL&color=%23ff5500&auto_play=false" width="100%" height="166">
+- Apple Music (music.apple.com/...) → <iframe src="https://embed.music.apple.com/..." height="450" allow="autoplay *; encrypted-media *">
+
+Style the section immersively: large, full-bleed or edge-to-edge, typography-heavy intro ("Listen.", "Now Playing.", etc).`;
+  }
+
+  // Hero video flag (separate from media.videoUrl which is an actual asset)
+  const heroVideoFlag = brief?.media?.hero_video === true;
+  const heroVideoBlock = heroVideoFlag && !videoUrl
+    ? `Hero video intent: client wants a cinematic/motion-driven hero. If no video asset is uploaded, build the hero with dramatic motion — large animated typography, CSS/canvas motion, scroll-driven transforms. Convey "video-like" energy with code.`
+    : '';
+
+  // Integration hints — so Sonnet doesn't hardcode booking iframes we inject later
+  const bookingProvider = brief?.integrations?.booking as string | undefined;
+  const bookingNote = (bookingProvider && bookingProvider !== 'none')
+    ? `Booking integration: post-processing will bind ${bookingProvider === 'calcom' ? 'Cal.com' : 'Calendly'} popup to buttons. For the primary CTA targeting "${primaryGoal || 'book'}", render a plain <a href="#book" data-book="true" class="..."> button. Do NOT embed a booking iframe yourself.`
+    : '';
+
+
+  // Combine creative context into one block
+  const creativeContextParts = [
+    voiceBlock && `### Brand Voice\n${voiceBlock}`,
+    copyBlock && `### Copy Approach\n${copyBlock}`,
+    goalBlock && `### Conversion Goal\n${goalBlock}`,
+    pricingBlock && `### Pricing Section\n${pricingBlock}`,
+    audioBlock && `### Audio / Music Section\n${audioBlock}`,
+    heroVideoBlock && `### Hero Video\n${heroVideoBlock}`,
+    bookingNote && `### Booking Widget\n${bookingNote}`,
+  ].filter(Boolean);
+  const creativeContextBlock = creativeContextParts.length > 0
+    ? `\n## Creative Context (brand-specific rendering rules)\n\n${creativeContextParts.join('\n\n')}\n`
+    : '';
 
   // Client design references
   const inspirationUrls = brief?.branding?.inspiration_urls as string[] | undefined;
@@ -257,6 +423,7 @@ Embed as an iframe or video element with explicit dimensions (width:100%;aspect-
 ${briefJson}
 ${languageDirective}${noPhotosBlock}
 ${sacredBlock ? `\n## Sacred Content (use EXACTLY as written)\n\n${sacredBlock}` : ''}
+${creativeContextBlock}
 ${!noPhotos && assetLines ? `\n## Uploaded Assets\n${assetLines}` : ''}
 ${creativePlan ? `
 ## Creative Direction (a creative director designed this experience for this brand)
@@ -374,16 +541,27 @@ export function applyBriefContent(html: string, brief: Record<string, any>): { h
 }
 
 // ─── Inject Analytics ────────────────────────────────────────────────────────
-// If brief has analytics.ga_id → Google Analytics 4.
-// Otherwise → lightweight self-hosted beacon to /api/analytics/:projectId.
+// Reads brief.integrations.analytics ("ga" | "plausible" | "fathom" | "none").
+// Fallback order: explicit provider → legacy analytics.ga_id → self-hosted beacon.
+// "none" disables tracking entirely (explicit user opt-out).
 
 export function injectAnalytics(html: string, brief: Record<string, any>, projectId: string): string {
-  if (html.includes('gtag(') || html.includes('__grappes_track')) return html;
+  if (html.includes('gtag(') || html.includes('__grappes_track') || html.includes('plausible.io/js/') || html.includes('cdn.usefathom.com')) return html;
 
-  const gaId = brief?.analytics?.ga_id;
+  const provider = brief?.integrations?.analytics as string | undefined;
+  if (provider === 'none') return html; // explicit opt-out
+
+  const gaId = brief?.analytics?.ga_id || brief?.integrations?.analytics_id;
+  const plausibleDomain = brief?.integrations?.plausible_domain || brief?.project?.domain;
+  const fathomSiteId = brief?.integrations?.analytics_id;
+
   let snippet: string;
 
-  if (gaId && /^G-[A-Z0-9]+$/i.test(gaId)) {
+  if (provider === 'plausible' && plausibleDomain) {
+    snippet = `\n<script defer data-domain="${plausibleDomain}" src="https://plausible.io/js/script.js"></script>`;
+  } else if (provider === 'fathom' && fathomSiteId) {
+    snippet = `\n<script src="https://cdn.usefathom.com/script.js" data-site="${fathomSiteId}" defer></script>`;
+  } else if ((provider === 'ga' || !provider) && gaId && /^G-[A-Z0-9]+$/i.test(gaId)) {
     snippet = `
 <script async src="https://www.googletagmanager.com/gtag/js?id=${gaId}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}');</script>`;
@@ -397,6 +575,67 @@ export function injectAnalytics(html: string, brief: Record<string, any>, projec
     return html.slice(0, headClose) + snippet + '\n' + html.slice(headClose);
   }
   return html;
+}
+
+// ─── Inject Booking Widget ──────────────────────────────────────────────────
+// Reads brief.integrations.booking ("calcom" | "calendly") + booking_url.
+// Binds any element with data-book="true" to the provider's popup.
+
+export function injectBookingWidget(html: string, brief: Record<string, any>): string {
+  const provider = brief?.integrations?.booking as string | undefined;
+  const bookingUrl = brief?.integrations?.booking_url as string | undefined;
+  if (!provider || provider === 'none' || !bookingUrl) return html;
+
+  let snippet = '';
+  if (provider === 'calcom') {
+    const calLink = bookingUrl.replace(/^https?:\/\/(app\.)?cal\.com\//, '').replace(/^\/+/, '').replace(/\/+$/, '');
+    snippet = `
+<script>
+(function(){
+  var s=document.createElement('script');
+  s.src='https://app.cal.com/embed/embed.js';
+  s.async=true;
+  s.onload=function(){
+    if(!window.Cal) return;
+    window.Cal('init','grappes',{origin:'https://cal.com'});
+    document.querySelectorAll('[data-book]').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.preventDefault();
+        window.Cal.ns.grappes('modal',{calLink:'${calLink}'});
+      });
+    });
+  };
+  document.head.appendChild(s);
+})();
+</script>`;
+  } else if (provider === 'calendly') {
+    snippet = `
+<link rel="stylesheet" href="https://assets.calendly.com/assets/external/widget.css">
+<script>
+(function(){
+  var u=${JSON.stringify(bookingUrl)};
+  var s=document.createElement('script');
+  s.src='https://assets.calendly.com/assets/external/widget.js';
+  s.async=true;
+  s.onload=function(){
+    document.querySelectorAll('[data-book]').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.preventDefault();
+        if(window.Calendly) window.Calendly.initPopupWidget({url:u});
+      });
+    });
+  };
+  document.head.appendChild(s);
+})();
+</script>`;
+  }
+
+  if (!snippet) return html;
+  const bodyClose = html.lastIndexOf('</body>');
+  if (bodyClose !== -1) {
+    return html.slice(0, bodyClose) + snippet + '\n' + html.slice(bodyClose);
+  }
+  return html + snippet;
 }
 
 // ─── Inject Backlink ─────────────────────────────────────────────────────────
@@ -521,8 +760,19 @@ async function generateCreativePlan(brief: BriefData, locale: string, rawConvers
   const style = brief?.branding?.style || '';
   const complexity = brief?.preferences?.complexity || 'complete';
   const noPhotos = brief?.media?.no_photos === true;
+  const entityType = brief?.business?.entity_type as string | undefined;
+  const primaryGoal = brief?.preferences?.primary_goal as string | undefined;
+  const voiceTraits = (brief?.branding?.voice?.traits as string[] | undefined)?.join(', ');
+  const voiceAvoid = (brief?.branding?.voice?.avoid as string[] | undefined)?.join(', ');
+  const voiceFormality = brief?.branding?.voice?.formality as string | undefined;
+  const audioEmbeds = brief?.media?.audio_embeds as string[] | undefined;
+  const collaborators = brief?.content?.collaborators as Array<{name: string; role?: string}> | undefined;
+  const pressMentions = brief?.content?.press_mentions as Array<{name: string}> | undefined;
+  const awards = brief?.content?.awards as Array<{name: string}> | undefined;
+  const pricingMode = brief?.content?.pricing_mode as string | undefined;
   const langNames: Record<string, string> = { ro: 'Romanian', en: 'English', fr: 'French', de: 'German', es: 'Spanish' };
   const lang = langNames[locale] || 'English';
+  const anchor = pickCreativeAnchor();
 
   try {
     const response = await createMessage({
@@ -582,10 +832,23 @@ ${description}
 Style: ${style || 'surprise me — make it unforgettable'}
 Complexity: ${complexity}
 Language: ${lang}
+${entityType ? `Entity: ${entityType === 'person' ? 'personal brand (first-person "I" voice for bio)' : 'organization (we/team voice)'}` : ''}
+${primaryGoal ? `Primary conversion goal: "${primaryGoal}" — the hero and journey must funnel visitors toward this action.` : ''}
+${voiceTraits ? `Brand voice traits: ${voiceTraits}` : ''}
+${voiceAvoid ? `Voice must NOT sound like: ${voiceAvoid}` : ''}
+${voiceFormality ? `Voice formality level: ${voiceFormality}` : ''}
+${collaborators && collaborators.length > 0 ? `Collaborators/Credits: ${collaborators.map(c => c.name + (c.role ? ' (' + c.role + ')' : '')).join(', ')} — design a dedicated "Credits" or "Collaborators" section for these people.` : ''}
+${pressMentions && pressMentions.length > 0 ? `Press coverage: ${pressMentions.map(p => p.name).join(', ')} — design a "Featured in" or "Press" section (logo row or typographic strip).` : ''}
+${awards && awards.length > 0 ? `Awards: ${awards.map(a => a.name).join(', ')} — integrate as social proof into the experience.` : ''}
+${audioEmbeds && audioEmbeds.length > 0 ? `Music embeds available (${audioEmbeds.length} streaming URLs) — design a dedicated, immersive "Listen" section around them.` : ''}
+${pricingMode && pricingMode !== 'none' ? `Pricing display: ${pricingMode === 'inquire' ? '"inquire only" — no numbers shown, contact-first' : pricingMode === 'list' ? 'editorial list (NOT SaaS table)' : 'tiered packages with brand-specific visual language'}.` : ''}
 ${noPhotos ? 'NO PHOTOGRAPHS. Zero <img> tags. Build the entire visual experience with typography, CSS shapes, canvas, color, and whitespace. Some of the best Awwwards sites are image-free.' : 'Only the client-uploaded assets are available — no stock photo services. Use each uploaded image as a PRIMARY visual medium (full-bleed, edge-to-edge, overlapping, as backgrounds — never decoration in boxes). For sections without an uploaded image, design with typography, CSS shapes, color, and whitespace instead of stock placeholders.'}
 
 Full brief:
 ${briefJson}
+
+Creative style anchor (starting point — adapt and evolve it for this brand):
+${anchor.name} — ${anchor.directive}
 
 MANDATORY — include these two things in your plan:
 
@@ -607,9 +870,25 @@ ${rawConversation}` : ''}`
     const outputTokens = response.usage?.output_tokens ?? 0;
     console.log(`[opus-plan] Generated for ${businessName}: ${raw.length} chars, ${inputTokens}+${outputTokens} tokens`);
     return { plan: raw.trim(), inputTokens, outputTokens };
-  } catch (e) {
-    console.error('[opus-plan] FAILED — site will generate without creative direction:', e);
-    return { plan: '', inputTokens: 0, outputTokens: 0 };
+  } catch (firstErr: any) {
+    console.error('[opus-plan] Attempt 1/2 failed:', firstErr?.message || firstErr);
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      console.log('[opus-plan] Retrying...');
+      const r2 = await createMessage({
+        model: OPUS_MODEL,
+        max_tokens: 4000,
+        system: 'You are an elite creative director for immersive digital experiences. Write a DETAILED creative plan: concept, signature interactions (unique to THIS brand — no grain/noise, no mix-blend-mode cursor, no diagonal wipe, no text-stroke outlines), typography with exact clamp() values, color hex codes, layout choreography describing how sections transition. Think in moments and transitions, not sections. Be specific enough for a developer to build exactly your vision. Write in English.',
+        messages: [{ role: 'user', content: `Creative plan for "${businessName}" — ${industry}.\n${description}\nStyle: ${style || 'surprise me — make it unforgettable'}. Complexity: ${complexity}. Language: ${lang}.\n${entityType ? 'Entity: ' + (entityType === 'person' ? 'personal brand (first-person voice)' : 'organization (we/team voice)') : ''}\n${primaryGoal ? 'Primary goal: ' + primaryGoal : ''}\n${voiceTraits ? 'Voice: ' + voiceTraits : ''}\nCreative anchor: ${anchor.name} — ${anchor.directive}\n\nFull brief:\n${briefJson}${rawConversation ? '\n\nClient words:\n' + rawConversation : ''}` }],
+      });
+      const raw = r2.content[0]?.type === 'text' ? r2.content[0].text : '';
+      console.log(`[opus-plan] Retry succeeded for ${businessName}: ${raw.length} chars`);
+      return { plan: raw.trim(), inputTokens: r2.usage?.input_tokens ?? 0, outputTokens: r2.usage?.output_tokens ?? 0 };
+    } catch (retryErr: any) {
+      console.error('[opus-plan] Attempt 2/2 failed:', retryErr?.message || retryErr);
+    }
+    console.warn('[opus-plan] Both attempts failed — using randomized creative seed');
+    return { plan: generateCreativeSeed(brief), inputTokens: 0, outputTokens: 0 };
   }
 }
 

@@ -20,6 +20,8 @@ const P1_FIELDS = [
   'branding.fonts.heading',
   'meta.title',
   'meta.description',
+  'preferences.primary_goal',
+  'content.copy_ownership',
 ];
 
 // P2 = 15% weight — nice-to-have fields
@@ -27,8 +29,10 @@ const P2_FIELDS = [
   'media.has_logo',
   'features.contact_form',
   'business.tagline',
+  'business.entity_type',
   'branding.colors.secondary',
   'branding.style',
+  'branding.voice.traits',
   'branding.logo',      // actual logo upload URL
   'media.heroImage',    // actual hero image upload URL
 ];
@@ -231,6 +235,60 @@ const INDUSTRY_DEFAULTS: Record<string, Defaults> = {
   },
   photography: {
     'content.pages': ['Home', 'Portfolio', 'Services', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  artist: {
+    'content.pages': ['Home', 'Work', 'About', 'Press', 'Contact'],
+    'features.contact_form': true,
+  },
+  musician: {
+    'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  music: {
+    'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  band: {
+    'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  dj: {
+    'content.pages': ['Home', 'Music', 'Events', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  producer: {
+    'content.pages': ['Home', 'Work', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  creator: {
+    'content.pages': ['Home', 'Work', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  author: {
+    'content.pages': ['Home', 'Books', 'About', 'Events', 'Contact'],
+    'features.contact_form': true,
+  },
+  writer: {
+    'content.pages': ['Home', 'Work', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  coach: {
+    'content.pages': ['Home', 'Services', 'About', 'Testimonials', 'Contact'],
+    'features.contact_form': true,
+    'features.booking': true,
+  },
+  therapist: {
+    'content.pages': ['Home', 'Services', 'About', 'Contact'],
+    'features.contact_form': true,
+    'features.booking': true,
+  },
+  filmmaker: {
+    'content.pages': ['Home', 'Work', 'About', 'Contact'],
+    'features.contact_form': true,
+  },
+  designer: {
+    'content.pages': ['Home', 'Work', 'About', 'Contact'],
     'features.contact_form': true,
   },
 };

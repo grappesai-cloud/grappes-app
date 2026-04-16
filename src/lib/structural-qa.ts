@@ -200,6 +200,105 @@ function checkImgAlts(html: string): QACheck {
   };
 }
 
+// ─── Layout & Interaction Checks ────────────────────────────────────────────
+
+function checkSectionCount(html: string): QACheck {
+  const count = countMatches(html, /data-section="/gi);
+  const passed = count >= 3;
+  return {
+    name: 'Section count',
+    passed,
+    message: passed
+      ? `${count} content sections found`
+      : `Only ${count} section(s) found — expected at least 3 for a complete site`,
+  };
+}
+
+function checkEmptySections(html: string): QACheck {
+  const openPattern = /<!-- SECTION:(\w[\w-]*) -->/g;
+  const sections: Array<{ name: string; hasContent: boolean }> = [];
+  let match;
+  while ((match = openPattern.exec(html)) !== null) {
+    const name = match[1];
+    const closeTag = `<!-- /SECTION:${name} -->`;
+    const closeIdx = html.indexOf(closeTag, match.index);
+    if (closeIdx === -1) continue;
+    const content = html.slice(match.index + match[0].length, closeIdx);
+    const textContent = content.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    sections.push({ name, hasContent: textContent.length >= 20 });
+  }
+  const empty = sections.filter(s => !s.hasContent);
+  if (sections.length === 0) {
+    return { name: 'Empty sections', passed: true, message: 'No section markers found' };
+  }
+  const passed = empty.length === 0;
+  return {
+    name: 'Empty sections',
+    passed,
+    message: passed
+      ? `All ${sections.length} sections have content`
+      : `${empty.length} section(s) appear empty: ${empty.map(s => s.name).join(', ')}`,
+  };
+}
+
+function checkMobileNav(html: string): QACheck {
+  const hasHamburger = /hamburger|mobile-menu|mob-menu|menu-toggle|nav-toggle|burger/i.test(html);
+  const hasResponsive = /@media[^{]*max-width/i.test(html) || /@media[^{]*min-width/i.test(html);
+  const passed = hasHamburger || !hasResponsive;
+  return {
+    name: 'Mobile navigation',
+    passed,
+    message: passed
+      ? 'Mobile navigation present'
+      : 'Responsive breakpoints found but no mobile menu/hamburger — site may be unusable on small screens',
+  };
+}
+
+function checkDuplicateIds(html: string): QACheck {
+  const ids = [...html.matchAll(/\bid=["']([^"']+)["']/gi)].map(m => m[1]);
+  const seen = new Set<string>();
+  const dupes = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) dupes.add(id);
+    seen.add(id);
+  }
+  const passed = dupes.size === 0;
+  return {
+    name: 'Duplicate IDs',
+    passed,
+    message: passed
+      ? `${ids.length} unique IDs found`
+      : `Duplicate ID(s) found: ${[...dupes].slice(0, 5).join(', ')}`,
+  };
+}
+
+function checkScriptBalance(html: string): QACheck {
+  const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)];
+  let unbalanced = false;
+  for (const [, code] of scripts) {
+    const cleaned = code
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*/g, '')
+      .replace(/'(?:[^'\\]|\\.)*'/g, '""')
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+      .replace(/`(?:[^`\\]|\\.)*`/g, '""');
+    const opens = (cleaned.match(/\{/g) || []).length;
+    const closes = (cleaned.match(/\}/g) || []).length;
+    if (Math.abs(opens - closes) > 1) {
+      unbalanced = true;
+      break;
+    }
+  }
+  const passed = !unbalanced;
+  return {
+    name: 'Script syntax balance',
+    passed,
+    message: passed
+      ? 'Script blocks appear syntactically balanced'
+      : 'Script block has unbalanced braces — possible truncation or syntax error',
+  };
+}
+
 // ─── Main Runner ─────────────────────────────────────────────────────────────
 
 export function runStructuralQA(html: string): QAReport {
@@ -214,6 +313,11 @@ export function runStructuralQA(html: string): QAReport {
     checkOgTitle(html),
     checkOgDescription(html),
     checkImgAlts(html),
+    checkSectionCount(html),
+    checkEmptySections(html),
+    checkMobileNav(html),
+    checkDuplicateIds(html),
+    checkScriptBalance(html),
   ];
 
   const passedCount = checks.filter(c => c.passed).length;
