@@ -647,11 +647,12 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       setInputEnabled(false);
       const thinking = showThinking();
       const isMenu = uiAction.variant === 'menu';
+      const isDoc = uiAction.variant === 'document';
       const { res, data } = await callAPI({
-        action: isMenu ? 'menu_uploaded' : 'media_uploaded',
+        action: isMenu ? 'menu_uploaded' : isDoc ? 'document_uploaded' : 'media_uploaded',
         type: uiAction.variant || 'section',
         assetId: uploadData.asset?.id,
-        assetUrl: isMenu ? uploadData.asset?.public_url : undefined,
+        assetUrl: (isMenu || isDoc) ? uploadData.asset?.public_url : undefined,
         sectionId: uiAction.sectionId,
         sectionTitle: uiAction.sectionTitle,
       });
@@ -896,17 +897,35 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
           ? `${succeeded.length} uploaded, ${failed.length} failed`
           : `${succeeded.length} ${succeeded.length === 1 ? 'image uploaded' : 'images uploaded'}`;
 
-      // Notify Haiku with all uploaded assets + user's context
+      // Notify Haiku — handle documents separately for text extraction
       const thinking = showThinking();
-      const { res, data } = await callAPI({
-        action: 'media_uploaded',
-        uploads: succeeded.map(r => ({ type: r.type, assetId: r.asset?.id })),
-        // keep single-upload fields for backwards compat with backend
-        type: succeeded[succeeded.length - 1].type,
-        assetId: succeeded[succeeded.length - 1].asset?.id,
-        userContext: text || undefined,
-      });
-      handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+      const docUploads = succeeded.filter(r => r.type === 'document');
+      const otherUploads = succeeded.filter(r => r.type !== 'document');
+
+      // Process document uploads first (PDF text extraction)
+      for (const doc of docUploads) {
+        var docResult = await callAPI({
+          action: 'document_uploaded',
+          type: 'document',
+          assetId: doc.asset?.id,
+          assetUrl: doc.asset?.public_url,
+          userContext: text || undefined,
+        });
+      }
+
+      // Then notify about remaining uploads
+      if (otherUploads.length > 0) {
+        var { res, data } = await callAPI({
+          action: 'media_uploaded',
+          uploads: otherUploads.map(r => ({ type: r.type, assetId: r.asset?.id })),
+          type: otherUploads[otherUploads.length - 1].type,
+          assetId: otherUploads[otherUploads.length - 1].asset?.id,
+          userContext: text || undefined,
+        });
+        handleApiResponse(res.ok ? data : { reply: data.error || 'Something went wrong.' }, thinking);
+      } else if (docUploads.length > 0) {
+        handleApiResponse(docResult?.res?.ok ? docResult.data : { reply: docResult?.data?.error || 'Something went wrong.' }, thinking);
+      }
       return;
     }
 

@@ -107,6 +107,13 @@ function buildActionMessage(action: string, type: string, extra?: Record<string,
   if (action === 'menu_uploaded') {
     return `I've uploaded a photo of my menu. Please acknowledge it and continue to the next phase.`;
   }
+  if (action === 'document_uploaded') {
+    const extracted = extra?.extractedText;
+    if (extracted) {
+      return `I've uploaded a PDF document. Here's the extracted content — use any relevant information (bio, links, social media, stats, contact info, press mentions, etc.) to enrich the brief:\n\n${extracted}\n\nAcknowledge what you found useful and continue.`;
+    }
+    return `I've uploaded a document. Please continue.`;
+  }
   return 'Please continue to the next step.';
 }
 
@@ -190,6 +197,52 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         }
       }
 
+      // ── PDF document: extract text + links via Claude ──
+      if (mediaAction === 'document_uploaded' && body.assetUrl) {
+        try {
+          const pdfRes = await fetch(body.assetUrl);
+          if (pdfRes.ok) {
+            const pdfBuffer = await pdfRes.arrayBuffer();
+            const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+
+            const docResponse = await createMessage({
+              model: HAIKU_MODEL,
+              max_tokens: 4000,
+              system: 'Extract ALL useful content from this PDF document. Return a structured summary with these sections (skip empty ones):\n\nBIO: (any biography or about text)\nCONTACT: (emails, phones, addresses)\nSOCIAL: (Instagram, TikTok, YouTube, Spotify, SoundCloud, etc. — include full URLs)\nSTATS: (follower counts, streams, chart positions, views)\nPRESS: (media mentions, publications, press quotes)\nAWARDS: (prizes, nominations, achievements)\nCOLLABORATORS: (featured artists, producers, partners)\nEVENTS: (upcoming shows, past festivals, residencies)\nLINKS: (ALL URLs found in the document)\nOTHER: (anything else relevant for building a website)\n\nOutput ONLY the structured text. Be thorough — extract every piece of information.',
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'Extract all content from this PDF:' },
+                  { type: 'document', source: { type: 'base64', media_type: 'application/pdf' as const, data: pdfBase64 } },
+                ],
+              }],
+            });
+
+            const extractedText = docResponse.content[0]?.type === 'text' ? docResponse.content[0].text : '';
+            const dInTokens = docResponse.usage?.input_tokens ?? 0;
+            const dOutTokens = docResponse.usage?.output_tokens ?? 0;
+            await db.costs.create({
+              project_id: params.projectId!, type: 'onboarding', model: HAIKU_MODEL,
+              input_tokens: dInTokens, output_tokens: dOutTokens,
+              cost_usd: dInTokens * INPUT_COST_PER_TOKEN + dOutTokens * OUTPUT_COST_PER_TOKEN,
+            });
+
+            if (extractedText) {
+              // Store extracted text in brief for reference
+              const existingExtracts = (brief?.data?.content?.document_extracts as string[]) ?? [];
+              await db.briefs.merge(params.projectId!, {
+                'content.document_extracts': [...existingExtracts, extractedText],
+              });
+
+              // Override synthetic message so Haiku gets the extracted content
+              body.extractedText = extractedText;
+            }
+          }
+        } catch (e) {
+          console.warn('[message] PDF extraction failed (non-fatal):', e);
+        }
+      }
+
       // Update brief metadata for the action (non-fatal)
       try {
         if (mediaAction === 'media_skipped' && fallback && type === 'hero') {
@@ -206,7 +259,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
       // Build synthetic message for Haiku
       const effectiveType = uploads?.[0]?.type ?? type;
-      const syntheticMsg = buildActionMessage(mediaAction, effectiveType, { fallback, note, sectionId, sectionTitle, choice, userContext, uploads });
+      const syntheticMsg = buildActionMessage(mediaAction, effectiveType, { fallback, note, sectionId, sectionTitle, choice, userContext, uploads, extractedText: body.extractedText });
 
       // Call Haiku with synthetic message (not stored as user message)
       const messages = compressHistory(conv.messages);
