@@ -860,11 +860,11 @@ if (hasPreview) {
         )}
         {isFreeSite && daysRemaining !== null && isLive && (
           <span class={`billing-badge ${daysRemaining <= 2 ? 'billing-badge--warn' : 'billing-badge--free'}`}>
-            {daysRemaining > 0 ? `${daysRemaining}z gratis` : 'Expirat'}
+            {daysRemaining > 0 ? `${daysRemaining}d free` : 'Expired'}
           </span>
         )}
         {isExpiredSite && (
-          <span class="billing-badge billing-badge--expired">Expirat</span>
+          <span class="billing-badge billing-badge--expired">Expired</span>
         )}
 
         {hasPreview && isBillingActive && (

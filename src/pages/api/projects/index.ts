@@ -65,7 +65,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const freeCount = await db.projects.countFree(user.id);
       if (freeCount >= 1) {
         return json(
-          { error: 'Ai deja un site gratuit. Activează-l pentru a crea altul.' },
+          { error: 'You already have a free site. Activate it to create another one.' },
           403
         );
       }
