@@ -85,7 +85,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 
     <form class="input-form" id="chat-form">
       <!-- Hidden file input — multiple, up to 5 -->
-      <input type="file" id="quick-file-input" accept=".svg,.png,.webp,.jpg,.jpeg,.gif,.heic" multiple hidden />
+      <input type="file" id="quick-file-input" accept=".svg,.png,.webp,.jpg,.jpeg,.gif,.heic,.pdf" multiple hidden />
 
       <div class="input-row">
         <button type="button" id="attach-btn" class="attach-btn" title="Attach image / logo" aria-label="Attach image or logo">
@@ -482,6 +482,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     menu:    { title: 'Menu Photo',        hint: 'JPG, PNG — photo of the menu — max 10 MB', accept: '.jpg,.jpeg,.png,.webp' },
     og:      { title: 'OG / Social Image', hint: 'JPG, PNG — 1200×630 — max 2 MB', accept: '.jpg,.jpeg,.png,.webp' },
     favicon: { title: 'Favicon',           hint: 'SVG or PNG — max 512 KB',    accept: '.svg,.png,.ico' },
+    document:{ title: 'Document',          hint: 'PDF, images — max 20 MB',    accept: '.pdf,.jpg,.jpeg,.png,.webp,.svg' },
   };
 
   function buildWidget(uiAction) {
@@ -799,6 +800,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   function inferAssetType(file) {
     var t = (file.type || '').toLowerCase();
     if (t === 'image/svg+xml') return 'logo';
+    if (t === 'application/pdf' || /\.pdf$/i.test(file.name)) return 'document';
     if (t.startsWith('video/')) return 'video';
     if (t.startsWith('font/') || /\.(woff2?|ttf|otf)$/i.test(file.name)) return 'font';
     return 'section';

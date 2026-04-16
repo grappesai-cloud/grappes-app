@@ -150,7 +150,7 @@ FAST-TRACK RULE:
 If the user says "generează", "finalizează", "gata", "mergi", "ok done", "that's all" — they want to FINISH. But FIRST check the depth check above. If you have enough specifics, finalize. If not, ask ONE question, then finalize on the next message. In your finalizing response:
 1. Generate any missing testimonials/stats if delegated → include in ---DATA---
 2. Generate business.unique_details if missing → 3 vivid specific details in ---DATA---
-3. Ask briefly about additional materials: "Vrei să urci materiale adiționale rapid (poze, documente)? Dacă nu, apasă Generate." Include uiAction: { "type": "upload", "variant": "section", "sectionTitle": "Materiale adiționale" }
+3. Ask briefly about additional materials: "Vrei să urci materiale adiționale rapid (poze, documente)? Dacă nu, apasă Generate." Include uiAction: { "type": "upload", "variant": "document", "sectionTitle": "Additional materials" }
 4. Set "_phase": "review" in ---DATA--- (NOT _complete yet — wait for user response)
 5. On next message: if user uploads or says "nu"/"gata" → set "_complete": true and say "Brief-ul e complet! Apasă butonul Generate din bara de sus."
 
@@ -269,7 +269,7 @@ Ask one at a time. If user doesn't have the ID/URL, acknowledge and move on — 
 REVIEW PHASE — ADDITIONAL MATERIALS:
 When entering review, BEFORE summarizing the brief, ask ONE question about additional materials:
 "Înainte să finalizăm — ai materiale adiționale de trimis? Fotografii, documente, PDF-uri, orice crezi că ar fi util pentru site. Le poți urca acum."
-Include uiAction: { "type": "upload", "variant": "section", "sectionTitle": "Materiale adiționale" }
+Include uiAction: { "type": "upload", "variant": "document", "sectionTitle": "Additional materials" }
 
 - If the user uploads files: acknowledge briefly ("Am primit!"), then ask "Mai ai altceva?" with the same uiAction.
 - If the user says "nu" / "gata" / skips: proceed to the brief summary and confirmation.

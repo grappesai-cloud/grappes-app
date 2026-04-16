@@ -17,6 +17,7 @@ const TYPE_LIMITS: Record<AssetType, number> = {
   font: 2 * 1024 * 1024,
   menu: 10 * 1024 * 1024,
   video: 50 * 1024 * 1024,
+  document: 20 * 1024 * 1024,
   other: 10 * 1024 * 1024,
 };
 
@@ -29,11 +30,12 @@ const ALLOWED_MIME: Record<AssetType, string[]> = {
   menu: ['image/png', 'image/jpeg', 'image/webp'],
   font: ['font/woff', 'font/woff2', 'font/ttf'],
   video: ['video/mp4', 'video/webm'],
+  document: ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'],
   other: ['image/png', 'image/jpeg', 'image/webp'],
 };
 
 // These formats are not converted — they're stored as-is (SVG is sanitized first)
-const NO_CONVERT = new Set(['image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon']);
+const NO_CONVERT = new Set(['image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon', 'application/pdf']);
 
 /** Strip dangerous elements/attributes from SVG to prevent stored XSS */
 function sanitizeSvg(svgBuffer: Buffer): Buffer {
@@ -58,7 +60,7 @@ function sanitizeSvg(svgBuffer: Buffer): Buffer {
   return Buffer.from(svg, 'utf-8');
 }
 
-const VALID_TYPES: AssetType[] = ['logo', 'hero', 'section', 'og', 'favicon', 'font', 'menu', 'other'];
+const VALID_TYPES: AssetType[] = ['logo', 'hero', 'section', 'og', 'favicon', 'font', 'menu', 'document', 'other'];
 
 /** Detect MIME type from file header magic bytes */
 function detectMimeFromHeader(h: Uint8Array): string | null {
@@ -91,6 +93,7 @@ function mimeToExt(mime: string): string {
     'font/woff': 'woff',
     'font/woff2': 'woff2',
     'font/ttf': 'ttf',
+    'application/pdf': 'pdf',
   };
   return map[mime] ?? 'webp';
 }

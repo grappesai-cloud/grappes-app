@@ -18,7 +18,7 @@ export type ProjectStatus =
   | 'failed'
   | 'archived';
 export type DeploymentStatus = 'queued' | 'building' | 'ready' | 'error' | 'canceled';
-export type AssetType = 'logo' | 'hero' | 'section' | 'og' | 'favicon' | 'font' | 'menu' | 'video' | 'other';
+export type AssetType = 'logo' | 'hero' | 'section' | 'og' | 'favicon' | 'font' | 'menu' | 'video' | 'document' | 'other';
 export type CostType = 'onboarding' | 'generation' | 'fix' | 'validation';
 export type ConversationPhase =
   | 'discovery'
