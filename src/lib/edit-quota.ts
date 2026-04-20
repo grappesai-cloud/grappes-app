@@ -1,9 +1,8 @@
 // ── Edit quota enforcement ────────────────────────────────────────────────────
 // Plans and monthly edit limits:
-//   free    (gratuit)   → 0 edits/month
-//   starter (€15/lună)  → 3 edits/month
-//   pro     (€100/an)   → 10 edits/month
-//   agency  (€250 lifetime) → 25 edits/month
+//   free    (gratuit)       → 0 edits/month
+//   pro     (€99/an)        → 10 edits/month
+//   agency  (€399 lifetime) → 25 edits/month
 //
 // Extra packs: +10 edits for €5 (non-expiring, consumed after monthly quota)
 //

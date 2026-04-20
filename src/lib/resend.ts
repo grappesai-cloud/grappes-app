@@ -595,12 +595,12 @@ export async function sendTrialStartedEmail(params: {
       </tr>
     </table>
     <p style="margin:0 0 24px;">After the trial, your site will be taken offline and you'll need an active plan to keep it live or create new sites.</p>
-    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Plans start at €15/month</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Plans start at €99/year</p>
     <p style="margin:0 0 4px;font-size:14px;">Activate now to keep your site live permanently.</p>
     ${emailBtn(`${SITE_URL}/dashboard`, 'Activate your site →')}
   `);
 
-  const text = `Your site is live — 7-day trial\n\n${params.siteName} is now live! You have 7 days to try it out for free.\n\nSite: ${params.siteUrl}\nTrial expires: ${expiryDate}\n\nAfter the trial, your site will be taken offline and you'll need an active plan to keep it live or create new sites.\n\nPlans start at €15/month. Activate now: ${SITE_URL}/dashboard`;
+  const text = `Your site is live — 7-day trial\n\n${params.siteName} is now live! You have 7 days to try it out for free.\n\nSite: ${params.siteUrl}\nTrial expires: ${expiryDate}\n\nAfter the trial, your site will be taken offline and you'll need an active plan to keep it live or create new sites.\n\nPlans start at €99/year. Activate now: ${SITE_URL}/dashboard`;
 
   return sendPlatformEmail({
     to: params.to,
@@ -666,10 +666,10 @@ export async function sendTrialFinalWarningEmail(params: {
       </tr>
     </table>
     ${emailBtn(`${SITE_URL}/dashboard`, 'Activate now — keep my site →')}
-    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €15/month. Cancel anytime.</p>
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €99/year. Cancel anytime.</p>
   `);
 
-  const text = `Last chance — your site goes offline tomorrow\n\nYour free trial for ${params.siteName} expires tomorrow (${expiryDate}).\n\nOnce expired, your site will be taken offline and all generated content will be deleted. To publish or create sites in the future, you'll need an active plan.\n\nActivate now: ${SITE_URL}/dashboard\n\nPlans start at €15/month. Cancel anytime.`;
+  const text = `Last chance — your site goes offline tomorrow\n\nYour free trial for ${params.siteName} expires tomorrow (${expiryDate}).\n\nOnce expired, your site will be taken offline and all generated content will be deleted. To publish or create sites in the future, you'll need an active plan.\n\nActivate now: ${SITE_URL}/dashboard\n\nPlans start at €99/year. Cancel anytime.`;
 
   return sendPlatformEmail({
     to: params.to,
@@ -691,7 +691,7 @@ export async function sendTrialExpiredEmail(params: {
     <p style="margin:0 0 24px;">Your 7-day free trial has ended and <span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.siteName)}</span> is no longer live.</p>
     <p style="margin:0 0 24px;">To bring your site back or create new ones, activate a paid plan. Your site content may still be recoverable if you act soon.</p>
     ${emailBtn(`${SITE_URL}/dashboard`, 'Reactivate my site →')}
-    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €15/month.</p>
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Plans start at €99/year.</p>
   `);
 
   const text = `Your trial has ended\n\n${params.siteName} has been taken offline after the 7-day free trial.\n\nTo bring your site back or create new ones, activate a paid plan.\n\nReactivate: ${SITE_URL}/dashboard`;

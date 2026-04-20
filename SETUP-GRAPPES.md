@@ -74,9 +74,9 @@ supabase db push
 2. Activate the account
 3. **Developers → API Keys** → copy secret + publishable → `STRIPE_SECRET_KEY`, `PUBLIC_STRIPE_PUBLISHABLE_KEY`
 4. Create products in Stripe Dashboard matching the pricing in `src/react/i18n/en.json`:
-   - Starter monthly (€15) → `STRIPE_PRICE_STARTER`
-   - Pro annual (€100) → `STRIPE_PRICE_PRO`
-   - Agency lifetime (€350) → `STRIPE_PRICE_AGENCY`
+   - Pro annual (€99) → `STRIPE_PRICE_PRO`
+   - Agency lifetime (€399) → `STRIPE_PRICE_AGENCY`
+   - Creative Direction (€949/yr) → `STRIPE_PRICE_CREATIVE_DIRECTION`
    - Multi-page variants → `MULTIPAGE_MONTHLY_PRICE_ID`, etc.
 5. Set up a webhook at `https://grappes.ai/api/webhooks/stripe` with events: `checkout.session.completed`, `customer.subscription.*`, `invoice.*` → copy signing secret → `STRIPE_WEBHOOK_SECRET`
 
