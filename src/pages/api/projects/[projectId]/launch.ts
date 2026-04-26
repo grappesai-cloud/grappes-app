@@ -186,6 +186,8 @@ export const POST: APIRoute = async ({ params, locals }) => {
 
 async function runPipeline(projectId: string) {
   const sub = (s: string | null) => db.projects.updateSubstatus(projectId, s);
+  const projectRow = await db.projects.findById(projectId);
+  const brandingRemoved = !!(projectRow as any)?.branding_removed;
 
   // ── Step 1: Load brief + assets from DB ─────────────────────────────────
   await sub('confirming_brief');
@@ -315,7 +317,7 @@ async function runPipeline(projectId: string) {
           pageHtml = injectEffectRuntimes(pageHtml);
           pageHtml = injectAnalytics(pageHtml, freshBrief.data, projectId);
           pageHtml = injectBookingWidget(pageHtml, freshBrief.data);
-          pageHtml = injectBacklink(pageHtml, { brandingRemoved: !!(project as any).branding_removed });
+          pageHtml = injectBacklink(pageHtml, { brandingRemoved });
           pageHtml = injectFormHandler(pageHtml, projectId);
 
           if (pageIdx === 0) homeHtml = pageHtml;
@@ -385,7 +387,7 @@ async function runPipeline(projectId: string) {
     html = injectEffectRuntimes(html);
     html = injectAnalytics(html, freshBrief.data, projectId);
     html = injectBookingWidget(html, freshBrief.data);
-    html = injectBacklink(html, { brandingRemoved: !!(project as any).branding_removed });
+    html = injectBacklink(html, { brandingRemoved });
     html = injectFormHandler(html, projectId);
   }
 
