@@ -187,8 +187,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     const brief = await db.briefs.findByProjectId(params.projectId!);
     newHtml = injectAnalytics(newHtml, brief?.data ?? {}, params.projectId!);
 
-    // Inject backlink + normalize copyright year
-    newHtml = injectBacklink(newHtml);
+    // Inject backlink + normalize copyright year (skip backlink if project paid to remove it)
+    newHtml = injectBacklink(newHtml, { brandingRemoved: !!(project as any).branding_removed });
 
     // Wire contact forms to /api/forms/:projectId
     newHtml = injectFormHandler(newHtml, params.projectId!);

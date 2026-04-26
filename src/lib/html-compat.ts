@@ -61,6 +61,29 @@ function addDataSectionAttributes(html: string): string {
   return html;
 }
 
+// ─── stripLenisFromHtml ─────────────────────────────────────────────────────
+// Edit mode only. Lenis (smooth-scroll lib) attaches wheel/touch listeners with
+// preventDefault and replaces native scroll with translateY transforms — both
+// break iframe interaction in the editor. We rip it out at three levels:
+//   1. <script src="…lenis…"> CDN tags (the most common install pattern)
+//   2. inline `new Lenis(...)` constructor calls (replaced with a no-op object)
+//   3. inline `lenis.raf(...)` / `lenis.on(...)` references that would now
+//      reference the no-op object (safe — they become no-ops too)
+// The head stub `window.Lenis = Stub` injected separately handles ESM imports
+// and any pattern we miss here.
+export function stripLenisFromHtml(html: string): string {
+  // 1. Remove CDN script tags
+  let out = html.replace(/<script[^>]*src=["'][^"']*lenis[^"']*["'][^>]*>\s*<\/script>/gi, '<!-- lenis stripped (edit mode) -->');
+
+  // 2. Replace `new Lenis(...)` with a no-op stub literal — neutralises the instance.
+  //    `on('scroll', cb)` is wired to native window scroll so ScrollTrigger.update
+  //    keeps firing. raf/start/stop are no-ops; native scroll is in charge now.
+  const noopLiteral = '({destroy:function(){},on:function(e,c){if(e==="scroll"&&typeof c==="function")window.addEventListener("scroll",function(){try{c(this);}catch(_){}}, {passive:true});return this;},off:function(){return this;},raf:function(){},start:function(){},stop:function(){},resize:function(){if(window.ScrollTrigger&&window.ScrollTrigger.refresh)window.ScrollTrigger.refresh();},scrollTo:function(t,o){var y=0;if(typeof t==="number")y=t;else if(t&&t.nodeType===1){var r=t.getBoundingClientRect();y=r.top+window.pageYOffset+((o&&o.offset)||0);}window.scrollTo(0,y);}})';
+  out = out.replace(/new\s+Lenis\s*\([^)]*\)/g, noopLiteral);
+
+  return out;
+}
+
 // ─── injectWnIds ────────────────────────────────────────────────────────────
 // Adds stable `data-wn-id` attributes to all editable leaf elements.
 // IDs are short deterministic counters (wn-0001, wn-0002, …).
@@ -97,6 +120,7 @@ export function injectWnIds(html: string): string {
 export function injectEditModeIntoFullPage(fullHtml: string): string {
   fullHtml = addDataSectionAttributes(fullHtml);
   fullHtml = injectWnIds(fullHtml);
+  fullHtml = stripLenisFromHtml(fullHtml);
 
   const editCss = `
     * { box-sizing: border-box; }
@@ -148,9 +172,23 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
     if(window.lenis){try{window.lenis.destroy();}catch(e){}}
     document.documentElement.style.setProperty('overflow','auto','important');
     document.body.style.setProperty('overflow','auto','important');
-    // Also catch late Lenis init
-    var _origLenis=window.Lenis;
-    if(_origLenis){window.Lenis=function(){var inst=new _origLenis(...arguments);setTimeout(function(){try{inst.destroy();}catch(e){}document.documentElement.style.setProperty('overflow','auto','important');document.body.style.setProperty('overflow','auto','important');},100);return inst;};}
+
+    // Reset ScrollTrigger to native scroll AFTER the page's own setup runs.
+    // Sonnet often wires ScrollTrigger.scrollerProxy(...) to Lenis — that proxy
+    // stops returning real scroll positions once we neutralise Lenis.
+    function resetScrollTrigger(){
+      if(!window.ScrollTrigger)return;
+      try{
+        if(typeof window.ScrollTrigger.scrollerProxy==='function')
+          window.ScrollTrigger.scrollerProxy(document.documentElement);
+        if(typeof window.ScrollTrigger.normalizeScroll==='function')
+          window.ScrollTrigger.normalizeScroll(false);
+        if(typeof window.ScrollTrigger.refresh==='function')
+          window.ScrollTrigger.refresh();
+      }catch(e){if(window.console)console.warn('[edit-mode] ScrollTrigger reset failed:',e);}
+    }
+    if(document.readyState==='complete')setTimeout(resetScrollTrigger,200);
+    else window.addEventListener('load',function(){setTimeout(resetScrollTrigger,200);});
 
     var TEXT_TAGS = {h1:1,h2:1,h3:1,h4:1,h5:1,h6:1,p:1,a:1,button:1,li:1,label:1,blockquote:1,figcaption:1,td:1,th:1,span:1,small:1,strong:1,em:1,b:1,i:1,u:1,mark:1,cite:1,time:1,address:1,dt:1,dd:1,caption:1,legend:1,summary:1,div:1};
     var editing = false;
@@ -643,7 +681,13 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
     });
   })();`;
 
+  // Stub window.Lenis BEFORE any other script runs, so generated `new Lenis()`
+  // calls produce a no-op instance that doesn't capture wheel events.
+  // This must be the first script in <head> to win the race against Lenis CDN.
+  const lenisStub = `(function(){try{var noop=function(){};var listeners={};function Stub(){var self=this;this.destroy=noop;this.off=function(ev,cb){var arr=listeners[ev];if(!arr)return;var i=arr.indexOf(cb);if(i>=0)arr.splice(i,1);if(ev==='scroll'&&cb)window.removeEventListener('scroll',cb);};this.on=function(ev,cb){if(typeof cb!=='function')return self;listeners[ev]=listeners[ev]||[];listeners[ev].push(cb);if(ev==='scroll'){window.addEventListener('scroll',function(){try{cb(self);}catch(_){}},{passive:true});}return self;};this.raf=noop;this.start=noop;this.stop=noop;this.resize=function(){if(window.ScrollTrigger&&typeof window.ScrollTrigger.refresh==='function')window.ScrollTrigger.refresh();};this.scrollTo=function(t,o){var y=0;if(typeof t==='number')y=t;else if(t&&t.nodeType===1){var r=t.getBoundingClientRect();y=r.top+window.pageYOffset+((o&&o.offset)||0);}window.scrollTo(0,y);};return this;}var existing=Object.getOwnPropertyDescriptor(window,'Lenis');if(!existing||existing.configurable!==false){try{Object.defineProperty(window,'Lenis',{configurable:true,get:function(){return Stub;},set:function(){}});}catch(_){window.Lenis=Stub;}}else{window.Lenis=Stub;}window.lenis=new Stub();}catch(e){if(window&&window.console)console.warn('[edit-mode] Lenis neutralisation failed:',e);}})();`;
+
   return fullHtml
+    .replace(/<head(\s[^>]*)?>/, (m) => `${m}\n  <script>${lenisStub}</script>`)
     .replace('</head>', `  <style>/* Edit mode */${editCss}</style>\n</head>`)
     .replace('</body>', `  <script>${editScript}</script>\n</body>`);
 }

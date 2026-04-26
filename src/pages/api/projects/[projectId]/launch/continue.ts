@@ -92,7 +92,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
   } catch {}
   html = injectEffectRuntimes(html);
   html = injectAnalytics(html, brief.data, params.projectId!);
-  html = injectBacklink(html);
+  html = injectBacklink(html, { brandingRemoved: !!(project as any).branding_removed });
   html = injectFormHandler(html, params.projectId!);
   result.page.html = html;
 

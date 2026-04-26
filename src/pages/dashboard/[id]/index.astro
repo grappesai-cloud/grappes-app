@@ -1,6 +1,20 @@
 ---
 import OnboardingChat from '../../../components/islands/OnboardingChat.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
+import SupportChatWidget from '../../../components/SupportChatWidget.astro';
+import OnboardingTour from '../../../components/OnboardingTour.astro';
+
+const editorTourSteps = [
+  { selector: '.topbar-link[aria-label="Back to projects"]', title: 'Back to your projects', body: 'Click the Projects link anytime to return to your project list.' },
+  { selector: '#section-list', title: 'Section list', body: 'Every section of your site appears here. Click one to select it on the canvas.' },
+  { selector: '#edit-input', title: 'Plain-English edits', body: 'Describe the change you want — Grappes rewrites the section instantly.' },
+  { selector: '#ve-bg-toggle-btn', title: 'Section backgrounds', body: 'Pick this toggle to recolor a section background without leaving the editor.' },
+  { selector: '#ve-bgimg-toggle-btn', title: 'Background images', body: 'Swap any background image directly from this panel.' },
+  { selector: '#history-toggle-btn', title: 'Version history', body: 'Every edit is versioned. Open this to compare and roll back.' },
+  { selector: '.topbar-btn--share', title: 'Share preview', body: 'Copy a private preview URL to share with teammates or clients before going live.' },
+  { selector: '#publish-btn, #launch-btn, #activate-btn', title: 'Publish', body: 'When the brief and edits look good, this button pushes your site live to the world.' },
+  { selector: '#domain-strip', title: 'Custom domain', body: 'Connect (or buy) a custom domain from this strip — no DNS knowledge required.' },
+];
 import { db } from '../../../lib/db';
 import { getSitePrice } from '../../../lib/site-billing';
 import { generateShareToken } from '../../preview/[projectId]';
@@ -41,6 +55,7 @@ const isBillingActive = billingStatus === 'active';
 const isFreeSite      = billingStatus === 'free';
 const isExpiredSite   = billingStatus === 'expired';
 const showActivate    = (isFreeSite || isExpiredSite) && hasPreview;
+const isBrandingRemoved = !!(project as any).branding_removed;
 
 const expiresAt = project.expires_at ? new Date(project.expires_at) : null;
 const daysRemaining = expiresAt
@@ -760,10 +775,16 @@ if (hasPreview) {
       border-bottom: 1px solid rgba(34,197,94,0.12);
       display: flex; align-items: center; gap: 8px; font-size: 12px; flex-shrink: 0;
       border-radius: 16px 16px 0 0;
+      position: relative; z-index: 3; pointer-events: auto;
     }
     .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
-    .live-url { color: #4ade80; }
+    .live-url {
+      color: #4ade80;
+      pointer-events: auto; cursor: pointer;
+      text-decoration: none;
+    }
+    .live-url:hover { text-decoration: underline; }
 
     /* Mobile tab toggle (chat / preview) */
     .mobile-tabs {
@@ -853,6 +874,12 @@ if (hasPreview) {
         )}
         {hasPreview && (
           <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
+        )}
+        {hasPreview && !isBrandingRemoved && (
+          <button type="button" class="topbar-btn topbar-btn--remove-brand" id="remove-brand-btn" title="Remove the by grappes.dev badge from your site">Remove badge</button>
+        )}
+        {hasPreview && isBrandingRemoved && (
+          <span class="billing-badge billing-badge--active" title="Grappes badge removed">No badge ✓</span>
         )}
         {/* Billing status badge */}
         {isBillingActive && (
@@ -1272,44 +1299,7 @@ if (hasPreview) {
     </div>
   </div>
 
-  <!-- Onboarding Tour Overlay -->
-  {hasPreview && (
-    <div id="tour-overlay" style="display:none;">
-      <div class="tour-backdrop"></div>
-      <div class="tour-tooltip" id="tour-tooltip">
-        <div class="tour-step-indicator" id="tour-step-indicator">1 / 3</div>
-        <p class="tour-text" id="tour-text"></p>
-        <div class="tour-actions">
-          <button class="tour-next-btn" id="tour-next-btn">Next →</button>
-        </div>
-      </div>
-    </div>
-  )}
-
   <style>
-    /* Tour overlay */
-    .tour-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 900;
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-    .tour-tooltip {
-      position: fixed; z-index: 901; max-width: 280px;
-      background: rgba(255,255,255,0.95); color: #1a1a2e;
-      border-radius: 16px; padding: 20px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
-      animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1);
-    }
-    @keyframes slideUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
-    .tour-step-indicator { font-size: 11px; font-weight: 600; color: rgba(0,0,0,0.4); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
-    .tour-text { font-size: 14px; line-height: 1.6; color: #1a1a2e; margin: 0 0 16px; }
-    .tour-next-btn {
-      background: #06bfdd; color: #1a1a2e; border: none; border-radius: 20px;
-      padding: 8px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-      transition: all 0.2s; width: 100%;
-    }
-    .tour-next-btn:hover { background: #00e088; }
-
     /* Billing badges */
     .billing-badge {
       display: inline-flex; align-items: center;
@@ -1678,61 +1668,6 @@ if (hasPreview) {
     }
 
     // VIEWPORT TOGGLES (panel sidebar)
-
-    // ONBOARDING TOUR
-    const TOUR_KEY = 'grappes_tour_done';
-
-    const TOUR_STEPS = [
-      { text: 'Select a section from the list on the left to start editing it.', anchor: '#section-list' },
-      { text: 'Describe the change you want.', anchor: '#edit-input' },
-      { text: 'Publish your site with one click using the Publish button above.', anchor: '#publish-btn' },
-    ];
-
-    if (hasPreview && !localStorage.getItem(TOUR_KEY)) {
-      let tourStep = 0;
-      const overlay = document.getElementById('tour-overlay');
-      const tooltip = document.getElementById('tour-tooltip');
-      const stepInd = document.getElementById('tour-step-indicator');
-      const tourText = document.getElementById('tour-text');
-      const nextBtn = document.getElementById('tour-next-btn');
-
-      function positionTourTooltip(anchorSelector) {
-        const anchor = document.querySelector(anchorSelector);
-        if (!anchor || !tooltip) return;
-        const rect = anchor.getBoundingClientRect();
-        const tipW = 280, tipH = 140;
-        let top = rect.bottom + 12;
-        let left = rect.left;
-        if (top + tipH > window.innerHeight) top = rect.top - tipH - 12;
-        if (left + tipW > window.innerWidth) left = window.innerWidth - tipW - 16;
-        if (left < 8) left = 8;
-        tooltip.style.top = top + 'px';
-        tooltip.style.left = left + 'px';
-      }
-
-      function showTourStep(step) {
-        if (!overlay || !tourText || !stepInd || !nextBtn) return;
-        overlay.style.display = 'block';
-        const s = TOUR_STEPS[step];
-        stepInd.textContent = `${step + 1} / ${TOUR_STEPS.length}`;
-        tourText.textContent = s.text;
-        nextBtn.textContent = step === TOUR_STEPS.length - 1 ? 'Got it!' : 'Next →';
-        positionTourTooltip(s.anchor);
-      }
-
-      nextBtn?.addEventListener('click', () => {
-        tourStep++;
-        if (tourStep >= TOUR_STEPS.length) {
-          if (overlay) overlay.style.display = 'none';
-          localStorage.setItem(TOUR_KEY, '1');
-        } else {
-          showTourStep(tourStep);
-        }
-      });
-
-      // Show tour after sections load (small delay)
-      setTimeout(() => showTourStep(0), 1500);
-    }
 
     // VERSION HISTORY
     const historyToggleBtn = document.getElementById('history-toggle-btn');
@@ -3080,5 +3015,169 @@ if (hasPreview) {
       });
     })();
   </script>
+
+  {hasPreview && !isBrandingRemoved && (
+    <div id="rb-modal" class="rb-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rb-modal-title">
+      <div class="rb-backdrop" id="rb-backdrop"></div>
+      <div class="rb-card">
+        <button type="button" class="rb-close" id="rb-close" aria-label="Close">×</button>
+        <div class="rb-eyebrow">One-time purchase</div>
+        <h3 class="rb-title" id="rb-modal-title">Remove the “by grappes.dev” badge</h3>
+        <p class="rb-body">
+          Your published site shows a small “by grappes.dev” link in the bottom-right corner.
+          Pay once and it disappears forever — no subscription, no renewal.
+        </p>
+        <ul class="rb-list">
+          <li>One-time payment, no subscription</li>
+          <li>Site is automatically re-deployed without the badge</li>
+          <li>Applies to this project only</li>
+        </ul>
+        <div class="rb-price-row">
+          <span class="rb-price">$5</span>
+          <span class="rb-price-sub">USD · one-time</span>
+        </div>
+        <div class="rb-actions">
+          <button type="button" class="rb-cancel" id="rb-cancel">Maybe later</button>
+          <button type="button" class="rb-pay" id="rb-pay" data-project-id={id}>
+            Pay $5 and remove badge →
+          </button>
+        </div>
+        <p class="rb-fineprint">Powered by Stripe. Secure checkout, no card details ever touch our servers.</p>
+      </div>
+    </div>
+  )}
+
+  <style>
+    .topbar-btn--remove-brand {
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    .topbar-btn--remove-brand:hover {
+      background: rgba(108,107,243,0.18); color: #fff; border-color: rgba(108,107,243,0.55);
+    }
+    .rb-modal { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; }
+    .rb-modal[hidden] { display: none; }
+    .rb-backdrop {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      animation: rbFadeIn 0.18s ease;
+    }
+    @keyframes rbFadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .rb-card {
+      position: relative; z-index: 1;
+      width: 460px; max-width: calc(100vw - 32px);
+      background: linear-gradient(180deg, rgba(28,28,38,0.98), rgba(18,18,26,0.98));
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(108,107,243,0.18) inset;
+      padding: 28px 28px 22px;
+      color: #fff; font-family: 'DM Sans', sans-serif;
+      animation: rbSlide 0.22s cubic-bezier(0.16,1,0.3,1);
+    }
+    @keyframes rbSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .rb-close {
+      position: absolute; top: 12px; right: 12px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.05); border: none; color: rgba(255,255,255,0.6);
+      font-size: 22px; line-height: 1; cursor: pointer; padding: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .rb-close:hover { background: rgba(255,255,255,0.10); color: #fff; }
+    .rb-eyebrow {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      letter-spacing: 0.10em; text-transform: uppercase;
+      color: #06bfdd; margin-bottom: 10px;
+    }
+    .rb-title { font-size: 22px; font-weight: 700; line-height: 1.25; margin: 0 0 12px; letter-spacing: -0.015em; color: #fff; }
+    .rb-body { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.72); margin: 0 0 16px; }
+    .rb-list { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .rb-list li { font-size: 13px; color: rgba(255,255,255,0.78); padding-left: 22px; position: relative; }
+    .rb-list li::before { content: '✓'; position: absolute; left: 0; top: 0; color: #06bfdd; font-weight: 700; }
+    .rb-price-row { display: flex; align-items: baseline; gap: 8px; margin: 0 0 18px; padding: 14px 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
+    .rb-price { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+    .rb-price-sub { font-size: 13px; color: rgba(255,255,255,0.5); }
+    .rb-actions { display: flex; gap: 10px; align-items: center; }
+    .rb-cancel {
+      background: none; border: 1px solid rgba(255,255,255,0.16); color: rgba(255,255,255,0.7);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 11px 16px; border-radius: 10px; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .rb-cancel:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .rb-pay {
+      flex: 1; background: linear-gradient(135deg, #06bfdd, #6c6bf3);
+      border: none; color: #0a0a0a; font-family: inherit; font-size: 14px; font-weight: 700;
+      padding: 12px 18px; border-radius: 10px; cursor: pointer; letter-spacing: -0.005em;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .rb-pay:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(6,191,221,0.35); }
+    .rb-pay:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+    .rb-fineprint { font-size: 11px; color: rgba(255,255,255,0.4); margin: 14px 0 0; text-align: center; }
+  </style>
+
+  <script is:inline>
+    (function () {
+      var openBtn  = document.getElementById('remove-brand-btn');
+      var modal    = document.getElementById('rb-modal');
+      if (!openBtn || !modal) return;
+
+      var backdrop = document.getElementById('rb-backdrop');
+      var closeBtn = document.getElementById('rb-close');
+      var cancelBtn = document.getElementById('rb-cancel');
+      var payBtn   = document.getElementById('rb-pay');
+      var projectId = payBtn && payBtn.dataset.projectId;
+
+      function open()  { modal.hidden = false; document.body.style.overflow = 'hidden'; }
+      function close() { modal.hidden = true;  document.body.style.overflow = ''; }
+
+      openBtn.addEventListener('click', open);
+      closeBtn && closeBtn.addEventListener('click', close);
+      cancelBtn && cancelBtn.addEventListener('click', close);
+      backdrop && backdrop.addEventListener('click', close);
+      document.addEventListener('keydown', function (e) {
+        if (!modal.hidden && e.key === 'Escape') close();
+      });
+
+      payBtn && payBtn.addEventListener('click', async function () {
+        if (!projectId) return;
+        var orig = payBtn.textContent;
+        payBtn.disabled = true;
+        payBtn.textContent = 'Redirecting to Stripe…';
+        try {
+          var res = await fetch('/api/billing/remove-branding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ projectId: projectId }),
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (res.ok && data.url) {
+            window.location.href = data.url;
+            return;
+          }
+          alert(data.error || 'Could not start checkout. Please try again.');
+        } catch (e) {
+          alert('Network error. Please try again.');
+        } finally {
+          payBtn.disabled = false;
+          payBtn.textContent = orig;
+        }
+      });
+
+      // Auto-show success toast if we just came back from Stripe
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('branding_removed') === '1') {
+        var toast = document.createElement('div');
+        toast.textContent = '✓ Badge removed — your site will redeploy in a moment.';
+        toast.style.cssText = 'position:fixed;top:80px;right:24px;z-index:9700;background:linear-gradient(135deg,#06bfdd,#6c6bf3);color:#0a0a0a;padding:14px 20px;border-radius:12px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:700;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
+        document.body.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 6000);
+        history.replaceState({}, '', window.location.pathname);
+      }
+    })();
+  </script>
+
+  <SupportChatWidget />
+  <OnboardingTour tourId="editor" steps={editorTourSteps} helpButtonLabel="Tour" />
 </body>
 </html>

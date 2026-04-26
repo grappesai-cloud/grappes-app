@@ -195,6 +195,52 @@ export const POST: APIRoute = async ({ request }) => {
           break;
         }
 
+        // ── Remove "by grappes.dev" badge (one-time $5) ──────────────
+        if (session.metadata?.type === 'remove_branding' && session.metadata?.project_id) {
+          const projectId  = session.metadata.project_id;
+          const userId     = session.metadata.user_id;
+          const customerId = typeof session.customer === 'string' ? session.customer : null;
+
+          await client
+            .from('projects')
+            .update({ branding_removed: true, updated_at: new Date().toISOString() })
+            .eq('id', projectId);
+
+          if (customerId && userId) {
+            await client.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
+          }
+
+          console.log(`[Stripe webhook] Branding removed for project ${projectId}`);
+
+          // Re-deploy the live site so the badge disappears immediately.
+          // Strip the badge from the latest stored HTML and push to Vercel.
+          try {
+            const proj = await db.projects.findById(projectId);
+            if (proj?.vercel_project_id && proj.billing_status === 'active') {
+              const latest = await db.generatedFiles.findLatest(projectId);
+              if (latest?.files && Object.keys(latest.files).length > 0) {
+                const { stripGrappesBacklink } = await import('../../../lib/creative-generation');
+                const cleaned: Record<string, string> = {};
+                for (const [k, v] of Object.entries(latest.files as Record<string, string>)) {
+                  cleaned[k] = typeof v === 'string' ? stripGrappesBacklink(v) : v;
+                }
+                const { deployHtml } = await import('../../../lib/vercel-api');
+                const projectNameSafe = (proj.name || 'grappes-site')
+                  .toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52) || 'grappes-site';
+                const result = await deployHtml(proj.vercel_project_id, projectNameSafe, cleaned);
+                if (result.ok) {
+                  console.log(`[Stripe webhook] Re-deployed ${projectId} without grappes badge`);
+                } else {
+                  console.warn(`[Stripe webhook] Badge-removal redeploy failed for ${projectId}:`, result.error);
+                }
+              }
+            }
+          } catch (redeployErr) {
+            console.error('[Stripe webhook] Badge-removal redeploy threw:', redeployErr);
+          }
+          break;
+        }
+
         // ── Multi-page add-on (subscription or lifetime one-time) ────
         if (session.metadata?.type === 'multipage_addon' && session.metadata?.user_id) {
           const userId     = session.metadata.user_id;

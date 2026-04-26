@@ -641,11 +641,14 @@ export function injectBookingWidget(html: string, brief: Record<string, any>): s
 // ─── Inject Backlink ─────────────────────────────────────────────────────────
 // Injects adsnow.ro backlink and normalizes copyright year before saving.
 
-export function injectBacklink(html: string): string {
+export function injectBacklink(html: string, opts?: { brandingRemoved?: boolean }): string {
   const currentYear = new Date().getFullYear().toString();
 
   // Normalize any old copyright year (e.g. © 2024, © 2023) to current year
   let result = html.replace(/©\s*20[0-9]{2}/g, `© ${currentYear}`);
+
+  // Skip the badge for projects that paid to remove branding.
+  if (opts?.brandingRemoved) return result;
 
   const backlink = `\n<!-- grappes.dev -->\n<div style="position:fixed;bottom:8px;right:12px;z-index:9999;font-size:11px;opacity:0.55;pointer-events:auto;font-family:sans-serif"><a href="https://grappes.dev" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">by grappes.dev</a></div>`;
 
@@ -654,6 +657,16 @@ export function injectBacklink(html: string): string {
     return result.slice(0, bodyClose) + backlink + '\n' + result.slice(bodyClose);
   }
   return result + backlink;
+}
+
+// Strip the injected grappes.dev backlink in-place from any HTML that already had it.
+// Used by the webhook after a successful "remove branding" purchase to clean up
+// already-deployed HTML before re-deploying it.
+export function stripGrappesBacklink(html: string): string {
+  return html
+    .replace(/\n?<!-- grappes\.dev -->\n?<div[^>]*>\s*<a[^>]*href="https:\/\/grappes\.dev"[^>]*>[^<]*<\/a>\s*<\/div>/g, '')
+    // Defensive cleanup if the comment was lost but the styled div remains.
+    .replace(/<div[^>]*z-index:9999[^>]*>\s*<a[^>]*href="https:\/\/grappes\.dev"[^>]*>by grappes\.dev<\/a>\s*<\/div>/g, '');
 }
 
 // ─── Inject Form Handler ─────────────────────────────────────────────────────

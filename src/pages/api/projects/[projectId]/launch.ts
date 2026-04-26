@@ -315,7 +315,7 @@ async function runPipeline(projectId: string) {
           pageHtml = injectEffectRuntimes(pageHtml);
           pageHtml = injectAnalytics(pageHtml, freshBrief.data, projectId);
           pageHtml = injectBookingWidget(pageHtml, freshBrief.data);
-          pageHtml = injectBacklink(pageHtml);
+          pageHtml = injectBacklink(pageHtml, { brandingRemoved: !!(project as any).branding_removed });
           pageHtml = injectFormHandler(pageHtml, projectId);
 
           if (pageIdx === 0) homeHtml = pageHtml;
@@ -385,7 +385,7 @@ async function runPipeline(projectId: string) {
     html = injectEffectRuntimes(html);
     html = injectAnalytics(html, freshBrief.data, projectId);
     html = injectBookingWidget(html, freshBrief.data);
-    html = injectBacklink(html);
+    html = injectBacklink(html, { brandingRemoved: !!(project as any).branding_removed });
     html = injectFormHandler(html, projectId);
   }
 

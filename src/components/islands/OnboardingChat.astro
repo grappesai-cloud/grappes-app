@@ -259,7 +259,8 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     // Question lists and open-ended prompts stay as plain bullets.
     var looksLikeQuestions = chips.some(function(c){ return /\?\s*$/.test(c); });
     var tooLong = chips.some(function(c){ return c.length > 60; });
-    var useChips = chips.length >= 2 && chips.length <= 6 && !looksLikeQuestions && !tooLong;
+    var isColorCategoryChips = chips.length > 0 && chips.every(function(c){ return /^(primary|secondary|accent)\s+colou?rs?\b/i.test(c.trim()); });
+    var useChips = chips.length >= 2 && chips.length <= 6 && !looksLikeQuestions && !tooLong && !isColorCategoryChips;
 
     var preText  = '';
     var postText = '';
