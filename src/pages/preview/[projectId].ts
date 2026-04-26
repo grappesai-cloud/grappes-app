@@ -96,7 +96,7 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
     // + third-party integrations (analytics providers, booking widgets, audio embeds).
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://www.googletagmanager.com https://plausible.io https://cdn.usefathom.com https://app.cal.com https://assets.calendly.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://www.googletagmanager.com https://plausible.io https://cdn.usefathom.com https://app.cal.com https://assets.calendly.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://assets.calendly.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https: http:",
