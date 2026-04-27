@@ -144,7 +144,8 @@ Think: "What would a creative agency with a $50K budget design?" Not three cards
 
 - Output ONLY the complete HTML. No explanation.
 - Every word of copy: specific to THIS brand. No generic text.
-- Be bold. Make something that stops the scroll.`;
+- Be bold. Make something that stops the scroll.
+- NEVER FABRICATE REAL-WORLD ARTIFACTS: do not invent track titles, album names, book titles, product SKUs, case-study client names, project names, award names, press outlet names, or any other "thing" that would exist as a real product/release in the world. Only mention these if they are explicitly in the brief (or marked [EXACT]). Inventing them feels like a lie when the visitor recognizes them as fake — and they will. For density around real assets (audio embeds, links, images), use the artist's voice/quotes/tagline/dates from the brief instead.`;
 
 // ─── Reference Pool ──────────────────────────────────────────────────────────
 
@@ -387,7 +388,9 @@ Embed patterns:
 - SoundCloud track URL → <iframe src="https://w.soundcloud.com/player/?url=ENCODED_URL&color=%23ff5500&auto_play=false" width="100%" height="166">
 - Apple Music (music.apple.com/...) → <iframe src="https://embed.music.apple.com/..." height="450" allow="autoplay *; encrypted-media *">
 
-Style the section immersively: large, full-bleed or edge-to-edge, typography-heavy intro ("Listen.", "Now Playing.", etc).`;
+Style the section immersively: large, full-bleed or edge-to-edge, typography-heavy intro ("Listen.", "Now Playing.", etc).
+
+CRITICAL — DO NOT INVENT TRACKS: Render ONLY the embeds in the URL list above — one iframe per URL, nothing more. Do NOT write track listings, fake release titles, fake album names, fake catalog numbers, or any text that looks like a discography unless those titles are explicitly in the brief content (e.g. brief.content.releases or [EXACT] sacred fields). Plausible-sounding fake titles ("Club Original", "Underground Protocol", "Volume One", "EP-23") are FORBIDDEN — readers will recognize them as fake and it destroys credibility. If you need more visual density around the embeds, use real assets from the brief (artist quotes, press mentions, tour dates, the artist's tagline) — never invented track metadata.`;
   }
 
   // Hero video flag (separate from media.videoUrl which is an actual asset)
