@@ -5,7 +5,6 @@ import { checkRateLimit, checkPersistentRateLimit, recordPersistentRateLimit } f
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
-  grammarCheckHtml,
   injectEffectRuntimes,
   injectAnalytics,
   injectBookingWidget,
@@ -18,7 +17,6 @@ import {
 } from '../../../../lib/creative-generation';
 import { runStructuralQA } from '../../../../lib/structural-qa';
 import { runPostQA } from '../../../../lib/post-qa';
-import { INPUT_COST_PER_TOKEN, OUTPUT_COST_PER_TOKEN } from '../../../../lib/anthropic';
 
 import { json } from '../../../../lib/api-utils';
 // Vercel Fluid Compute — up to 800s
@@ -397,61 +395,18 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
     html = injectFormHandler(html, projectId);
   }
 
-  // ── Grammar check (Haiku, ~3s, only for non-English) ────────────────────
-  if (locale !== 'en') {
-    try {
-      const gc = await grammarCheckHtml({ html, locale });
-      if (gc.corrections > 0) {
-        html = gc.html;
-        totalInputTokens += gc.inputTokens;
-        totalOutputTokens += gc.outputTokens;
-        totalCost += gc.inputTokens * INPUT_COST_PER_TOKEN + gc.outputTokens * OUTPUT_COST_PER_TOKEN;
-        console.log(`[launch] Grammar check: ${gc.corrections} correction(s) in ${locale}`);
-      }
-    } catch (e) {
-      console.warn('[launch] Grammar check failed (non-blocking):', e);
-    }
-    // Grammar check inner pages too
-    if (multiPageFiles) {
-      for (const page of multiPageFiles) {
-        try {
-          const pgc = await grammarCheckHtml({ html: page.html, locale });
-          if (pgc.corrections > 0) {
-            page.html = pgc.html;
-            totalInputTokens += pgc.inputTokens;
-            totalOutputTokens += pgc.outputTokens;
-            totalCost += pgc.inputTokens * INPUT_COST_PER_TOKEN + pgc.outputTokens * OUTPUT_COST_PER_TOKEN;
-            console.log(`[launch] Grammar check (${page.title}): ${pgc.corrections} correction(s)`);
-          }
-        } catch (pe) {
-          console.warn(`[launch] Grammar check failed for ${page.title} (non-blocking):`, pe);
-        }
-      }
-    }
-  }
+  // Grammar check (Haiku) was previously run here for non-English locales,
+  // but the Sonnet system prompt already enforces locale strictly via the
+  // language directive. The extra Haiku pass added 10-30s to the critical
+  // path with marginal value — removed to fit within Vercel's 300s function
+  // budget on Hobby plans.
 
   // Structural QA (in-memory, instant)
   const structuralReport = runStructuralQA(html);
   const allIssues = structuralReport.checks.filter(c => !c.passed).map(c => `[structural] ${c.name}: ${c.message}`);
 
-  // Post-generation QA (brief-aware: placeholder text, brand asset usage,
-  // missing sections, broken anchors, Haiku verdict). Non-blocking — if it
-  // fails, the site still ships.
-  let postReport: Awaited<ReturnType<typeof runPostQA>> | null = null;
-  try {
-    const expectedSections = (brief?.data?.business?.selectedSections as string[]) ?? [];
-    postReport = await runPostQA({
-      html,
-      brief: brief?.data ?? {},
-      assets: assetData.map(a => ({ type: a.type, url: a.url })),
-      expectedSections,
-    });
-    console.log(`[launch] Post-QA: score ${postReport.score}, ${postReport.issues.length} issue(s) — verdict: ${postReport.haikuVerdict}`);
-  } catch (qaErr) {
-    console.warn('[launch] Post-QA threw (non-fatal):', qaErr);
-  }
-
   // ── Step 8: Save to DB as FULL_PAGE_KEY ─────────────────────────────────
+  // Save BEFORE post-QA so the site is persisted even if Haiku QA times out.
   const existingGen = await db.generatedFiles.findLatest(projectId);
   const version = (existingGen?.version ?? 0) + 1;
 
@@ -459,7 +414,6 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
     [FULL_PAGE_KEY]: html,
     '__structural-qa.json': JSON.stringify(structuralReport, null, 2),
     '__qa_status': allIssues.length === 0 ? 'passed' : 'failed',
-    ...(postReport && { '__post-qa.json': JSON.stringify(postReport, null, 2) }),
   };
 
   // Store multi-page files
@@ -507,6 +461,29 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
   });
   await db.projects.updateStatus(projectId, opts.wasLive ? 'live' : 'generated');
   await sub(null);
+
+  // ── Step 10: Best-effort post-QA (after status='generated') ─────────────
+  // Runs AFTER the site is saved so a Haiku timeout or Vercel function kill
+  // doesn't waste the generation. The QA report is informational — the site
+  // is already live for the user. We update the same generated_files row
+  // with __post-qa.json once it lands.
+  try {
+    const expectedSections = (brief?.data?.business?.selectedSections as string[]) ?? [];
+    const postReport = await runPostQA({
+      html,
+      brief: brief?.data ?? {},
+      assets: assetData.map(a => ({ type: a.type, url: a.url })),
+      expectedSections,
+    });
+    console.log(`[launch] Post-QA: score ${postReport.score}, ${postReport.issues.length} issue(s) — verdict: ${postReport.haikuVerdict}`);
+    const savedGen = await db.generatedFiles.findLatest(projectId);
+    if (savedGen) {
+      const updatedFiles = { ...savedGen.files, '__post-qa.json': JSON.stringify(postReport, null, 2) };
+      await db.generatedFiles.update(savedGen.id, { files: updatedFiles });
+    }
+  } catch (qaErr) {
+    console.warn('[launch] Post-QA threw (non-fatal):', qaErr);
+  }
 
   return generationWarnings;
 }
