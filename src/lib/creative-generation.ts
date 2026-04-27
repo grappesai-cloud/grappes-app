@@ -215,6 +215,9 @@ export function buildUserPrompt(
     if (asset.type === 'logo' && asset.url) {
       brandAssetLines += `\nLOGO IMAGE: ${asset.url} — use as <img> in nav and footer`;
     }
+    if (asset.type === 'logo-alt' && asset.url) {
+      brandAssetLines += `\nLOGO IMAGE (alternate variant for opposite background, e.g. white-on-dark vs black-on-light): ${asset.url} — use whichever variant gives best contrast in each section`;
+    }
     if (asset.type === 'hero' && asset.url) {
       if (asset.variants && Object.keys(asset.variants).length > 0) {
         const variantEntries: string[] = [];
@@ -237,6 +240,9 @@ export function buildUserPrompt(
     if (asset.type === 'section' && asset.url && asset.sectionId) {
       photoAssetLines += `\nSECTION IMAGE (${asset.sectionId}): ${asset.url}`;
     }
+    if (asset.type === 'gallery' && asset.url) {
+      photoAssetLines += `\nGALLERY IMAGE (untagged — pick where it fits best: hero, story, gallery, parallax band, full-bleed divider): ${asset.url}`;
+    }
     if (asset.type === 'menu' && asset.url) {
       photoAssetLines += `\nMENU PHOTO: ${asset.url} — reference only, menu data already extracted as content.menu in the brief`;
     }
@@ -246,13 +252,23 @@ export function buildUserPrompt(
   }
   let assetLines = brandAssetLines + photoAssetLines;
 
-  // Video embed instruction (treated as a brand asset — kept even in no-photos mode)
-  const videoUrl = brief?.media?.videoUrl;
+  // Video embed instruction (treated as a brand asset — kept even in no-photos mode).
+  // Sites can have multiple videos uploaded (e.g. several DJ sets). Render all of
+  // them; legacy `media.videoUrl` is kept as a single-video fallback.
+  const allVideos = (brief?.media?.videos as string[] | undefined)
+    ?? (brief?.media?.videoUrl ? [brief.media.videoUrl] : []);
   const videoMode = brief?.media?.videoPlayMode || 'click';
-  if (videoUrl) {
-    const videoBlock = `\n\nVIDEO: ${videoUrl}
+  if (allVideos.length === 1) {
+    const videoBlock = `\n\nVIDEO: ${allVideos[0]}
 Play mode: ${videoMode === 'autoplay' ? 'autoplay when 50% visible in viewport' : 'click-to-play (show thumbnail + play button)'}
 Embed as an iframe or video element with explicit dimensions (width:100%;aspect-ratio:16/9).`;
+    brandAssetLines += videoBlock;
+    assetLines += videoBlock;
+  } else if (allVideos.length > 1) {
+    const videoBlock = `\n\nVIDEOS (${allVideos.length} clips uploaded — render ALL of them, do NOT pick just one):
+${allVideos.map((u, i) => `${i + 1}. ${u}`).join('\n')}
+Default play mode: ${videoMode === 'autoplay' ? 'autoplay when 50% visible in viewport (muted, loop)' : 'click-to-play (poster thumbnail + play button)'}.
+Render as a dedicated "Live" / "Performance" / "Sets" section: a grid, horizontal-scroll strip, or stacked full-bleed bands. Each video gets <video src="..." muted playsinline ${videoMode === 'autoplay' ? 'autoplay loop' : 'controls'} style="width:100%;aspect-ratio:16/9;object-fit:cover;"></video> or an iframe-equivalent. NEVER reduce the count — the user uploaded ${allVideos.length} distinct clips for a reason.`;
     brandAssetLines += videoBlock;
     assetLines += videoBlock;
   }

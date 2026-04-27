@@ -209,45 +209,120 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
   const assetData: AssetData[] = [];
 
   if (rawAssets.length > 0) {
+    // Heuristic: filenames like "logo.svg", "brand_white.webp", "EdiP_black.webp",
+    // "wordmark.png" are almost always logos even when uploaded as 'section' from
+    // a chat drag-drop. The onboarding chat doesn't ask the user to tag each file,
+    // so without this fallback the logo never reaches the prompt.
+    const LOGO_NAME_RE = /\b(logo|brand[-_ ]?mark|wordmark)\b|_(black|white|dark|light|mono|reverse|color)\.(webp|png|svg|jpg|jpeg)$/i;
+
+    const isLogoFilename = (filename?: string | null) =>
+      !!filename && LOGO_NAME_RE.test(filename);
+
+    // Pre-classify so we can promote section uploads to logo / hero when needed.
+    let logoCount = rawAssets.filter(a => a.type === 'logo').length;
+    let heroCount = rawAssets.filter(a => a.type === 'hero').length;
+
     const mergeMap: Record<string, any> = {};
+    const allVideos: Array<{ url: string; playMode?: string; filename?: string }> = [];
+    const promotedToLogo = new Set<string>();
+    const promotedToHero = new Set<string>();
+
     for (const asset of rawAssets) {
       if (!asset.public_url) continue;
 
       const variants = asset.metadata?.variants as Record<string, string> | undefined;
 
-      if (asset.type === 'logo') {
-        mergeMap['branding.logo'] = asset.public_url;
-        assetData.push({ type: 'logo', url: asset.public_url });
+      // Section image with a logo-ish filename + no explicit logo yet → promote.
+      let effectiveType = asset.type;
+      if (effectiveType === 'section' && logoCount === 0 && isLogoFilename(asset.filename)) {
+        effectiveType = 'logo';
+        promotedToLogo.add(asset.id);
+        logoCount++;
+      } else if (effectiveType === 'section' && !asset.metadata?.sectionId && heroCount === 0 && !isLogoFilename(asset.filename)) {
+        // First untagged section photo with no explicit hero → use as hero.
+        effectiveType = 'hero';
+        promotedToHero.add(asset.id);
+        heroCount++;
       }
-      if (asset.type === 'hero') {
-        mergeMap['media.heroImage'] = asset.public_url;
-        assetData.push({ type: 'hero', url: asset.public_url, variants });
+
+      if (effectiveType === 'logo') {
+        // Keep the first logo as primary; second variant (e.g. light/dark)
+        // gets stored as media.logoAlt so Sonnet can switch by background.
+        if (!mergeMap['branding.logo']) {
+          mergeMap['branding.logo'] = asset.public_url;
+          assetData.push({ type: 'logo', url: asset.public_url });
+        } else if (!mergeMap['media.logoAlt']) {
+          mergeMap['media.logoAlt'] = asset.public_url;
+          assetData.push({ type: 'logo-alt', url: asset.public_url });
+        }
+        continue;
       }
-      if (asset.type === 'og') {
+
+      if (effectiveType === 'hero') {
+        if (!mergeMap['media.heroImage']) {
+          mergeMap['media.heroImage'] = asset.public_url;
+          assetData.push({ type: 'hero', url: asset.public_url, variants });
+        }
+        continue;
+      }
+
+      if (effectiveType === 'og') {
         mergeMap['media.ogImage'] = asset.public_url;
         assetData.push({ type: 'og', url: asset.public_url });
+        continue;
       }
-      if (asset.type === 'favicon') {
+
+      if (effectiveType === 'favicon') {
         mergeMap['media.favicon'] = asset.public_url;
+        continue;
       }
-      if (asset.type === 'video') {
-        mergeMap['media.videoUrl'] = asset.public_url;
+
+      if (effectiveType === 'video') {
         const playMode = asset.metadata?.playMode as string | undefined;
-        if (playMode) mergeMap['media.videoPlayMode'] = playMode;
+        allVideos.push({ url: asset.public_url, playMode, filename: asset.filename ?? undefined });
+        continue;
       }
-      if (asset.type === 'section' && asset.metadata?.sectionId) {
-        const fresh = await db.briefs.findByProjectId(projectId);
-        const sectionImages = { ...(fresh?.data?.media?.sectionImages ?? {}) };
-        sectionImages[asset.metadata.sectionId] = asset.public_url;
-        mergeMap['media.sectionImages'] = sectionImages;
-        assetData.push({
-          type: 'section',
-          url: asset.public_url,
-          sectionId: asset.metadata.sectionId as string,
-          variants,
-        });
+
+      if (effectiveType === 'section') {
+        if (asset.metadata?.sectionId) {
+          // Tagged to a specific section.
+          const fresh = await db.briefs.findByProjectId(projectId);
+          const sectionImages = { ...(fresh?.data?.media?.sectionImages ?? {}) };
+          sectionImages[asset.metadata.sectionId as string] = asset.public_url;
+          mergeMap['media.sectionImages'] = sectionImages;
+          assetData.push({
+            type: 'section',
+            url: asset.public_url,
+            sectionId: asset.metadata.sectionId as string,
+            variants,
+          });
+        } else {
+          // Untagged photo — push to general gallery pool. Sonnet picks where to
+          // place each one. Without this branch they used to be silently dropped.
+          assetData.push({ type: 'gallery', url: asset.public_url, variants });
+        }
       }
     }
+
+    // Surface ALL videos to the brief — previously each one overwrote the
+    // single `media.videoUrl` slot, so multi-video uploads collapsed to one.
+    if (allVideos.length > 0) {
+      mergeMap['media.videoUrl']      = allVideos[0].url;          // back-compat: primary video
+      if (allVideos[0].playMode) mergeMap['media.videoPlayMode'] = allVideos[0].playMode;
+      mergeMap['media.videos']        = allVideos.map(v => v.url); // all of them
+      mergeMap['media.videosMeta']    = allVideos;                  // with playMode / filename
+    }
+
+    if (promotedToLogo.size > 0) {
+      console.log(`[launch] Promoted ${promotedToLogo.size} section asset(s) to logo by filename heuristic`);
+    }
+    if (promotedToHero.size > 0) {
+      console.log(`[launch] Promoted ${promotedToHero.size} section asset(s) to hero (no explicit hero uploaded)`);
+    }
+    if (allVideos.length > 1) {
+      console.log(`[launch] Surfacing ${allVideos.length} videos via media.videos (was ${allVideos.length === 1 ? 1 : 1} in legacy single-slot)`);
+    }
+
     if (Object.keys(mergeMap).length > 0) await db.briefs.merge(projectId, mergeMap);
   }
 
