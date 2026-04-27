@@ -190,6 +190,38 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
     if(document.readyState==='complete')setTimeout(resetScrollTrigger,200);
     else window.addEventListener('load',function(){setTimeout(resetScrollTrigger,200);});
 
+    // Force-reveal pass for edit mode. Sonnet generates lots of scroll-triggered
+    // entrance animations (opacity:0 → 1 via GSAP/IntersectionObserver). Inside
+    // an iframe those triggers often miss — viewport math is off, ScrollTrigger
+    // attaches before our scroller proxy resets, IntersectionObserver fires
+    // late or never. Result: DOM is intact (sections clickable, text editable)
+    // but the page looks empty because most elements are stuck at opacity 0.
+    // After a short grace period, walk the DOM and unstick anything still
+    // invisible so the editor is usable. Skips overlay helpers (#__wn_*).
+    function forceReveal(){
+      var changed = 0;
+      document.querySelectorAll('body *:not([id^="__wn_"])').forEach(function(el){
+        var cs = getComputedStyle(el);
+        if (cs.opacity === '0' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+          el.style.setProperty('opacity', '1', 'important');
+          // Common entrance transforms (translateY/translateX/scale) — neutralize too
+          if (cs.transform && cs.transform !== 'none' && cs.transform !== 'matrix(1, 0, 0, 1, 0, 0)') {
+            el.style.setProperty('transform', 'none', 'important');
+          }
+          if (cs.visibility === 'hidden') el.style.setProperty('visibility', 'visible', 'important');
+          if (cs.clipPath && cs.clipPath !== 'none' && cs.clipPath !== 'inset(0)') {
+            el.style.setProperty('clip-path', 'none', 'important');
+          }
+          changed++;
+        }
+      });
+      if (changed > 0 && window.console) console.log('[edit-mode] force-revealed', changed, 'stuck elements');
+    }
+    // First pass shortly after load — gives normal animations a chance to play.
+    function scheduleForceReveal(){ setTimeout(forceReveal, 1800); setTimeout(forceReveal, 4000); }
+    if (document.readyState === 'complete') scheduleForceReveal();
+    else window.addEventListener('load', scheduleForceReveal);
+
     var TEXT_TAGS = {h1:1,h2:1,h3:1,h4:1,h5:1,h6:1,p:1,a:1,button:1,li:1,label:1,blockquote:1,figcaption:1,td:1,th:1,span:1,small:1,strong:1,em:1,b:1,i:1,u:1,mark:1,cite:1,time:1,address:1,dt:1,dd:1,caption:1,legend:1,summary:1,div:1};
     var editing = false;
     var editingEl = null;
