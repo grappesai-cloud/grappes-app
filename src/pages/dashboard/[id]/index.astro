@@ -972,6 +972,11 @@ if (hasPreview) {
             {isFailed ? 'Retry →' : 'Generate ✦'}
           </button>
         )}
+        {canLaunch && !isLaunching && hasPreview && !isLive && (
+          <button class="topbar-btn" id="launch-btn" title="Re-run AI generation using the current brief and uploaded assets">
+            Regenerate
+          </button>
+        )}
         <form method="POST" action="/api/auth/signout" style="margin:0;">
           <button type="submit" class="topbar-signout--dash"><span>Sign out</span></button>
         </form>
@@ -2157,8 +2162,14 @@ if (hasPreview) {
 
     // LAUNCH — confirm brief, fire generation (don't await pipeline), reload to show spinner
     document.getElementById('launch-btn')?.addEventListener('click', async function() {
+      var originalLabel = this.textContent;
+      // For Regenerate (hasPreview), warn that AI iterations + manual edits will be replaced
+      if (hasPreview) {
+        var ok = confirm('Regenerate will replace the current site with a fresh AI generation using the same brief and uploaded assets. All visual edits and AI iterations on this version will be lost. Continue?');
+        if (!ok) return;
+      }
       this.disabled = true;
-      this.textContent = 'Generating…';
+      this.textContent = hasPreview ? 'Regenerating…' : 'Generating…';
       try {
         // Confirm brief first (idempotent — transitions onboarding → brief_ready)
         await fetch(`/api/onboarding/${projectId}/confirm`, { method: 'POST' });
@@ -2175,12 +2186,12 @@ if (hasPreview) {
           var errData = await launchRes.json().catch(() => ({}));
           alert(errData.error || 'Generation failed. Try again.');
           this.disabled = false;
-          this.textContent = 'Generate ✦';
+          this.textContent = originalLabel;
         }
       } catch {
         alert('Network error.');
         this.disabled = false;
-        this.textContent = 'Generate ✦';
+        this.textContent = originalLabel;
       }
     });
 
