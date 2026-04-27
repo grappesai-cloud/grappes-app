@@ -978,15 +978,13 @@ export async function generateSite(params: {
   console.log(`[creative-generation] Assets: ${assets.length}`);
 
   // Single Sonnet call — 64K output is enough for a full site.
-  // MAX_CONTINUATIONS=1 caps total Sonnet calls at 2 (initial + 1 retry on
-  // truncation). Previously 3 continuations could push the pipeline past
-  // Vercel's 300s function timeout for content-rich briefs (multiple videos,
-  // gallery, audio embeds). If HTML still doesn't end with </html> after
-  // the single retry, we salvage the partial output instead of throwing —
-  // a truncated site is better than a failed generation that resets the
-  // project to 'failed' state and forces a manual retry.
+  // MAX_CONTINUATIONS=3 fits within Vercel Pro's 800s function budget. On
+  // Hobby plans (300s cap) this should be lowered to 1 — content-rich briefs
+  // (multiple videos, gallery, audio embeds) can otherwise hit 4 Sonnet
+  // calls and timeout. The salvage path below keeps a truncated site ship-
+  // pable when continuations still don't close </html>.
   const MAX_TOKENS = 64000;
-  const MAX_CONTINUATIONS = 1;
+  const MAX_CONTINUATIONS = 3;
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
