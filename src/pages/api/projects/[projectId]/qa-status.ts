@@ -53,13 +53,25 @@ export const GET: APIRoute = async ({ params, locals }) => {
         issueCount = postIssues.length;
       }
 
-      // Fallback to structural QA score if no post-QA report exists
+      // Fallback to structural QA score if no post-QA report exists.
+      // Surface failed structural checks as postIssues so the modal can
+      // render them — otherwise the pill shows "N issues" while the modal
+      // claims "No issues to address."
       if (score === null) {
         const structRaw = (files as Record<string, string>)['__structural-qa.json'];
         if (structRaw) {
           const parsed = typeof structRaw === 'string' ? JSON.parse(structRaw) : structRaw;
-          score      = parsed.score ?? null;
-          issueCount = Array.isArray(parsed.checks) ? parsed.checks.filter((c: any) => !c.passed).length : 0;
+          score = parsed.score ?? null;
+          const failed = Array.isArray(parsed.checks) ? parsed.checks.filter((c: any) => !c.passed) : [];
+          issueCount = failed.length;
+          postIssues = failed.map((c: any) => ({
+            severity: 'warning',
+            area:     c.name || 'structural',
+            message:  c.message || 'Check failed',
+          }));
+          if (verdict == null && failed.length > 0) {
+            verdict = `Post-QA still running — showing ${failed.length} structural check${failed.length === 1 ? '' : 's'} that did not pass.`;
+          }
         }
       }
     }
