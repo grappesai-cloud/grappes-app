@@ -972,7 +972,7 @@ if (hasPreview) {
             {isFailed ? 'Retry →' : 'Generate ✦'}
           </button>
         )}
-        {canLaunch && !isLaunching && hasPreview && !isLive && (
+        {hasPreview && !isLaunching && (
           <button class="topbar-btn" id="launch-btn" title="Re-run AI generation using the current brief and uploaded assets">
             Regenerate
           </button>
@@ -2165,7 +2165,10 @@ if (hasPreview) {
       var originalLabel = this.textContent;
       // For Regenerate (hasPreview), warn that AI iterations + manual edits will be replaced
       if (hasPreview) {
-        var ok = confirm('Regenerate will replace the current site with a fresh AI generation using the same brief and uploaded assets. All visual edits and AI iterations on this version will be lost. Continue?');
+        var liveNote = isLive
+          ? '\n\nNote: your live site keeps serving the current version until you click Republish.'
+          : '';
+        var ok = confirm('Regenerate will replace the preview with a fresh AI generation using the same brief and uploaded assets. All visual edits and AI iterations on the current preview will be lost.' + liveNote + '\n\nContinue?');
         if (!ok) return;
       }
       this.disabled = true;

@@ -133,14 +133,19 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }, 422);
   }
 
-  // Atomic status transition — prevents double generation race condition
+  // Atomic status transition — prevents double generation race condition.
+  // 'live' is allowed so users can regenerate live sites: the live URL keeps
+  // serving the previous deployment until they click Republish, but the
+  // preview HTML gets refreshed. We track the original status to restore it
+  // (live → generating → live) instead of demoting the project to 'generated'.
   const { createAdminClient } = await import('../../../../lib/supabase');
   const supabase = createAdminClient();
+  const wasLive = project.status === 'live';
   const { data: locked } = await supabase
     .from('projects')
     .update({ status: 'generating', substatus: 'confirming_brief', updated_at: new Date().toISOString() })
     .eq('id', params.projectId!)
-    .in('status', ['onboarding', 'brief_ready', 'generated', 'failed'])
+    .in('status', ['onboarding', 'brief_ready', 'generated', 'failed', 'live'])
     .select('id')
     .maybeSingle();
 
@@ -154,7 +159,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
   // ── Run pipeline synchronously (Vercel Fluid Compute — up to 800s) ──────
   let pipelineWarnings: string[] = [];
   try {
-    pipelineWarnings = await runPipeline(params.projectId!);
+    pipelineWarnings = await runPipeline(params.projectId!, { wasLive });
   } catch (e: any) {
     const errMsg = (e?.message || String(e)).slice(0, 200);
     const isAnthropicRateLimit = e?.status === 429 || e?.error?.error?.type === 'rate_limit_error';
@@ -185,7 +190,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
 
 // ── Pipeline ───────────────────────────────────────────────────────────────────
 
-async function runPipeline(projectId: string) {
+async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) {
   const sub = (s: string | null) => db.projects.updateSubstatus(projectId, s);
   const projectRow = await db.projects.findById(projectId);
   const brandingRemoved = !!(projectRow as any)?.branding_removed;
@@ -494,10 +499,13 @@ async function runPipeline(projectId: string) {
   });
 
   // ── Step 9: Update project status ───────────────────────────────────────
+  // For live regenerations, restore status to 'live' — the live URL is still
+  // serving the previous deployment, only the preview HTML changed. The user
+  // hits Republish to push the new HTML to the live URL.
   await db.projects.update(projectId, {
     preview_url: `/preview/${projectId}`,
   });
-  await db.projects.updateStatus(projectId, 'generated');
+  await db.projects.updateStatus(projectId, opts.wasLive ? 'live' : 'generated');
   await sub(null);
 
   return generationWarnings;
