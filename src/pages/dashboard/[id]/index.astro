@@ -755,6 +755,20 @@ if (hasPreview) {
     .quota-buy { font-size: 11px; font-weight: 600; color: #00a4af; text-decoration: none; padding: 2px 8px; border: 1px solid rgba(0,164,175,0.3); border-radius: 20px; transition: all 0.15s; }
     .quota-buy:hover { background: rgba(0,164,175,0.1); }
 
+    .edit-messages {
+      flex: 1; min-height: 80px; max-height: 38vh; overflow-y: auto;
+      padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .edit-messages:empty { display: none; }
+    .edit-msg {
+      max-width: 92%; padding: 8px 12px; border-radius: 12px;
+      font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word;
+    }
+    .edit-msg.user      { align-self: flex-end; background: rgba(6,191,221,0.12); border: 1px solid rgba(6,191,221,0.25); color: #fff; }
+    .edit-msg.assistant { align-self: flex-start; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.85); }
+    .edit-msg.system    { align-self: center; background: none; border: none; color: rgba(255,255,255,0.45); font-size: 11.5px; font-style: italic; padding: 4px 8px; }
+
     .edit-input-area { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
     .edit-suggestions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
     .edit-suggestion {
@@ -1043,6 +1057,22 @@ if (hasPreview) {
           <div class="phase-edit">
             <div class="ve-hint" id="ve-hint">Click an element to select it. Double-click to edit.</div>
 
+            <!-- Section list -->
+            <div class="section-list-header">
+              <span class="section-list-title">Sections</span>
+              <button id="history-toggle-btn" class="history-toggle-btn" type="button" title="Version history">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+                <span>History</span>
+              </button>
+            </div>
+            <div id="section-list" class="section-list">
+              {serverSectionIds.length === 0 ? (
+                <div style="color:rgba(255,255,255,0.4);font-size:12px;padding:8px 12px">Loading sections…</div>
+              ) : serverSectionIds.map((sid) => (
+                <div class="section-item" data-section-id={sid}>{sid.charAt(0).toUpperCase() + sid.slice(1)}</div>
+              ))}
+            </div>
+
             <!-- Background edit mode toggle -->
             <div class="ve-bg-toggle">
               <button id="ve-bg-toggle-btn" class="ve-bg-toggle-btn" title="Edit section backgrounds"></button>
@@ -1118,6 +1148,23 @@ if (hasPreview) {
                   <span>Delete element</span>
                 </button>
               </div>
+            </div>
+
+            <!-- AI chat messages -->
+            <div id="edit-messages" class="edit-messages"></div>
+
+            <!-- AI chat input -->
+            <div class="edit-input-area">
+              <div class="edit-tip">
+                <button id="edit-tip-toggle" class="edit-tip-icon" type="button" aria-label="How to write edits">i</button>
+                <div id="edit-tip-popup" class="edit-tip-popup">
+                  <strong>Tip:</strong> click a section in the list above (or in the preview), then describe the change in plain English — e.g. "make the hero darker", "shorter testimonials", "add a quote from Ana".
+                </div>
+              </div>
+              <form id="edit-form" class="edit-form">
+                <input id="edit-input" class="edit-input" type="text" placeholder="Select a section to start editing…" disabled autocomplete="off" />
+                <button id="edit-send" class="edit-send" type="submit" disabled>Send</button>
+              </form>
             </div>
 
           </div>
@@ -2183,6 +2230,13 @@ if (hasPreview) {
       // Load section list from preview iframe
       const iframe = document.getElementById('preview-iframe');
       const sectionList = document.getElementById('section-list');
+
+      // Event delegation — works for both SSR-rendered items and dynamically
+      // re-populated ones (populateSections wipes innerHTML and re-adds).
+      sectionList?.addEventListener('click', (ev) => {
+        const item = ev.target.closest('.section-item');
+        if (item && item.dataset.sectionId) selectSection(item.dataset.sectionId);
+      });
 
       function populateSections(ids) {
         if (!sectionList) return;
