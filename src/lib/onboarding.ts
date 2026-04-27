@@ -326,9 +326,14 @@ export function applySmartDefaults(data: Record<string, any>): Record<string, an
     setNestedValue(result, dotPath, value);
   }
 
-  // Universal fallback defaults
+  // Universal fallback defaults — site type defaults to landing unless user
+  // explicitly asked for multi-page. Pages then follow from that decision.
+  if (!hasValue(result?.preferences?.websiteType)) {
+    setNestedValue(result, 'preferences.websiteType', 'landing');
+  }
   if (!hasValue(result?.content?.pages)) {
-    setNestedValue(result, 'content.pages', ['Home', 'About', 'Services', 'Contact']);
+    const isMulti = result?.preferences?.websiteType === 'multi-page';
+    setNestedValue(result, 'content.pages', isMulti ? ['Home', 'About', 'Services', 'Contact'] : ['Home']);
   }
   if (!hasValue(result?.features?.contact_form)) {
     setNestedValue(result, 'features.contact_form', true);
