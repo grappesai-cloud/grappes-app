@@ -1048,9 +1048,9 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     appendMessage('user', text);
     const thinking = showThinking();
 
-    // ── 2a: Detect ingestable URLs (Drive folder, Spotify, SoundCloud, YouTube, Apple Music)
+    // ── 2a: Detect ingestable URLs (Spotify, SoundCloud, YouTube, Apple Music)
     const URL_RE = /(https?:\/\/[^\s"'<>]+)/gi;
-    const INGEST_HOST_RE = /(drive\.google\.com\/drive\/folders|open\.spotify\.com|spotify\.com\/(track|album|playlist)|soundcloud\.com|youtube\.com|youtu\.be|music\.apple\.com)/i;
+    const INGEST_HOST_RE = /(open\.spotify\.com|spotify\.com\/(track|album|playlist)|soundcloud\.com|youtube\.com|youtu\.be|music\.apple\.com)/i;
     const urlMatches = (text.match(URL_RE) || []).filter(u => INGEST_HOST_RE.test(u));
     let ingestNote = '';
     if (urlMatches.length > 0) {

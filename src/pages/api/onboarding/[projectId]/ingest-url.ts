@@ -1,7 +1,10 @@
 // ─── Onboarding URL Ingestion ────────────────────────────────────────────────
-// User pastes a public link (Drive folder, Spotify, SoundCloud, YouTube,
-// Apple Music). We extract usable assets (image URLs) or embeds and merge
-// them into the brief so site generation can use them.
+// User pastes a Spotify / SoundCloud / YouTube / Apple Music link. We extract
+// canonical embed URLs and merge them into the brief so site generation
+// renders a "Music" / "Listen" section with iframes.
+//
+// For bulk image uploads use the zip upload flow (drag a .zip in chat) — much
+// faster and works without external auth.
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
@@ -33,51 +36,27 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   }
 
   if (result.source === 'unknown') {
-    return json({
-      ok: false,
-      source: 'unknown',
-      summary: result.summary,
-    });
+    return json({ ok: false, source: 'unknown', summary: result.summary });
   }
 
-  // Merge into brief.data.media so the generation pipeline can use it.
+  // Merge canonical embed URLs into media.audio_embeds — the existing prompt
+  // path already turns these into iframe sections.
   const brief = await db.briefs.findByProjectId(params.projectId!);
   const currentMedia = (brief?.data as any)?.media ?? {};
-
-  // Drive images → media.linkImages (new bucket; not photos but referenceable URLs)
-  // Audio/Video embeds → media.audio_embeds (string array — existing prompt path)
-  const linkImages: any[]     = Array.isArray(currentMedia.linkImages)  ? [...currentMedia.linkImages]  : [];
   const audioEmbeds: string[] = Array.isArray(currentMedia.audio_embeds) ? [...currentMedia.audio_embeds] : [];
 
   for (const a of result.assets) {
-    if (a.kind === 'image') {
-      if (!linkImages.some((x: any) => x?.url === a.url)) {
-        linkImages.push({
-          source:    result.source,
-          url:       a.url,
-          title:     a.title,
-          mimeType:  a.mimeType,
-          thumbnail: a.thumbnail,
-        });
-      }
-    } else {
-      // audio_embed / video_embed → push canonical URL the prompt already handles
-      const canonical = a.url;
-      if (!audioEmbeds.includes(canonical)) audioEmbeds.push(canonical);
-    }
+    const canonical = a.url;
+    if (!audioEmbeds.includes(canonical)) audioEmbeds.push(canonical);
   }
 
-  await db.briefs.merge(params.projectId!, {
-    'media.linkImages':   linkImages,
-    'media.audio_embeds': audioEmbeds,
-  });
+  await db.briefs.merge(params.projectId!, { 'media.audio_embeds': audioEmbeds });
 
   return json({
     ok:         true,
     source:     result.source,
     summary:    result.summary,
     assetCount: result.assets.length,
-    images:     linkImages.length,
     embeds:     audioEmbeds.length,
   });
 };

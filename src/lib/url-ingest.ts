@@ -1,25 +1,23 @@
 // ─── URL Ingestion ───────────────────────────────────────────────────────────
-// Detect & extract usable assets/metadata from URLs the user pastes during
-// onboarding (Google Drive folder, Spotify, SoundCloud, YouTube).
+// Detect & extract usable metadata from URLs the user pastes during
+// onboarding (Spotify, SoundCloud, YouTube, Apple Music).
 //
-// Drive: list public folder via Drive API v3 (needs GOOGLE_API_KEY).
-// Spotify/SoundCloud/YouTube: oEmbed (no auth) — title, thumbnail, embed iframe.
+// All providers use oEmbed (no auth) — title, thumbnail, embed iframe.
+// For bulk image/asset uploads use the zip upload flow instead.
 
-export type IngestedAssetKind = 'image' | 'audio_embed' | 'video_embed';
+export type IngestedAssetKind = 'audio_embed' | 'video_embed';
 
 export interface IngestedAsset {
   kind:        IngestedAssetKind;
   title?:      string;
-  url:         string;            // direct URL (image) or canonical URL (embed)
+  url:         string;            // canonical URL
   thumbnail?:  string;
-  embedHtml?:  string;            // for audio/video — iframe HTML to drop into the site
+  embedHtml?:  string;            // iframe HTML to drop into the site
   embedUrl?:   string;            // canonical embed URL
-  mimeType?:   string;            // images only
-  sourceName?: string;            // file name from Drive
 }
 
 export interface IngestResult {
-  source:    'drive' | 'spotify' | 'soundcloud' | 'youtube' | 'apple_music' | 'unknown';
+  source:    'spotify' | 'soundcloud' | 'youtube' | 'apple_music' | 'unknown';
   assets:    IngestedAsset[];
   summary:   string;              // human-readable, shown to Haiku as context
   raw?:      Record<string, any>;
@@ -27,89 +25,20 @@ export interface IngestResult {
 
 // ── URL classification ──────────────────────────────────────────────────────
 
-const DRIVE_FOLDER_RE  = /^https?:\/\/drive\.google\.com\/drive\/folders\/([a-zA-Z0-9_-]+)/i;
-const DRIVE_FOLDER_ALT = /^https?:\/\/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/i;
-const SPOTIFY_RE       = /^https?:\/\/(open\.)?spotify\.com\//i;
-const SOUNDCLOUD_RE    = /^https?:\/\/(www\.)?soundcloud\.com\//i;
-const YOUTUBE_RE       = /^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i;
-const APPLE_MUSIC_RE   = /^https?:\/\/music\.apple\.com\//i;
+const SPOTIFY_RE     = /^https?:\/\/(open\.)?spotify\.com\//i;
+const SOUNDCLOUD_RE  = /^https?:\/\/(www\.)?soundcloud\.com\//i;
+const YOUTUBE_RE     = /^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i;
+const APPLE_MUSIC_RE = /^https?:\/\/music\.apple\.com\//i;
 
 export function classifyUrl(url: string): IngestResult['source'] {
-  if (DRIVE_FOLDER_RE.test(url) || DRIVE_FOLDER_ALT.test(url)) return 'drive';
-  if (SPOTIFY_RE.test(url))    return 'spotify';
-  if (SOUNDCLOUD_RE.test(url)) return 'soundcloud';
-  if (YOUTUBE_RE.test(url))    return 'youtube';
+  if (SPOTIFY_RE.test(url))     return 'spotify';
+  if (SOUNDCLOUD_RE.test(url))  return 'soundcloud';
+  if (YOUTUBE_RE.test(url))     return 'youtube';
   if (APPLE_MUSIC_RE.test(url)) return 'apple_music';
   return 'unknown';
 }
 
-// ── Google Drive: list public folder ────────────────────────────────────────
-
-interface DriveFile {
-  id:           string;
-  name:         string;
-  mimeType:     string;
-  thumbnailLink?: string;
-  size?:        string;
-}
-
-async function listDriveFolder(folderId: string, apiKey: string): Promise<DriveFile[]> {
-  const params = new URLSearchParams({
-    q:        `'${folderId}' in parents and trashed = false`,
-    fields:   'files(id,name,mimeType,thumbnailLink,size)',
-    pageSize: '100',
-    key:      apiKey,
-  });
-  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`);
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Drive API ${res.status}: ${errBody.slice(0, 200)}`);
-  }
-  const data = await res.json() as { files?: DriveFile[] };
-  return data.files ?? [];
-}
-
-function driveDownloadUrl(fileId: string, apiKey: string): string {
-  return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`;
-}
-
-async function ingestDriveFolder(url: string): Promise<IngestResult> {
-  const apiKey = import.meta.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    return {
-      source:  'drive',
-      assets:  [],
-      summary: 'Google Drive ingestion not configured (GOOGLE_API_KEY missing). Ask user to upload files directly.',
-    };
-  }
-
-  const m = url.match(DRIVE_FOLDER_RE) || url.match(DRIVE_FOLDER_ALT);
-  const folderId = m?.[1];
-  if (!folderId) {
-    return { source: 'drive', assets: [], summary: 'Could not parse Drive folder ID from URL.' };
-  }
-
-  const files = await listDriveFolder(folderId, apiKey);
-  const images = files.filter(f => f.mimeType.startsWith('image/'));
-  const pdfs   = files.filter(f => f.mimeType === 'application/pdf');
-
-  const assets: IngestedAsset[] = images.map(f => ({
-    kind:       'image',
-    title:      f.name,
-    url:        driveDownloadUrl(f.id, apiKey),
-    thumbnail:  f.thumbnailLink,
-    mimeType:   f.mimeType,
-    sourceName: f.name,
-  }));
-
-  const summary = images.length > 0
-    ? `Drive folder contains ${images.length} image(s)${pdfs.length ? ` and ${pdfs.length} PDF(s)` : ''}: ${images.slice(0, 8).map(f => f.name).join(', ')}${images.length > 8 ? '…' : ''}`
-    : `Drive folder is empty or contains no usable assets (${files.length} files total).`;
-
-  return { source: 'drive', assets, summary, raw: { fileCount: files.length, imageCount: images.length, pdfCount: pdfs.length } };
-}
-
-// ── oEmbed providers (Spotify / SoundCloud / YouTube / Apple Music) ─────────
+// ── oEmbed providers ────────────────────────────────────────────────────────
 
 interface OEmbedResponse {
   title?:         string;
@@ -170,7 +99,6 @@ async function ingestSoundCloud(url: string): Promise<IngestResult> {
 async function ingestYouTube(url: string): Promise<IngestResult> {
   const meta = await fetchOEmbed(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
   if (!meta) return { source: 'youtube', assets: [], summary: 'Could not fetch YouTube metadata.' };
-  // canonical embed
   const idMatch = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
   const embedUrl = idMatch ? `https://www.youtube.com/embed/${idMatch[1]}` : url;
   return {
@@ -189,7 +117,7 @@ async function ingestYouTube(url: string): Promise<IngestResult> {
 }
 
 async function ingestAppleMusic(url: string): Promise<IngestResult> {
-  // Apple Music doesn't have public oEmbed; just return embed URL for music.apple.com /embed/
+  // Apple Music has no public oEmbed — just rewrite to embed.music.apple.com
   const embedUrl = url.replace('music.apple.com/', 'embed.music.apple.com/');
   return {
     source: 'apple_music',
@@ -213,12 +141,11 @@ export async function ingestUrl(rawUrl: string): Promise<IngestResult> {
 
   const source = classifyUrl(url);
   switch (source) {
-    case 'drive':       return ingestDriveFolder(url);
     case 'spotify':     return ingestSpotify(url);
     case 'soundcloud':  return ingestSoundCloud(url);
     case 'youtube':     return ingestYouTube(url);
     case 'apple_music': return ingestAppleMusic(url);
     default:
-      return { source: 'unknown', assets: [], summary: `Unknown URL type: ${url}. Supported: Google Drive (folder), Spotify, SoundCloud, YouTube, Apple Music.` };
+      return { source: 'unknown', assets: [], summary: `Unknown URL type: ${url}. Supported: Spotify, SoundCloud, YouTube, Apple Music. For bulk image uploads, attach a .zip in chat instead.` };
   }
 }
