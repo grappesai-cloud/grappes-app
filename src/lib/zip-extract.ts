@@ -14,7 +14,7 @@
 
 import yauzl from 'yauzl';
 import sharp from 'sharp';
-import { Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { db } from './db';
 import { createAdminClient } from './supabase';
 import type { AssetType } from './db';

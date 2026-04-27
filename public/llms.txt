@@ -1,0 +1,20 @@
+# Grappes
+
+> AI website generator that builds custom-designed sites from a brief — no templates, no coding. Tell Grappes about your business and get a fully designed, deployed website in under 90 seconds.
+
+Grappes generates each website from scratch using a multi-stage AI pipeline (Claude Opus for creative direction, Sonnet for HTML/CSS, Haiku for QA). Every site is unique — no template library, no shared CSS, no recycled layouts.
+
+## Core
+
+- [Home](https://grappes.dev/): What Grappes is and how it works
+- [Sign up](https://grappes.dev/sign-up): Free trial, no credit card required
+- [Sign in](https://grappes.dev/sign-in): Account access for existing users
+
+## Legal
+
+- [Privacy Policy](https://grappes.dev/privacy)
+- [Terms & Conditions](https://grappes.dev/terms)
+
+## Contact
+
+- Email: hello@grappes.dev
