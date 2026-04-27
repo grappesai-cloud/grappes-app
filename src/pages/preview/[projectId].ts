@@ -170,6 +170,14 @@ function normalizeOldHtml(html: string, projectId: string): string {
   html = html.replace(/https:\/\/adsnow\.ro(?=['"])/g, 'https://grappes.dev');
   html = html.replace(/by adsnow\.ro/g, 'by grappes.dev');
 
+  // Strip any `<meta http-equiv="Content-Security-Policy">` tag — older
+  // generated sites may have a strict CSP meta that blocks eval used by
+  // GSAP/Webflow IX2 runtime. Our response-header CSP allows 'unsafe-eval'.
+  html = html.replace(
+    /<meta\s+[^>]*http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>\s*/gi,
+    ''
+  );
+
   // Remove duplicate inline <script> blocks (same first 80 chars = same script)
   const seen = new Set<string>();
   html = html.replace(/<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi, (match) => {

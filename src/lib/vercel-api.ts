@@ -208,11 +208,17 @@ export async function deployHtml(
   projectName: string,
   files: Record<string, string>
 ): Promise<{ ok: boolean; url?: string; error?: string }> {
-  const filePayload = Object.entries(files).map(([path, content]) => ({
-    file: path,
-    data: Buffer.from(content, 'utf-8').toString('base64'),
-    encoding: 'base64',
-  }));
+  // Strip any AI-generated CSP meta tag from HTML files before deploying —
+  // it can be stricter than what GSAP / Webflow IX2 / inline scripts need.
+  const CSP_META_RE = /<meta\s+[^>]*http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>\s*/gi;
+  const filePayload = Object.entries(files).map(([path, content]) => {
+    const cleaned = path.endsWith('.html') ? content.replace(CSP_META_RE, '') : content;
+    return {
+      file: path,
+      data: Buffer.from(cleaned, 'utf-8').toString('base64'),
+      encoding: 'base64',
+    };
+  });
 
   const res = await vercel(`/v13/deployments${qs()}`, {
     method: 'POST',

@@ -476,7 +476,24 @@ export function extractHtml(response: string): string {
     html = html.slice(0, endIdx + '</html>'.length);
   }
 
+  // Strip any CSP meta tag Sonnet may have generated — it can be stricter
+  // than the response-header CSP we set on /preview/[projectId], breaking
+  // GSAP / Webflow IX2 / inline animations that need 'unsafe-eval'.
+  html = stripCspMeta(html);
+
   return html.trim();
+}
+
+/**
+ * Remove any `<meta http-equiv="Content-Security-Policy" ...>` tag.
+ * Sonnet sometimes adds one with `script-src 'self'` which blocks eval()
+ * used by GSAP/Webflow runtime libs.
+ */
+export function stripCspMeta(html: string): string {
+  return html.replace(
+    /<meta\s+[^>]*http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>\s*/gi,
+    ''
+  );
 }
 
 // ─── Apply Brief Content (post-generation sacred text replacement) ───────────
