@@ -977,9 +977,16 @@ export async function generateSite(params: {
   console.log(`[creative-generation] Brief size: ${JSON.stringify(brief).length} chars`);
   console.log(`[creative-generation] Assets: ${assets.length}`);
 
-  // Single Sonnet call — 64K output is enough for a full site
+  // Single Sonnet call — 64K output is enough for a full site.
+  // MAX_CONTINUATIONS=1 caps total Sonnet calls at 2 (initial + 1 retry on
+  // truncation). Previously 3 continuations could push the pipeline past
+  // Vercel's 300s function timeout for content-rich briefs (multiple videos,
+  // gallery, audio embeds). If HTML still doesn't end with </html> after
+  // the single retry, we salvage the partial output instead of throwing —
+  // a truncated site is better than a failed generation that resets the
+  // project to 'failed' state and forces a manual retry.
   const MAX_TOKENS = 64000;
-  const MAX_CONTINUATIONS = 3;
+  const MAX_CONTINUATIONS = 1;
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -1024,10 +1031,31 @@ export async function generateSite(params: {
     combinedHtml += contRaw.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
   }
 
-  const html = extractHtml(combinedHtml);
+  let html = extractHtml(combinedHtml);
 
+  // Salvage truncated output instead of throwing — better to ship a partial
+  // site than to fail the whole generation and lock the project to 'failed'.
   if (!html.includes('</html>')) {
-    throw new Error(`HTML incomplete after ${MAX_CONTINUATIONS} continuations (${html.length} chars) — generation failed`);
+    console.warn(`[creative-generation] HTML truncated at ${html.length} chars after ${MAX_CONTINUATIONS} continuation(s) — salvaging by closing open tags`);
+    // Trim trailing partial token (avoid mid-tag rip), then close common
+    // missing wrappers. Sonnet consistently leaves <main>/<body>/<html> open
+    // when it runs out of tokens; harder cases (mid-string, mid-attribute)
+    // fall back to a simple terminator that browsers will tolerate.
+    const lastClosingTagIdx = Math.max(
+      html.lastIndexOf('</section>'),
+      html.lastIndexOf('</div>'),
+      html.lastIndexOf('</footer>'),
+      html.lastIndexOf('</nav>'),
+      html.lastIndexOf('</article>')
+    );
+    if (lastClosingTagIdx > 0) {
+      // Cut after the last well-formed closing tag we can find.
+      const closeEnd = html.indexOf('>', lastClosingTagIdx) + 1;
+      html = html.slice(0, closeEnd);
+    }
+    if (!/<\/main>/i.test(html)) html += '\n</main>';
+    if (!/<\/body>/i.test(html)) html += '\n</body>';
+    if (!/<\/html>/i.test(html)) html += '\n</html>';
   }
 
   console.log(`[creative-generation] Complete: ${html.length} chars, ${totalOutputTokens} output tokens`);
