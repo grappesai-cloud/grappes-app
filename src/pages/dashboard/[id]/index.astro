@@ -3369,6 +3369,6 @@ if (hasPreview) {
   </script>
 
   <SupportChatWidget />
-  <OnboardingTour tourId="editor" steps={editorTourSteps} helpButtonLabel="Tour" />
+  {hasPreview && <OnboardingTour tourId="editor" steps={editorTourSteps} helpButtonLabel="Tour" />}
 </body>
 </html>
