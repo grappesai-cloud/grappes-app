@@ -205,11 +205,14 @@ export function buildUserPrompt(
   const siteLangLabel = localeNames[siteLocale] || siteLocale;
   const languageDirective = `\n## Language — MANDATORY\nWrite ALL visible copy on the site (headlines, body text, nav labels, buttons, form placeholders, alt text, footer) in ${siteLangLabel}. The ONLY exceptions are: proper nouns, brand names, and any text marked [EXACT] in the sacred-content block — those stay verbatim. Do NOT mix languages.\n`;
 
-  // Build asset lines for the prompt
-  let assetLines = '';
+  // Build asset lines for the prompt.
+  // Split into BRAND assets (logo, og — always included even in no-photos mode)
+  // and PHOTO assets (hero, section, menu — suppressed when no_photos is true).
+  let brandAssetLines = '';
+  let photoAssetLines = '';
   for (const asset of assets) {
     if (asset.type === 'logo' && asset.url) {
-      assetLines += `\nLOGO IMAGE: ${asset.url} — use as <img> in nav and footer`;
+      brandAssetLines += `\nLOGO IMAGE: ${asset.url} — use as <img> in nav and footer`;
     }
     if (asset.type === 'hero' && asset.url) {
       if (asset.variants && Object.keys(asset.variants).length > 0) {
@@ -220,41 +223,48 @@ export function buildUserPrompt(
         variantEntries.push(`${asset.url} 1920w`);
         if (variantEntries.length > 1) {
           const srcset = variantEntries.join(', ');
-          assetLines += `\nHERO IMAGE: ${asset.url}`;
-          assetLines += `\n  Responsive srcset: ${srcset}`;
-          assetLines += `\n  For hero (LCP): add fetchpriority="high", remove loading="lazy"`;
+          photoAssetLines += `\nHERO IMAGE: ${asset.url}`;
+          photoAssetLines += `\n  Responsive srcset: ${srcset}`;
+          photoAssetLines += `\n  For hero (LCP): add fetchpriority="high", remove loading="lazy"`;
         } else {
-          assetLines += `\nHERO IMAGE: ${asset.url} — use as hero background or <img>`;
+          photoAssetLines += `\nHERO IMAGE: ${asset.url} — use as hero background or <img>`;
         }
       } else {
-        assetLines += `\nHERO IMAGE: ${asset.url} — use as hero background or <img>`;
+        photoAssetLines += `\nHERO IMAGE: ${asset.url} — use as hero background or <img>`;
       }
     }
     if (asset.type === 'section' && asset.url && asset.sectionId) {
-      assetLines += `\nSECTION IMAGE (${asset.sectionId}): ${asset.url}`;
+      photoAssetLines += `\nSECTION IMAGE (${asset.sectionId}): ${asset.url}`;
     }
     if (asset.type === 'menu' && asset.url) {
-      assetLines += `\nMENU PHOTO: ${asset.url} — reference only, menu data already extracted as content.menu in the brief`;
+      photoAssetLines += `\nMENU PHOTO: ${asset.url} — reference only, menu data already extracted as content.menu in the brief`;
     }
     if (asset.type === 'og' && asset.url) {
-      assetLines += `\nOG IMAGE: ${asset.url} — use for og:image meta tag`;
+      brandAssetLines += `\nOG IMAGE: ${asset.url} — use for og:image meta tag`;
     }
   }
+  let assetLines = brandAssetLines + photoAssetLines;
 
-  // Video embed instruction
+  // Video embed instruction (treated as a brand asset — kept even in no-photos mode)
   const videoUrl = brief?.media?.videoUrl;
   const videoMode = brief?.media?.videoPlayMode || 'click';
   if (videoUrl) {
-    assetLines += `\n\nVIDEO: ${videoUrl}
+    const videoBlock = `\n\nVIDEO: ${videoUrl}
 Play mode: ${videoMode === 'autoplay' ? 'autoplay when 50% visible in viewport' : 'click-to-play (show thumbnail + play button)'}
 Embed as an iframe or video element with explicit dimensions (width:100%;aspect-ratio:16/9).`;
+    brandAssetLines += videoBlock;
+    assetLines += videoBlock;
   }
 
-  // If brief contains extracted menu data, add rendering instruction
+  // Menu data (data, not a photo — kept even in no-photos mode)
   if (brief?.content?.menu?.categories?.length > 0) {
-    assetLines += `\n\nMENU DATA: The brief contains content.menu with structured menu categories and items (extracted from a photo). Render this as a beautifully styled menu section — not a plain list. Think editorial restaurant menu: clean typography, category headers, item names with prices, subtle separators. This is real data from the client's actual menu.`;
+    const menuBlock = `\n\nMENU DATA: The brief contains content.menu with structured menu categories and items (extracted from a photo). Render this as a beautifully styled menu section — not a plain list. Think editorial restaurant menu: clean typography, category headers, item names with prices, subtle separators. This is real data from the client's actual menu.`;
+    brandAssetLines += menuBlock;
+    assetLines += menuBlock;
   } else if (brief?.content?.menu_raw) {
-    assetLines += `\n\nMENU DATA (raw text): The brief contains content.menu_raw with menu items extracted from a photo. Parse this text and render it as a styled menu section with categories, items, and prices.`;
+    const menuRawBlock = `\n\nMENU DATA (raw text): The brief contains content.menu_raw with menu items extracted from a photo. Parse this text and render it as a styled menu section with categories, items, and prices.`;
+    brandAssetLines += menuRawBlock;
+    assetLines += menuRawBlock;
   }
 
   const briefJson = JSON.stringify(brief, null, 2);
@@ -412,10 +422,12 @@ Style the section immersively: large, full-bleed or edge-to-edge, typography-hea
     ? inspirationUrls.map(u => `- ${u}`).join('\n') + '\nStudy the aesthetic, typography, and layout patterns of these sites. Absorb the sensibility, not the content.'
     : '';
 
-  // No-photos directive
+  // No-photos directive. Brand assets (logo, OG image, video) are STILL allowed —
+  // "no photos" means no editorial photography (hero, section images, gallery), not
+  // zero brand identity.
   const noPhotos = brief?.media?.no_photos === true;
   const noPhotosBlock = noPhotos
-    ? `\n## ⚠️ NO PHOTOS — TYPOGRAPHY-ONLY DESIGN\n\nThe client explicitly requested ZERO images. Do NOT use any <img> tags or stock photo URLs (Unsplash, Pexels, or anything else). Build the entire visual experience with typography, color, geometric CSS shapes, borders, gradients, and whitespace. This is a creative challenge — some of the best Awwwards sites are image-free.\n`
+    ? `\n## ⚠️ NO EDITORIAL PHOTOS — TYPOGRAPHY-FOCUSED DESIGN\n\nThe client requested no editorial photography (no hero photos, no section photos, no gallery). Do NOT use any photographic <img> for sections, heroes, galleries, or backgrounds. Stock photo URLs (Unsplash, Pexels, etc.) are forbidden.\n\nBUT — uploaded brand assets ARE allowed and SHOULD be used:\n- Logo (in nav and footer) — required if uploaded\n- OG image (for social sharing meta tag) — required if uploaded\n- Video (if uploaded) — embed as specified\n\nFor sections without an uploaded brand asset, build the visual experience with typography, color, geometric CSS shapes, borders, gradients, and whitespace.\n`
     : '';
 
   return `## Client Brief
@@ -424,7 +436,7 @@ ${briefJson}
 ${languageDirective}${noPhotosBlock}
 ${sacredBlock ? `\n## Sacred Content (use EXACTLY as written)\n\n${sacredBlock}` : ''}
 ${creativeContextBlock}
-${!noPhotos && assetLines ? `\n## Uploaded Assets\n${assetLines}` : ''}
+${assetLines ? `\n## Uploaded Assets\n${noPhotos ? brandAssetLines : assetLines}` : ''}
 ${creativePlan ? `
 ## Creative Direction (a creative director designed this experience for this brand)
 
