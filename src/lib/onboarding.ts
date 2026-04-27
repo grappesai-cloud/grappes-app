@@ -331,6 +331,9 @@ export function applySmartDefaults(data: Record<string, any>): Record<string, an
   if (!hasValue(result?.preferences?.websiteType)) {
     setNestedValue(result, 'preferences.websiteType', 'landing');
   }
+  if (!hasValue(result?.preferences?.complexity)) {
+    setNestedValue(result, 'preferences.complexity', 'complete');
+  }
   if (!hasValue(result?.content?.pages)) {
     const isMulti = result?.preferences?.websiteType === 'multi-page';
     setNestedValue(result, 'content.pages', isMulti ? ['Home', 'About', 'Services', 'Contact'] : ['Home']);
