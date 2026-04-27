@@ -8,7 +8,7 @@ import { db } from '../../../../lib/db';
 import { createMessage } from '../../../../lib/anthropic';
 import { SONNET_MODEL } from '../../../../lib/generation';
 import { FULL_PAGE_KEY } from '../../../../lib/creative-generation';
-import { checkAndConsumeEdit, getEditQuota } from '../../../../lib/edit-quota';
+import { createAdminClient } from '../../../../lib/supabase';
 import { json } from '../../../../lib/api-utils';
 
 
@@ -91,17 +91,20 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
-  // ── Quota pre-check (read-only — consumption happens after success) ─────
-  const quotaCheck = await getEditQuota(user.id);
-  if (!quotaCheck.allowed) {
+  // ── Project iteration quota pre-check (consumption happens after success) ─
+  const projectForQuota = await db.projects.findById(params.projectId!);
+  if (!projectForQuota || projectForQuota.user_id !== user.id) return json({ error: 'Not found' }, 404);
+  const _used  = (projectForQuota as any).iterations_used  ?? 0;
+  const _quota = (projectForQuota as any).iterations_quota ?? 20;
+  if (_used >= _quota) {
     return json({
-      error: 'edit_limit_reached',
-      used: quotaCheck.used,
-      limit: quotaCheck.limit,
-      extra: quotaCheck.extra,
-      plan: quotaCheck.plan,
+      error: 'iteration_limit_reached',
+      used: _used,
+      quota: _quota,
+      remaining: 0,
     }, 429);
   }
+  const admin = createAdminClient();
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -199,8 +202,8 @@ ${currentSection}`,
       generation_tokens: 0,
     });
 
-    // Consume edit quota only after successful save
-    await checkAndConsumeEdit(user.id);
+    // Consume one project iteration only after successful save
+    try { await admin.rpc('consume_project_iteration', { p_project_id: params.projectId! }); } catch { /* best-effort */ }
 
     console.log(`[edit-section] "${sectionId}" edited for project ${params.projectId}: "${instruction.slice(0, 60)}"`);
 

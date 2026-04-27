@@ -267,6 +267,17 @@ Embed as an iframe or video element with explicit dimensions (width:100%;aspect-
     assetLines += menuRawBlock;
   }
 
+  // Drive-ingested images: extra reference images the user shared via public link.
+  // They're not categorized (no logo/hero/section role) — let the AI use them as
+  // section/gallery imagery. Suppressed in no-photos mode.
+  const linkImages = brief?.media?.linkImages as Array<{ url: string; title?: string; source?: string }> | undefined;
+  if (linkImages && linkImages.length > 0) {
+    const imgList = linkImages.slice(0, 30).map(i => `  - ${i.url}${i.title ? `  (${i.title})` : ''}`).join('\n');
+    const linkBlock = `\n\nLINKED IMAGES (from public Drive folder, ${linkImages.length} total — use across sections, galleries, backgrounds, hero):\n${imgList}`;
+    photoAssetLines += linkBlock;
+    assetLines += linkBlock;
+  }
+
   const briefJson = JSON.stringify(brief, null, 2);
 
   // ── Surface high-value brief fields explicitly (don't bury in JSON) ─────────

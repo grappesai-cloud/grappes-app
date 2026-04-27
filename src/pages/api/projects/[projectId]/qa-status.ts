@@ -27,53 +27,45 @@ export const GET: APIRoute = async ({ params, locals }) => {
   // Get latest generated file
   const { data: latestFile } = await client
     .from('generated_files')
-    .select('content, metadata')
+    .select('files')
     .eq('project_id', projectId!)
     .order('version', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!latestFile) return json({ score: null, issues: null });
+  if (!latestFile) return json({ score: null, issues: null, postIssues: [], verdict: null });
 
-  // Try to extract QA data from content (stored as JSON keyed sections)
-  // Generated files may have a __visual-qa.json or __structural-qa.json key in content object
-  let score: number | null = null;
-  let issues: number | null = null;
+  let score:      number | null = null;
+  let issueCount: number        = 0;
+  let postIssues: any[]         = [];
+  let verdict:    string | null = null;
 
   try {
-    const content = latestFile.content;
-    if (content && typeof content === 'object') {
-      // Try visual QA key
-      const visualQaRaw = (content as Record<string, string>)['__visual-qa.json']
-        || (content as Record<string, string>)['__visual-qa'];
-      if (visualQaRaw) {
-        const parsed = typeof visualQaRaw === 'string' ? JSON.parse(visualQaRaw) : visualQaRaw;
-        score = parsed.score ?? parsed.overall_score ?? null;
-        issues = Array.isArray(parsed.issues) ? parsed.issues.length : (parsed.issue_count ?? null);
+    const files = latestFile.files;
+    if (files && typeof files === 'object') {
+      // Brief-aware post-QA wins (most informative, matches the brief)
+      const postRaw = (files as Record<string, string>)['__post-qa.json'];
+      if (postRaw) {
+        const parsed = typeof postRaw === 'string' ? JSON.parse(postRaw) : postRaw;
+        score      = typeof parsed.score === 'number' ? parsed.score : null;
+        postIssues = Array.isArray(parsed.issues) ? parsed.issues : [];
+        verdict    = parsed.haikuVerdict ?? null;
+        issueCount = postIssues.length;
       }
 
-      // Try structural QA key if visual not found
+      // Fallback to structural QA score if no post-QA report exists
       if (score === null) {
-        const structQaRaw = (content as Record<string, string>)['__structural-qa.json']
-          || (content as Record<string, string>)['__structural-qa'];
-        if (structQaRaw) {
-          const parsed = typeof structQaRaw === 'string' ? JSON.parse(structQaRaw) : structQaRaw;
-          score = parsed.score ?? null;
-          issues = Array.isArray(parsed.issues) ? parsed.issues.length : (parsed.issue_count ?? 0);
+        const structRaw = (files as Record<string, string>)['__structural-qa.json'];
+        if (structRaw) {
+          const parsed = typeof structRaw === 'string' ? JSON.parse(structRaw) : structRaw;
+          score      = parsed.score ?? null;
+          issueCount = Array.isArray(parsed.checks) ? parsed.checks.filter((c: any) => !c.passed).length : 0;
         }
       }
-    }
-
-    // Also check metadata
-    if (score === null && latestFile.metadata) {
-      const meta = typeof latestFile.metadata === 'string'
-        ? JSON.parse(latestFile.metadata) : latestFile.metadata;
-      score = meta.qa_score ?? meta.score ?? null;
-      issues = meta.qa_issues ?? meta.issue_count ?? null;
     }
   } catch (e) {
     console.error('[qa-status] Parse error:', e);
   }
 
-  return json({ score, issues: issues ?? 0 });
+  return json({ score, issues: issueCount, postIssues, verdict });
 };

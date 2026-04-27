@@ -241,6 +241,28 @@ export const POST: APIRoute = async ({ request }) => {
           break;
         }
 
+        // ── Buy +N AI iterations pack (one-time, per-project) ─────────
+        if (session.metadata?.type === 'buy_iterations' && session.metadata?.project_id) {
+          const projectId = session.metadata.project_id;
+          const userId    = session.metadata.user_id;
+          const amount    = Number(session.metadata.amount) || 10;
+          const customerId = typeof session.customer === 'string' ? session.customer : null;
+
+          const { data: newQuota, error: addErr } = await client.rpc('add_project_iterations', {
+            p_project_id: projectId,
+            p_amount:     amount,
+          });
+          if (addErr) {
+            console.error('[Stripe webhook] add_project_iterations error:', addErr);
+          } else {
+            console.log(`[Stripe webhook] +${amount} iterations added to project ${projectId} (new quota: ${newQuota})`);
+          }
+          if (customerId && userId) {
+            await client.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
+          }
+          break;
+        }
+
         // ── Multi-page add-on (subscription or lifetime one-time) ────
         if (session.metadata?.type === 'multipage_addon' && session.metadata?.user_id) {
           const userId     = session.metadata.user_id;

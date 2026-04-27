@@ -85,7 +85,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
 
     <form class="input-form" id="chat-form">
       <!-- Hidden file input — multiple, up to 5 -->
-      <input type="file" id="quick-file-input" accept=".svg,.png,.webp,.jpg,.jpeg,.gif,.heic,.pdf" multiple hidden />
+      <input type="file" id="quick-file-input" accept=".svg,.png,.webp,.jpg,.jpeg,.gif,.heic,.pdf,.zip,.mp4,.webm,.mov" multiple hidden />
 
       <div class="input-row">
         <button type="button" id="attach-btn" class="attach-btn" title="Attach image / logo" aria-label="Attach image or logo">
@@ -781,8 +781,16 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       const card = document.createElement('div');
       card.className = 'staged-card';
       card.style.cssText = 'position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid rgba(0,0,0,0.1);flex-shrink:0;';
+      var isImage = (item.file.type || '').startsWith('image/');
+      var thumb;
+      if (isImage) {
+        thumb = `<img src="${item.previewUrl}" alt="${item.file.name}" class="staged-thumb" style="width:100%;height:100%;object-fit:cover;display:block;" />`;
+      } else {
+        var icon = item.type === 'zip' ? '🗂️' : (item.type === 'video' ? '🎬' : '📄');
+        thumb = `<div class="staged-thumb" style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f3f4f6;font-size:22px;line-height:1;color:#6b7280;text-align:center;padding:4px;"><span>${icon}</span><span style="font-size:8px;margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${item.type}</span></div>`;
+      }
       card.innerHTML = `
-        <img src="${item.previewUrl}" alt="${item.file.name}" class="staged-thumb" style="width:100%;height:100%;object-fit:cover;display:block;" />
+        ${thumb}
         <span class="staged-type">${item.type}</span>
         <button type="button" class="staged-remove" data-idx="${idx}" aria-label="Remove">×</button>`;
       stagedStrip.appendChild(card);
@@ -801,12 +809,87 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   // so we must match: SVG → logo, video → video, font → font, image → section.
   function inferAssetType(file) {
     var t = (file.type || '').toLowerCase();
+    var name = (file.name || '').toLowerCase();
+    if (name.endsWith('.zip')) return 'zip';
     if (t === 'image/svg+xml') return 'logo';
-    if (t === 'application/pdf' || /\.pdf$/i.test(file.name)) return 'document';
-    if (t.startsWith('video/')) return 'video';
-    if (t.startsWith('font/') || /\.(woff2?|ttf|otf)$/i.test(file.name)) return 'font';
+    if (t === 'application/pdf' || name.endsWith('.pdf')) return 'document';
+    if (t.startsWith('video/') || /\.(mp4|webm|mov)$/.test(name)) return 'video';
+    if (t.startsWith('font/') || /\.(woff2?|ttf|otf)$/.test(name)) return 'font';
     return 'section';
   }
+
+  // Files > 4MB OR videos OR zips bypass the Vercel function (4.5MB body limit)
+  // and upload directly to Supabase Storage via signed URL.
+  const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024;
+  function needsDirectUpload(file, type) {
+    if (type === 'zip' || type === 'video') return true;
+    return file.size > DIRECT_UPLOAD_THRESHOLD;
+  }
+
+  async function uploadViaDirect(file, type) {
+    var kind = type === 'zip' ? 'zip' : (type === 'video' ? 'video' : 'image');
+    var assetType = type === 'zip' ? 'section' : type;
+
+    // 1) Get a signed upload URL
+    var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename:    file.name,
+        contentType: file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream'),
+        kind:        kind,
+        size:        file.size,
+        assetType:   assetType,
+      }),
+    });
+    var signData = await signRes.json();
+    if (!signRes.ok || !signData.signedUrl) return { ok: false, error: signData.error || 'Sign failed' };
+
+    // 2) PUT directly to Supabase Storage
+    var putRes = await fetch(signData.signedUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    if (!putRes.ok) return { ok: false, error: 'Direct upload failed (' + putRes.status + ')' };
+
+    // 3) Finalize: register asset row(s) and (for zip) extract entries
+    var finRes = await fetch('/api/assets/' + projectId + '/finalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storagePath: signData.path,
+        publicUrl:   signData.publicUrl,
+        contentType: file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream'),
+        filename:    file.name,
+        sizeBytes:   file.size,
+        kind:        kind,
+        assetType:   assetType,
+      }),
+    });
+    var finData = await finRes.json();
+    if (!finRes.ok) return { ok: false, error: finData.error || 'Finalize failed' };
+
+    if (kind === 'zip') {
+      return {
+        ok:        true,
+        type:      'zip',
+        extracted: finData.extracted,
+        skipped:   finData.skipped,
+        assets:    finData.assets,
+      };
+    }
+    return { ok: true, asset: finData.asset, type: type };
+  }
+
+  // Client-side size limits — must match sign-upload.ts MAX_BYTES
+  const SIZE_LIMITS = {
+    image:    20 * 1024 * 1024,
+    video:    50 * 1024 * 1024,
+    zip:     200 * 1024 * 1024,
+    document: 20 * 1024 * 1024,
+    font:      5 * 1024 * 1024,
+  };
 
   // File selected → stage (don't upload yet). User describes intent in message.
   quickFileInput.addEventListener('change', (e) => {
@@ -815,9 +898,18 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     if (!files.length) return;
 
     const remaining = MAX_STAGED - stagedFiles.length;
+    const tooBig = [];
     files.slice(0, remaining).forEach(file => {
-      stagedFiles.push({ file, type: inferAssetType(file), previewUrl: URL.createObjectURL(file) });
+      const type = inferAssetType(file);
+      const limitKey = type === 'video' ? 'video' : type === 'zip' ? 'zip' : type === 'document' ? 'document' : type === 'font' ? 'font' : 'image';
+      const limit = SIZE_LIMITS[limitKey];
+      if (file.size > limit) {
+        tooBig.push(`${file.name} (${Math.round(file.size / 1024 / 1024)}MB > ${Math.round(limit / 1024 / 1024)}MB)`);
+        return;
+      }
+      stagedFiles.push({ file, type, previewUrl: URL.createObjectURL(file) });
     });
+    if (tooBig.length > 0) alert(`Too large:\n${tooBig.join('\n')}`);
     renderStagedStrip();
     input.focus();
     if (!input.value.trim()) {
@@ -867,17 +959,20 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       }
       wrapper.scrollIntoView({ behavior: 'smooth', block: 'end' });
 
-      // Upload all in parallel
+      // Upload all in parallel — large files / videos / zips go through direct-upload
       const results = await Promise.all(filesToUpload.map(async ({ file, type }) => {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('type', type);
         try {
+          if (needsDirectUpload(file, type)) {
+            return await uploadViaDirect(file, type);
+          }
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('type', type);
           const res = await fetch(`/api/assets/${projectId}/upload`, { method: 'POST', body: fd });
           const d = await res.json();
           return res.ok ? { ok: true, asset: d.asset, type } : { ok: false, error: d.error };
-        } catch {
-          return { ok: false, error: 'Network error' };
+        } catch (e) {
+          return { ok: false, error: e?.message || 'Network error' };
         }
       }));
 
@@ -901,7 +996,26 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       // Notify Haiku — handle documents separately for text extraction
       const thinking = showThinking();
       const docUploads = succeeded.filter(r => r.type === 'document');
-      const otherUploads = succeeded.filter(r => r.type !== 'document');
+      const zipUploads = succeeded.filter(r => r.type === 'zip');
+      const directUploads = succeeded.filter(r => r.type !== 'document' && r.type !== 'zip');
+
+      // Flatten zip results into individual upload entries for Haiku
+      const zipExpanded = [];
+      for (const z of zipUploads) {
+        if (Array.isArray(z.assets)) {
+          for (const a of z.assets) {
+            zipExpanded.push({ type: a.type || 'section', asset: { id: a.id, public_url: a.public_url } });
+          }
+        }
+      }
+      const otherUploads = [...directUploads, ...zipExpanded];
+
+      // Update bubble status to mention zip extraction count
+      if (zipUploads.length > 0) {
+        const totalExtracted = zipUploads.reduce((n, z) => n + (z.extracted || 0), 0);
+        const statusEl = bubble.querySelector('.ub-status');
+        if (statusEl) statusEl.textContent = `Zip extracted — ${totalExtracted} image${totalExtracted === 1 ? '' : 's'} added`;
+      }
 
       // Process document uploads first (PDF text extraction)
       for (const doc of docUploads) {
@@ -934,8 +1048,32 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     appendMessage('user', text);
     const thinking = showThinking();
 
+    // ── 2a: Detect ingestable URLs (Drive folder, Spotify, SoundCloud, YouTube, Apple Music)
+    const URL_RE = /(https?:\/\/[^\s"'<>]+)/gi;
+    const INGEST_HOST_RE = /(drive\.google\.com\/drive\/folders|open\.spotify\.com|spotify\.com\/(track|album|playlist)|soundcloud\.com|youtube\.com|youtu\.be|music\.apple\.com)/i;
+    const urlMatches = (text.match(URL_RE) || []).filter(u => INGEST_HOST_RE.test(u));
+    let ingestNote = '';
+    if (urlMatches.length > 0) {
+      const ingestSummaries = [];
+      for (const u of urlMatches.slice(0, 5)) { // safety cap
+        try {
+          const ir = await fetch(`/api/onboarding/${projectId}/ingest-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: u }),
+          });
+          const id = await ir.json().catch(() => ({}));
+          if (id.ok && id.summary) ingestSummaries.push(`- ${id.summary}`);
+          else if (id.summary)     ingestSummaries.push(`- ${id.summary}`);
+        } catch {}
+      }
+      if (ingestSummaries.length > 0) {
+        ingestNote = `\n\n[System: extracted from links]\n${ingestSummaries.join('\n')}`;
+      }
+    }
+
     try {
-      const { res, data } = await callAPI({ message: text });
+      const { res, data } = await callAPI({ message: text + ingestNote });
       if (res.ok) {
         handleApiResponse(data, thinking);
       } else if (res.status === 503) {

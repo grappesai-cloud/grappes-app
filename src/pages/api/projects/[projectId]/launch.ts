@@ -17,6 +17,7 @@ import {
   type AssetData,
 } from '../../../../lib/creative-generation';
 import { runStructuralQA } from '../../../../lib/structural-qa';
+import { runPostQA } from '../../../../lib/post-qa';
 import { INPUT_COST_PER_TOKEN, OUTPUT_COST_PER_TOKEN } from '../../../../lib/anthropic';
 
 import { json } from '../../../../lib/api-utils';
@@ -428,6 +429,23 @@ async function runPipeline(projectId: string) {
   const structuralReport = runStructuralQA(html);
   const allIssues = structuralReport.checks.filter(c => !c.passed).map(c => `[structural] ${c.name}: ${c.message}`);
 
+  // Post-generation QA (brief-aware: placeholder text, brand asset usage,
+  // missing sections, broken anchors, Haiku verdict). Non-blocking — if it
+  // fails, the site still ships.
+  let postReport: Awaited<ReturnType<typeof runPostQA>> | null = null;
+  try {
+    const expectedSections = (brief?.data?.business?.selectedSections as string[]) ?? [];
+    postReport = await runPostQA({
+      html,
+      brief: brief?.data ?? {},
+      assets: assetData.map(a => ({ type: a.type, url: a.url })),
+      expectedSections,
+    });
+    console.log(`[launch] Post-QA: score ${postReport.score}, ${postReport.issues.length} issue(s) — verdict: ${postReport.haikuVerdict}`);
+  } catch (qaErr) {
+    console.warn('[launch] Post-QA threw (non-fatal):', qaErr);
+  }
+
   // ── Step 8: Save to DB as FULL_PAGE_KEY ─────────────────────────────────
   const existingGen = await db.generatedFiles.findLatest(projectId);
   const version = (existingGen?.version ?? 0) + 1;
@@ -436,6 +454,7 @@ async function runPipeline(projectId: string) {
     [FULL_PAGE_KEY]: html,
     '__structural-qa.json': JSON.stringify(structuralReport, null, 2),
     '__qa_status': allIssues.length === 0 ? 'passed' : 'failed',
+    ...(postReport && { '__post-qa.json': JSON.stringify(postReport, null, 2) }),
   };
 
   // Store multi-page files

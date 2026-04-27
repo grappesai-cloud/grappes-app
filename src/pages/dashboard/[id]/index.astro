@@ -588,8 +588,42 @@ if (hasPreview) {
     }
     .history-restore-btn:hover { background: rgba(0,164,175,0.1); }
 
-    /* QA status — hidden from user */
-    .qa-status-bar { display: none !important; }
+    /* QA status pill in topbar */
+    .qa-status-pill {
+      display: none; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px; font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s;
+    }
+    .qa-status-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .qa-status-pill.good  { color: #10b981; border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.08); }
+    .qa-status-pill.warn  { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+    .qa-status-pill.bad   { color: #ef4444; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); }
+    .qa-status-pill svg { width: 12px; height: 12px; }
+
+    /* QA report modal */
+    #qa-report-modal { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; }
+    #qa-report-modal.open { display: flex; }
+    .qa-report-card {
+      position: relative; z-index: 1; background: #0d1229;
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+      padding: 28px; max-width: 540px; width: calc(100% - 32px);
+      max-height: 80vh; overflow-y: auto;
+    }
+    .qa-report-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .qa-score-badge {
+      width: 64px; height: 64px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 700; flex-shrink: 0;
+    }
+    .qa-score-badge.good { background: rgba(16,185,129,0.15); color: #10b981; border: 2px solid rgba(16,185,129,0.4); }
+    .qa-score-badge.warn { background: rgba(245,158,11,0.15); color: #f59e0b; border: 2px solid rgba(245,158,11,0.4); }
+    .qa-score-badge.bad  { background: rgba(239,68,68,0.15); color: #ef4444; border: 2px solid rgba(239,68,68,0.4); }
+    .qa-issue-row { padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; line-height: 1.5; }
+    .qa-issue-row.error   { background: rgba(239,68,68,0.08); border-left: 3px solid #ef4444; color: rgba(255,255,255,0.85); }
+    .qa-issue-row.warning { background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; color: rgba(255,255,255,0.85); }
+    .qa-issue-row.info    { background: rgba(255,255,255,0.04); border-left: 3px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); }
+    .qa-issue-area { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; margin-right: 8px; }
 
     /* Phase: edit (generated/live) */
     .phase-edit { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
@@ -869,6 +903,18 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-right">
+        {hasPreview && (
+          <button type="button" class="qa-status-pill" id="qa-status-pill" title="Open QA report">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="qa-status-label">QA …</span>
+          </button>
+        )}
+        {hasPreview && (
+          <div class="topbar-quota" id="topbar-quota" title="AI editor iterations remaining on this project">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <span id="topbar-quota-label">— / 20 iterations</span>
+          </div>
+        )}
         {hasPreview && project.preview_url && !project.preview_url.startsWith('/') && (
           <a href={project.preview_url} target="_blank" class="topbar-btn">View live ↗</a>
         )}
@@ -1250,6 +1296,44 @@ if (hasPreview) {
   <!-- Activated success banner -->
   <div id="activated-banner">✓ Site activated successfully!</div>
 
+  <!-- QA report modal -->
+  <div id="qa-report-modal">
+    <div class="activate-backdrop" id="qa-report-backdrop"></div>
+    <div class="qa-report-card">
+      <div class="qa-report-header">
+        <div class="qa-score-badge" id="qa-score-badge">—</div>
+        <div>
+          <p style="font-weight:600;font-size:16px;color:#fff;margin:0;">QA Report</p>
+          <p id="qa-verdict-line" style="margin:4px 0 0;font-size:13px;color:rgba(255,255,255,0.55);line-height:1.45;">Reviewing the generated site against your brief…</p>
+        </div>
+      </div>
+      <div id="qa-issues-list"></div>
+      <p style="text-align:center;margin-top:16px;"><a href="#" id="qa-report-close" style="color:rgba(255,255,255,0.4);font-size:13px;text-decoration:none;">Close</a></p>
+    </div>
+  </div>
+
+  <!-- Iteration limit reached modal -->
+  <div id="iter-limit-modal" style="display:none;">
+    <div class="activate-backdrop" id="iter-limit-backdrop"></div>
+    <div class="activate-dialog">
+      <p class="activate-title">You've used all 20 iterations</p>
+      <p class="activate-sub">This project has used its included AI editing budget. Buy +10 more iterations to keep editing.</p>
+      <div class="activate-plans">
+        <div class="activate-plan highlight" id="iter-buy-pack" style="cursor:pointer;">
+          <div class="ap-left">
+            <span class="ap-name">+10 iterations</span>
+            <span class="ap-desc">Added to this project — instant</span>
+          </div>
+          <div class="ap-right">
+            <span class="ap-price">$5</span>
+          </div>
+        </div>
+      </div>
+      <p class="activate-loading" id="iter-loading" style="display:none;">Redirecting to Stripe...</p>
+      <p style="text-align:center;margin-top:16px;"><a href="#" id="iter-limit-close" style="color:rgba(255,255,255,0.4);font-size:13px;text-decoration:none;">Close</a></p>
+    </div>
+  </div>
+
   <!-- Domain modal -->
   <div id="domain-modal">
     <div class="domain-backdrop" id="domain-backdrop"></div>
@@ -1313,11 +1397,11 @@ if (hasPreview) {
     .topbar-btn--activate:hover { background: rgba(167,139,250,0.25); border-color: rgba(167,139,250,0.5); }
 
     /* Activate modal */
-    #activate-modal {
+    #activate-modal, #iter-limit-modal {
       display: none; position: fixed; inset: 0; z-index: 1000;
       align-items: center; justify-content: center;
     }
-    #activate-modal.open { display: flex; }
+    #activate-modal.open, #iter-limit-modal.open { display: flex; }
     .activate-backdrop {
       position: absolute; inset: 0; background: rgba(0,0,0,0.6);
       backdrop-filter: blur(4px); cursor: pointer;
@@ -1551,7 +1635,7 @@ if (hasPreview) {
 
     async function loadQuota() {
       try {
-        const res  = await fetch('/api/billing/edit-quota');
+        const res  = await fetch(`/api/projects/${projectId}/iterations`);
         if (!res.ok) return;
         const q = await res.json();
         renderQuota(q);
@@ -1560,43 +1644,50 @@ if (hasPreview) {
 
     function renderQuota(q) {
       const remaining = q.remaining ?? 0;
+      const quota     = q.quota     ?? 20;
+      const used      = q.used      ?? 0;
 
       // Topbar pill
       const topbarQuota = document.getElementById('topbar-quota');
       const topbarLabel = document.getElementById('topbar-quota-label');
       if (topbarQuota && topbarLabel) {
         topbarQuota.className = 'topbar-quota' + (remaining <= 0 ? ' empty' : remaining <= 3 ? ' warn' : '');
-        topbarLabel.textContent = remaining <= 0 ? '0 credits' : `${remaining} credits`;
+        topbarLabel.textContent = `${used}/${quota} iterations`;
       }
 
       // Inline bar (below suggestions)
       if (quotaBar && quotaLabel) {
         quotaBar.style.display = 'flex';
         if (remaining <= 0) {
-          quotaLabel.textContent = '0 edits left';
+          quotaLabel.textContent = '0 iterations left';
           quotaLabel.className = 'quota-label empty';
           if (buyBtn) buyBtn.style.display = 'inline';
         } else {
-          quotaLabel.textContent = `${remaining} edits left`;
-          quotaLabel.className = `quota-label${remaining <= 1 ? ' warn' : ''}`;
-          if (buyBtn) buyBtn.style.display = remaining <= 2 ? 'inline' : 'none';
+          quotaLabel.textContent = `${remaining} / ${quota} iterations left`;
+          quotaLabel.className = `quota-label${remaining <= 2 ? ' warn' : ''}`;
+          if (buyBtn) buyBtn.style.display = remaining <= 3 ? 'inline' : 'none';
         }
       }
     }
 
     if (buyBtn) {
+      buyBtn.textContent = '+10 iterations · $5';
       buyBtn.addEventListener('click', async e => {
         e.preventDefault();
         buyBtn.textContent = '...';
         try {
-          const res  = await fetch('/api/billing/buy-edits', { method: 'POST' });
+          const res  = await fetch('/api/billing/buy-iterations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId }),
+          });
           const data = await res.json();
           if (data.url) window.location.href = data.url;
           else alert(data.error || 'Stripe not configured yet.');
         } catch {
           alert('Error. Try again.');
         }
-        buyBtn.textContent = '+ 10 edits / €5';
+        buyBtn.textContent = '+10 iterations · $5';
       });
     }
 
@@ -1655,6 +1746,42 @@ if (hasPreview) {
     if (justActivated && activatedBanner) {
       activatedBanner.style.display = 'block';
       setTimeout(() => { activatedBanner.style.display = 'none'; }, 4000);
+    }
+
+    // ── Iteration-limit modal (buy +10 iterations / $5) ────────────────────
+    const iterLimitModal    = document.getElementById('iter-limit-modal');
+    const iterLimitBackdrop = document.getElementById('iter-limit-backdrop');
+    const iterLimitClose    = document.getElementById('iter-limit-close');
+    const iterBuyPack       = document.getElementById('iter-buy-pack');
+    const iterLoading       = document.getElementById('iter-loading');
+    const closeIterModal = () => {
+      if (iterLimitModal) { iterLimitModal.style.display = 'none'; iterLimitModal.classList.remove('open'); }
+    };
+    iterLimitBackdrop?.addEventListener('click', closeIterModal);
+    iterLimitClose?.addEventListener('click', e => { e.preventDefault(); closeIterModal(); });
+    iterBuyPack?.addEventListener('click', async () => {
+      if (iterLoading) iterLoading.style.display = 'block';
+      iterBuyPack.style.pointerEvents = 'none';
+      try {
+        const res  = await fetch('/api/billing/buy-iterations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId }),
+        });
+        const data = await res.json();
+        if (data.url) window.location.href = data.url;
+        else { alert(data.error || 'Stripe not configured.'); if (iterLoading) iterLoading.style.display = 'none'; iterBuyPack.style.pointerEvents = ''; }
+      } catch {
+        alert('Network error. Please try again.');
+        if (iterLoading) iterLoading.style.display = 'none';
+        iterBuyPack.style.pointerEvents = '';
+      }
+    });
+
+    // Refresh quota counter after returning from Stripe ($5 pack purchase)
+    if (new URLSearchParams(window.location.search).get('iterations_bought') === '1') {
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(loadQuota, 500); // give webhook a moment to land
     }
 
     // Show banner after domain purchase redirect
@@ -1725,20 +1852,80 @@ if (hasPreview) {
       }
     }
 
-    // QA STATUS
+    // QA STATUS — pill in topbar + modal with full issue list
+    let qaData = null;
+    function classifyScore(score) {
+      if (score == null) return 'warn';
+      if (score >= 85) return 'good';
+      if (score >= 60) return 'warn';
+      return 'bad';
+    }
+    function renderQaPill(data) {
+      const pill  = document.getElementById('qa-status-pill');
+      const label = document.getElementById('qa-status-label');
+      if (!pill || !label) return;
+      pill.style.display = 'flex';
+      const score  = data?.score;
+      const issues = data?.issues ?? 0;
+      const cls = classifyScore(score);
+      pill.classList.remove('good', 'warn', 'bad');
+      pill.classList.add(cls);
+      if (score == null) {
+        label.textContent = 'QA pending';
+      } else if (issues === 0) {
+        label.textContent = `QA ${score}/100 ✓`;
+      } else {
+        label.textContent = `QA ${score}/100 · ${issues} issue${issues === 1 ? '' : 's'}`;
+      }
+    }
+    function openQaModal() {
+      const m = document.getElementById('qa-report-modal');
+      const badge = document.getElementById('qa-score-badge');
+      const verdict = document.getElementById('qa-verdict-line');
+      const list  = document.getElementById('qa-issues-list');
+      if (!m || !qaData) return;
+      const score = qaData.score ?? 0;
+      const cls   = classifyScore(score);
+      if (badge) {
+        badge.classList.remove('good','warn','bad');
+        badge.classList.add(cls);
+        badge.textContent = String(score);
+      }
+      if (verdict) verdict.textContent = qaData.verdict || (qaData.issues === 0 ? 'No issues found — site matches your brief.' : 'Review the issues below.');
+      if (list) {
+        const issues = Array.isArray(qaData.postIssues) ? qaData.postIssues : [];
+        if (issues.length === 0) {
+          list.innerHTML = '<p style="color:rgba(255,255,255,0.5);font-size:13px;margin:0;">No issues to address.</p>';
+        } else {
+          list.innerHTML = issues.map(i => {
+            const sev = (i.severity || 'info').toLowerCase();
+            const area = (i.area || '').replace(/</g, '&lt;');
+            const msg  = (i.message || '').replace(/</g, '&lt;');
+            return `<div class="qa-issue-row ${sev}"><span class="qa-issue-area">${area}</span>${msg}</div>`;
+          }).join('');
+        }
+      }
+      m.style.display = 'flex';
+      m.classList.add('open');
+    }
+    document.getElementById('qa-status-pill')?.addEventListener('click', openQaModal);
+    document.getElementById('qa-report-backdrop')?.addEventListener('click', () => {
+      const m = document.getElementById('qa-report-modal');
+      if (m) { m.style.display = 'none'; m.classList.remove('open'); }
+    });
+    document.getElementById('qa-report-close')?.addEventListener('click', e => {
+      e.preventDefault();
+      const m = document.getElementById('qa-report-modal');
+      if (m) { m.style.display = 'none'; m.classList.remove('open'); }
+    });
+
     if (hasPreview) {
       fetch(`/api/projects/${projectId}/qa-status`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          const bar = document.getElementById('qa-status-bar');
-          if (!bar || !data) return;
-          bar.style.display = 'block';
-          const issues = data.issues ?? 0;
-          if (issues === 0) {
-            bar.innerHTML = '<span class="qa-badge ok">✓ QA OK</span>';
-          } else {
-            bar.innerHTML = `<span class="qa-badge warn">⚠ ${issues} issue${issues === 1 ? '' : 's'}</span>`;
-          }
+          if (!data) return;
+          qaData = data;
+          renderQaPill(data);
         })
         .catch(() => {});
     }
@@ -2618,12 +2805,16 @@ if (hasPreview) {
             if (last?.classList?.contains('system') && last.textContent === 'Thinking...') last.remove();
           };
 
-          // Helper: show quota-exceeded message
+          // Helper: show quota-exceeded message + open buy modal
           const showLimitError = (d) => {
-            const msg = `Edit limit reached (${d.used}/${d.limit + (d.extra||0)}). Buy an extra pack or upgrade your plan.`;
+            const used  = d.used  ?? 0;
+            const quota = d.quota ?? 20;
+            const msg = `You've used all ${quota} AI iterations on this project. Buy +10 more for $5.`;
             addEditMessage('system', msg);
             if (buyBtn) buyBtn.style.display = 'inline';
-            if (quotaLabel) { quotaLabel.textContent = '0 edits left'; quotaLabel.className = 'quota-label empty'; }
+            if (quotaLabel) { quotaLabel.textContent = `0 / ${quota} iterations left`; quotaLabel.className = 'quota-label empty'; }
+            const m = document.getElementById('iter-limit-modal');
+            if (m) { m.style.display = 'flex'; m.classList.add('open'); }
           };
 
           // Helper: full-page iterate (used as primary or fallback)
@@ -2635,7 +2826,7 @@ if (hasPreview) {
             });
             data = await res.json();
             removePlaceholder();
-            if (data.error === 'edit_limit_reached') { showLimitError(data); return; }
+            if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) { showLimitError(data); return; }
             if (data.reply) addEditMessage('assistant', data.reply);
             if (data.newHtml) iframe.src = `${previewUrl}?edit&t=${Date.now()}`;
             await loadQuota();
@@ -2656,7 +2847,7 @@ if (hasPreview) {
             data = await res.json();
             removePlaceholder();
 
-            if (data.error === 'edit_limit_reached') {
+            if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) {
               showLimitError(data);
             } else if (!res.ok && activeSectionId) {
               // Fallback: route to section edit instead of full-site iterate
@@ -2701,7 +2892,7 @@ if (hasPreview) {
             });
             data = await res.json();
             removePlaceholder();
-            if (data.error === 'edit_limit_reached') {
+            if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) {
               showLimitError(data);
             } else if (!res.ok) {
               addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');

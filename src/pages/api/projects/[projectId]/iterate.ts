@@ -9,7 +9,7 @@ import { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST } from '../../../..
 import { createMessage } from '../../../../lib/anthropic';
 import { runStructuralQA } from '../../../../lib/structural-qa';
 import { runPageVisualQA } from '../../../../lib/visual-qa';
-import { checkAndConsumeEdit, getEditQuota } from '../../../../lib/edit-quota';
+import { createAdminClient } from '../../../../lib/supabase';
 import { json } from '../../../../lib/api-utils';
 
 
@@ -65,36 +65,28 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
-  // ── Quota: consume 4 edits atomically BEFORE the AI call ────────────────
-  const quotaCheck = await getEditQuota(user.id);
-  if (quotaCheck.remaining < 4) {
-    return json({
-      error: 'edit_limit_reached',
-      used: quotaCheck.used,
-      limit: quotaCheck.limit,
-      extra: quotaCheck.extra,
-      plan: quotaCheck.plan,
-      required: 4,
-      available: quotaCheck.remaining,
-    }, 429);
-  }
+  // ── Verify project ownership BEFORE quota check ─────────────────────────
+  const project = await db.projects.findById(params.projectId!);
+  if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  // Reserve credits upfront (refunded on failure)
-  let creditsConsumed = 0;
-  for (let i = 0; i < 4; i++) {
-    const ok = await checkAndConsumeEdit(user.id);
-    if (ok) creditsConsumed++;
-    else break;
+  // ── Per-project iteration quota: 20 included in plan, +10 per $5 pack ───
+  const admin = createAdminClient();
+  const { data: consumeData, error: consumeErr } = await admin.rpc('consume_project_iteration', {
+    p_project_id: params.projectId!,
+  });
+  if (consumeErr || !consumeData) {
+    console.error('[iterate] consume_project_iteration error:', consumeErr);
+    return json({ error: 'Internal error' }, 500);
   }
-  if (creditsConsumed < 4) {
-    // Partial reserve — refund what we took (race with concurrent request)
-    if (creditsConsumed > 0) {
-      try {
-        const { createAdminClient } = await import('../../../../lib/supabase');
-        await createAdminClient().rpc('refund_edits', { p_user_id: user.id, p_amount: creditsConsumed });
-      } catch { /* best-effort */ }
-    }
-    return json({ error: 'edit_limit_reached', required: 4, available: creditsConsumed }, 429);
+  const consume = consumeData as { allowed?: boolean; used?: number; quota?: number; remaining?: number; error?: string };
+  if (consume.error === 'project_not_found') return json({ error: 'Not found' }, 404);
+  if (!consume.allowed) {
+    return json({
+      error: 'iteration_limit_reached',
+      used: consume.used,
+      quota: consume.quota,
+      remaining: 0,
+    }, 429);
   }
 
   try {
@@ -104,9 +96,6 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     if (!message?.trim()) {
       return json({ error: 'message is required' }, 400);
     }
-
-    const project = await db.projects.findById(params.projectId!);
-    if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
     const gen = await db.generatedFiles.findLatest(params.projectId!);
     if (!gen?.files) return json({ error: 'No generated files found. Launch the site first.' }, 409);
@@ -177,9 +166,10 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     const raw = response.content[0]?.type === 'text' ? response.content[0].text : '';
     let newHtml = extractHtml(raw);
 
-    // If extraction didn't find valid HTML, keep the current version
+    // If extraction didn't find valid HTML, keep the current version + refund the iteration
     if (!newHtml.includes('</html>')) {
       console.warn('[iterate] Sonnet did not return complete HTML, keeping current version');
+      try { await admin.rpc('refund_project_iteration', { p_project_id: params.projectId! }); } catch { /* best-effort */ }
       return json({ reply: 'Edit failed — the change was too complex. Try a more specific instruction (e.g. "change the heading text to X").', newHtml: null });
     }
 
@@ -241,15 +231,13 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       newHtml,
       history:    updatedHistory,
       usedVision,
+      iterations: { used: consume.used, quota: consume.quota, remaining: (consume.quota ?? 0) - (consume.used ?? 0) },
     });
 
   } catch (e: any) {
     console.error('[POST /api/projects/:id/iterate]', e);
-    // Refund the 4 credits consumed upfront since the operation failed
-    try {
-      const { createAdminClient } = await import('../../../../lib/supabase');
-      await createAdminClient().rpc('refund_edits', { p_user_id: user.id, p_amount: 4 });
-    } catch { /* best-effort refund */ }
+    // Refund the iteration consumed upfront since the operation failed
+    try { await admin.rpc('refund_project_iteration', { p_project_id: params.projectId! }); } catch { /* best-effort refund */ }
     return json({ error: 'Internal server error' }, 500);
   }
 };
