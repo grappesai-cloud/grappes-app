@@ -91,9 +91,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
     step = 'insertProject';
     const supabase = createAdminClient();
 
+    // Owner-equivalent users (plan=owner OR extra_edits>=999999) get unlimited
+    // AI editor iterations on every project they create.
+    const isOwnerEquiv = dbUser.plan === 'owner' || (dbUser.extra_edits ?? 0) >= 999999;
+    const projectInsert: Record<string, unknown> = { user_id: user.id, name, slug };
+    if (isOwnerEquiv) projectInsert.iterations_quota = 999999;
+
     const { data: project, error: projErr } = await supabase
       .from('projects')
-      .insert({ user_id: user.id, name, slug })
+      .insert(projectInsert)
       .select('*')
       .single();
 

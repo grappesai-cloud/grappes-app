@@ -94,7 +94,8 @@ export const POST: APIRoute = async ({ params, locals }) => {
   const dbUser = await db.users.findById(user.id);
   const userPlan = dbUser?.plan ?? 'free';
   const launchRateKey = `launch:${user.id}`;
-  if (userPlan !== 'owner') {
+  const isOwnerEquiv = userPlan === 'owner' || (dbUser?.extra_edits ?? 0) >= 999999;
+  if (!isOwnerEquiv) {
     const maxLaunches = ['pro', 'agency'].includes(userPlan) ? 10 : userPlan === 'starter' ? 5 : 3;
     if (!(await checkPersistentRateLimit(launchRateKey, maxLaunches, 3_600_000))) {
       return json({ error: 'Too many generation requests. Please wait before trying again.' }, 429);
@@ -175,7 +176,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
   }
 
   // Record rate limit ONLY on success — failed attempts get a free retry
-  if (userPlan !== 'owner') {
+  if (!isOwnerEquiv) {
     await recordPersistentRateLimit(launchRateKey);
   }
 

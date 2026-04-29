@@ -35,6 +35,8 @@ export interface User {
   plan: UserPlan;
   stripe_customer_id?: string | null;
   projects_limit: number;
+  edits_used?: number | null;
+  extra_edits?: number | null;
   multipage_addon?: boolean | null;
   multipage_addon_lifetime?: boolean | null;
   multipage_addon_subscription_id?: string | null;

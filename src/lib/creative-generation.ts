@@ -411,7 +411,7 @@ CRITICAL — DO NOT INVENT TRACKS: Render ONLY the embeds in the URL list above 
 
   // Hero video flag (separate from media.videoUrl which is an actual asset)
   const heroVideoFlag = brief?.media?.hero_video === true;
-  const heroVideoBlock = heroVideoFlag && !videoUrl
+  const heroVideoBlock = heroVideoFlag && allVideos.length === 0
     ? `Hero video intent: client wants a cinematic/motion-driven hero. If no video asset is uploaded, build the hero with dramatic motion — large animated typography, CSS/canvas motion, scroll-driven transforms. Convey "video-like" energy with code.`
     : '';
 
