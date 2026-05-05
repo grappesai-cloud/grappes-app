@@ -54,7 +54,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       await client.from('users').upsert({
         id: user.id,
         email: user.email ?? '',
-        name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+        name: user.name ?? null,
       }, { onConflict: 'id' });
       dbUser = await db.users.findById(user.id);
       if (!dbUser) return json({ error: 'Failed to create user profile' }, 500);

@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { auth } from './lib/auth';
+import { createAuthClient } from './lib/supabase';
 import { checkRateLimit, getClientIp } from './lib/rate-limit';
 import { e } from './lib/env';
 
@@ -47,6 +48,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     if (isPublic(path)) {
       context.locals.user = null;
       context.locals.session = null;
+      context.locals.supabase = createAuthClient();
       return next();
     }
     return new Response(
@@ -65,6 +67,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   context.locals.user = user;
   context.locals.session = session;
+  context.locals.supabase = createAuthClient(context.request, context.cookies);
 
   // Track ?ref=CODE in a 30-day cookie for referral attribution
   const refCode = context.url.searchParams.get('ref');

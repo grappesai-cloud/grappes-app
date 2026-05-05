@@ -1,23 +1,23 @@
 // ─── Signed Upload URL ──────────────────────────────────────────────────────
-// Returns a signed URL that allows the browser to upload directly to Supabase
-// Storage, bypassing the Vercel function body limit (4.5MB on Hobby).
-// Supports: images (large), videos, zip archives.
+// Returns a Vercel Blob client-upload token so the browser can upload directly
+// to Blob storage, bypassing the Vercel function body limit.
+// Called by the client via `upload()` from `@vercel/blob/client` — that helper
+// posts the request body that `handleUpload` expects below.
+// Supports: images, videos, zip archives.
 
 import type { APIRoute } from 'astro';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { db } from '../../../../lib/db';
-import { createAdminClient } from '../../../../lib/supabase';
 import { json } from '../../../../lib/api-utils';
 
-const BUCKET = 'assets';
-
-// Max sizes per kind (enforced server-side via path + later in finalize)
+// Max sizes per kind
 const MAX_BYTES = {
-  image:  20 * 1024 * 1024,   //  20 MB — wide margin for raw photographer dumps
-  video:  50 * 1024 * 1024,   //  50 MB — short marketing clip
-  zip:   200 * 1024 * 1024,   // 200 MB — bulk asset bundle
+  image:  20 * 1024 * 1024,
+  video:  50 * 1024 * 1024,
+  zip:   200 * 1024 * 1024,
 } as const;
 
-const MIME_BY_KIND: Record<string, { mimes: string[]; exts: string[] }> = {
+const MIME_BY_KIND: Record<'image' | 'video' | 'zip', { mimes: string[]; exts: string[] }> = {
   image: {
     mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'],
     exts:  ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'],
@@ -32,66 +32,62 @@ const MIME_BY_KIND: Record<string, { mimes: string[]; exts: string[] }> = {
   },
 };
 
+interface ClientPayload {
+  kind?: 'image' | 'video' | 'zip';
+  assetType?: string;
+}
+
 export const POST: APIRoute = async ({ params, locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
-  const project = await db.projects.findById(params.projectId!);
+  const projectId = params.projectId!;
+  const project = await db.projects.findById(projectId);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  let body: any;
+  let body: HandleUploadBody;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
-  const {
-    filename,
-    contentType,
-    kind = 'image',
-    size,
-    assetType = 'section',
-  } = body as {
-    filename:    string;
-    contentType: string;
-    kind?:       'image' | 'video' | 'zip';
-    size?:       number;
-    assetType?:  string;  // logo|hero|section|og|video|menu|other — used at finalize
-  };
 
-  if (!filename || !contentType) return json({ error: 'filename and contentType required' }, 400);
-  if (!['image', 'video', 'zip'].includes(kind)) return json({ error: 'kind must be image|video|zip' }, 400);
+  try {
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname: string, clientPayloadStr) => {
+        let payload: ClientPayload = {};
+        try { if (clientPayloadStr) payload = JSON.parse(clientPayloadStr); } catch { /* ignore */ }
+        const kind = (payload.kind && ['image', 'video', 'zip'].includes(payload.kind)) ? payload.kind : 'image';
+        const allow = MIME_BY_KIND[kind];
+        const assetType = payload.assetType ?? 'section';
 
-  const allow = MIME_BY_KIND[kind];
-  if (!allow.mimes.includes(contentType.toLowerCase()) && !(kind === 'zip' && filename.toLowerCase().endsWith('.zip'))) {
-    return json({ error: `Invalid contentType "${contentType}" for kind "${kind}". Allowed: ${allow.mimes.join(', ')}` }, 400);
+        // Choose final pathname: <projectId>/<folder>/<uuid>.<ext>
+        const rawExt = pathname.split('.').pop()?.toLowerCase() || '';
+        const ext = allow.exts.includes(rawExt) ? rawExt : allow.exts[0];
+        const uuid = crypto.randomUUID();
+        const folder = kind === 'zip' ? '_uploads' : (kind === 'video' ? 'video' : assetType);
+        const finalPathname = `assets/${projectId}/${folder}/${uuid}.${ext}`;
+
+        return {
+          allowedContentTypes: allow.mimes,
+          maximumSizeInBytes: MAX_BYTES[kind],
+          tokenPayload: JSON.stringify({ projectId, kind, assetType, finalPathname }),
+          // Override the upload destination so files land at our chosen path.
+          addRandomSuffix: false,
+          pathname: finalPathname,
+        } as any;
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Hook for post-upload work; currently a no-op (the /finalize endpoint
+        // registers the asset row after the client confirms upload). Kept for
+        // future webhook-style flows.
+        try {
+          const meta = tokenPayload ? JSON.parse(tokenPayload) : null;
+          console.log('[sign-upload] completed:', { url: blob.url, pathname: blob.pathname, meta });
+        } catch { /* ignore */ }
+      },
+    });
+    return json(jsonResponse);
+  } catch (err) {
+    console.error('[sign-upload] handleUpload error:', err);
+    return json({ error: err instanceof Error ? err.message : 'Failed to create upload URL' }, 500);
   }
-
-  if (typeof size === 'number' && size > MAX_BYTES[kind]) {
-    return json({ error: `File too large. Max ${Math.round(MAX_BYTES[kind] / 1024 / 1024)}MB for ${kind}` }, 413);
-  }
-
-  const rawExt = filename.split('.').pop()?.toLowerCase() || '';
-  const ext = allow.exts.includes(rawExt) ? rawExt : allow.exts[0];
-  const uuid = crypto.randomUUID();
-  const folder = kind === 'zip' ? '_uploads' : (kind === 'video' ? 'video' : assetType);
-  const storagePath = `${params.projectId}/${folder}/${uuid}.${ext}`;
-
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUploadUrl(storagePath);
-
-  if (error) {
-    console.error('[sign-upload] Error:', error);
-    return json({ error: 'Failed to create upload URL' }, 500);
-  }
-
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-
-  return json({
-    signedUrl:  data.signedUrl,
-    token:      data.token,
-    path:       storagePath,
-    publicUrl:  urlData.publicUrl,
-    kind,
-    assetType,
-    maxBytes:   MAX_BYTES[kind],
-  });
 };
