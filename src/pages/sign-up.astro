@@ -1,9 +1,8 @@
 ---
 import { sendWelcomeEmail } from '../lib/resend';
-import { recordReferral } from '../lib/referral';
 import { checkRateLimit, getClientIp } from '../lib/rate-limit';
-import { createAdminClient } from '../lib/supabase';
 import { verifyTurnstile, turnstileSiteKey } from '../lib/turnstile';
+import { callAuthApi, redirectWithCookies } from '../lib/auth-server';
 
 if (Astro.locals.user) return Astro.redirect('/dashboard');
 
@@ -13,9 +12,9 @@ let error = '';
 if (Astro.request.method === 'POST') {
   const ip = getClientIp(Astro.request);
   const formData = await Astro.request.formData();
-  const email = formData.get('email') as string;
+  const email = (formData.get('email') as string)?.trim().toLowerCase();
   const password = formData.get('password') as string;
-  const name = formData.get('name') as string;
+  const name = (formData.get('name') as string) ?? '';
   const refCode = (formData.get('referral_code') as string || '').trim().toLowerCase();
   const turnstileToken = (formData.get('cf-turnstile-response') as string | null);
 
@@ -31,48 +30,32 @@ if (Astro.request.method === 'POST') {
   }
 
   if (!error) {
-    const { data: { user: newUser }, error: authError } = await Astro.locals.supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: name } },
-    });
+    // Forward referral code (if entered in form) via cookie so the auth.databaseHooks
+    // can pick it up alongside any cookie set by ?ref= attribution.
+    if (refCode && /^[a-z0-9]{4,16}$/i.test(refCode)) {
+      Astro.cookies.set('ref_code', refCode, {
+        path: '/', maxAge: 600, httpOnly: true, sameSite: 'lax', secure: import.meta.env.PROD,
+      });
+    }
 
-    if (authError) {
-      error = authError.message;
+    // Re-build headers so the freshly-set ref_code cookie is visible to Better-Auth.
+    const headers = new Headers(Astro.request.headers);
+    const existingCookie = headers.get('cookie') ?? '';
+    if (refCode) {
+      headers.set('cookie', existingCookie ? `${existingCookie}; ref_code=${refCode}` : `ref_code=${refCode}`);
+    }
+
+    const result = await callAuthApi('signUpEmail', { email, password, name }, headers);
+    if (!result.ok) {
+      error = result.error ?? 'Sign-up failed';
     } else {
-      // Ensure user profile exists (fallback if DB trigger missed)
-      if (newUser?.id) {
-        try {
-          const admin = createAdminClient();
-          await admin.from('users').upsert({
-            id: newUser.id,
-            email,
-            name: name || null,
-          }, { onConflict: 'id', ignoreDuplicates: true });
-        } catch (e) {
-          console.warn('[sign-up] User profile upsert failed:', e);
-        }
-      }
-      // Track referral (from form field or cookie)
-      const cookieRef = Astro.cookies.get('ref_code')?.value ?? '';
-      const finalRef = refCode || cookieRef;
-      if (finalRef && newUser?.id) {
-        try {
-          const signupIp = Astro.clientAddress ?? Astro.request.headers.get('x-real-ip') ?? 'unknown';
-          await recordReferral(newUser.id, finalRef, signupIp);
-          // Only clear cookie on success — retry on next login if it failed
-          Astro.cookies.delete('ref_code', { path: '/' });
-        } catch (refErr) {
-          console.warn('[sign-up] Referral recording failed (cookie preserved for retry):', refErr);
-        }
-      }
       try {
-        await sendWelcomeEmail({ to: email, name: name || undefined, userId: newUser?.id });
+        await sendWelcomeEmail({ to: email, name: name || undefined, userId: result.data?.user?.id });
       } catch (emailErr) {
         console.error('[sign-up] Welcome email failed:', emailErr);
       }
-      // New account → drop them straight into project creation
-      return Astro.redirect('/dashboard/new');
+      Astro.cookies.delete('ref_code', { path: '/' });
+      return redirectWithCookies('/dashboard/new', result.setCookieHeaders);
     }
   }
 }
@@ -97,7 +80,7 @@ if (Astro.request.method === 'POST') {
     <meta name="twitter:image" content="https://grappes.dev/assets/grappes/og-image.png" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
-    
+
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
   </head>
   <body data-auth-bg style="--auth-bg: url('/assets/grappes/auth/sign-up.webp');">
@@ -128,10 +111,14 @@ if (Astro.request.method === 'POST') {
             <h2 class="auth-form-title">Create your account</h2>
             <p class="auth-form-sub">Free to start, no credit card required</p>
 
-            <button type="button" id="googleBtn" class="auth-google-btn">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.26c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg>
-              <span>Continue with Google</span>
-            </button>
+            <form id="googleForm" method="POST" action="/api/auth/sign-in/social">
+              <input type="hidden" name="provider" value="google" />
+              <input type="hidden" name="callbackURL" value="/dashboard/new" />
+              <button type="submit" class="auth-google-btn">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.26c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg>
+                <span>Continue with Google</span>
+              </button>
+            </form>
 
             <div class="auth-divider"><span>or</span></div>
 
@@ -190,11 +177,5 @@ if (Astro.request.method === 'POST') {
     {siteKey && (
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     )}
-
-    <script is:inline>
-      document.getElementById('googleBtn')?.addEventListener('click', () => {
-        window.location.href = '/api/auth/google';
-      });
-    </script>
   </body>
 </html>

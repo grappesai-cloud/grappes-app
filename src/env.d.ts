@@ -1,11 +1,14 @@
 /// <reference types="astro/client" />
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { auth } from './lib/auth';
+
+type Session = typeof auth.$Infer.Session;
+type AuthUser = Session['user'];
 
 declare global {
   namespace App {
     interface Locals {
-      supabase: SupabaseClient;
-      user: User | null;
+      user: AuthUser | null;
+      session: Session['session'] | null;
     }
   }
 }

@@ -3,14 +3,12 @@
 // Sends a confirmation email so the user knows their password was changed.
 
 import type { APIRoute } from 'astro';
-import { createAuthClient } from '../../../lib/supabase';
+import { getUser } from '../../../lib/session';
 import { sendPasswordChangedEmail } from '../../../lib/resend';
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST: APIRoute = async ({ request }) => {
   try {
-    const supabase = createAuthClient(request, cookies);
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await getUser(request);
     if (!user?.email) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
     }

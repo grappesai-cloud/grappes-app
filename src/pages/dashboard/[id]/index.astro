@@ -977,7 +977,7 @@ if (hasPreview) {
             Regenerate
           </button>
         )}
-        <form method="POST" action="/api/auth/signout" style="margin:0;">
+        <form method="POST" action="/api/auth/sign-out" style="margin:0;">
           <button type="submit" class="topbar-signout--dash"><span>Sign out</span></button>
         </form>
         <a href="/dashboard/account" class="topbar-avatar" title="Account">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
