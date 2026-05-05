@@ -1,12 +1,11 @@
 import type { APIRoute } from 'astro';
+import { put as blobPut, del as blobDel } from '@vercel/blob';
 import { db } from '../../../../lib/db';
-import { createAdminClient } from '../../../../lib/supabase';
 import type { AssetType } from '../../../../lib/db';
 import sharp from 'sharp';
 
 import { json } from '../../../../lib/api-utils';
 import { checkRateLimit } from '../../../../lib/rate-limit';
-const BUCKET = 'assets';
 
 const TYPE_LIMITS: Record<AssetType, number> = {
   logo: 2 * 1024 * 1024,
@@ -235,31 +234,36 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
     return json({ error: 'Image conversion failed' }, 500);
   }
 
-  // Build storage path with final extension
+  // Build storage path with final extension (matches sign-upload convention)
   const uuid = crypto.randomUUID();
   const extension = mimeToExt(finalMime);
-  const storagePath = `${params.projectId}/${type}/${uuid}.${extension}`;
+  const storagePath = `assets/${params.projectId}/${type}/${uuid}.${extension}`;
 
-  // Upload converted file to Supabase Storage (with retry)
-  const supabase = createAdminClient();
+  // Upload converted file to Vercel Blob (with retry)
+  let publicUrl: string | null = null;
   let uploadError: any = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(storagePath, convertedBuffer, { contentType: finalMime, upsert: false });
-    uploadError = error;
-    if (!error) break;
-    console.warn(`[upload] Storage attempt ${attempt + 1} failed:`, error.message);
-    if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+    try {
+      const blob = await blobPut(storagePath, convertedBuffer, {
+        access: 'public',
+        contentType: finalMime,
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      });
+      publicUrl = blob.url;
+      uploadError = null;
+      break;
+    } catch (err) {
+      uploadError = err;
+      console.warn(`[upload] Blob attempt ${attempt + 1} failed:`, (err as any)?.message);
+      if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+    }
   }
 
-  if (uploadError) {
-    console.error('[upload] Storage error after retries:', uploadError);
-    return json({ error: `Storage upload failed: ${uploadError.message}` }, 500);
+  if (uploadError || !publicUrl) {
+    console.error('[upload] Blob error after retries:', uploadError);
+    return json({ error: `Storage upload failed: ${(uploadError as any)?.message || 'unknown'}` }, 500);
   }
-
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-  const publicUrl = urlData.publicUrl;
 
   // Generate and upload responsive variants for hero/section images
   const variantUrls: Record<string, string> = {};
@@ -270,15 +274,18 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
     const variants = await generateResponsiveVariants(convertedBuffer, finalMime, type, quality);
 
     for (const v of variants) {
-      const variantPath = `${params.projectId}/${type}/${uuid}${v.suffix}.webp`;
-      const { error: vErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(variantPath, v.buffer, { contentType: 'image/webp', upsert: false });
-
-      if (!vErr) {
-        const { data: vUrl } = supabase.storage.from(BUCKET).getPublicUrl(variantPath);
-        variantUrls[`${v.width}w`] = vUrl.publicUrl;
+      const variantPath = `assets/${params.projectId}/${type}/${uuid}${v.suffix}.webp`;
+      try {
+        const vBlob = await blobPut(variantPath, v.buffer, {
+          access: 'public',
+          contentType: 'image/webp',
+          addRandomSuffix: false,
+          allowOverwrite: false,
+        });
+        variantUrls[`${v.width}w`] = vBlob.url;
         variantPaths.push(variantPath);
+      } catch (vErr) {
+        console.warn('[upload] Variant upload failed:', (vErr as any)?.message);
       }
     }
   } catch (e) {
@@ -315,8 +322,8 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
     });
   } catch (e: any) {
-    // Rollback storage upload
-    await supabase.storage.from(BUCKET).remove([storagePath]);
+    // Rollback uploads (main + variants)
+    try { await blobDel([publicUrl, ...Object.values(variantUrls)]); } catch { /* ignore */ }
     const details = e?.message || (typeof e === 'string' ? e : JSON.stringify(e));
     const code    = e?.code || e?.details || null;
     console.error('[upload] DB error:', code, details, e);

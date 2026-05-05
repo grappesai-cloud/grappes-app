@@ -829,38 +829,32 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   async function uploadViaDirect(file, type) {
     var kind = type === 'zip' ? 'zip' : (type === 'video' ? 'video' : 'image');
     var assetType = type === 'zip' ? 'section' : type;
+    var contentType = file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream');
 
-    // 1) Get a signed upload URL
-    var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename:    file.name,
-        contentType: file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream'),
-        kind:        kind,
-        size:        file.size,
-        assetType:   assetType,
-      }),
-    });
-    var signData = await signRes.json();
-    if (!signRes.ok || !signData.signedUrl) return { ok: false, error: signData.error || 'Sign failed' };
+    // 1) Stream directly to Vercel Blob via client-direct upload.
+    //    The /sign-upload endpoint generates a short-lived token; the file
+    //    bypasses the function body limit entirely.
+    var blob;
+    try {
+      var mod = await import('@vercel/blob/client');
+      blob = await mod.upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',
+        clientPayload: JSON.stringify({ kind: kind, assetType: assetType }),
+        contentType: contentType,
+      });
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : 'Direct upload failed' };
+    }
 
-    // 2) PUT directly to Supabase Storage
-    var putRes = await fetch(signData.signedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      body: file,
-    });
-    if (!putRes.ok) return { ok: false, error: 'Direct upload failed (' + putRes.status + ')' };
-
-    // 3) Finalize: register asset row(s) and (for zip) extract entries
+    // 2) Finalize: register asset row(s) and (for zip) extract entries
     var finRes = await fetch('/api/assets/' + projectId + '/finalize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storagePath: signData.path,
-        publicUrl:   signData.publicUrl,
-        contentType: file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream'),
+        storagePath: blob.pathname,
+        publicUrl:   blob.url,
+        contentType: contentType,
         filename:    file.name,
         sizeBytes:   file.size,
         kind:        kind,

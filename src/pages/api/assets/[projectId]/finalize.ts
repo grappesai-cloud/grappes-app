@@ -1,15 +1,14 @@
 // ─── Finalize direct-upload ─────────────────────────────────────────────────
-// After the client uploads a file directly to Supabase Storage (via the
-// sign-upload signed URL), this endpoint registers the asset row.
+// After the client uploads a file directly to Vercel Blob (via the
+// sign-upload handleUpload flow), this endpoint registers the asset row.
 // For zip archives it triggers extract-zip in-process.
 
 import type { APIRoute } from 'astro';
+import { del as blobDel } from '@vercel/blob';
 import { db } from '../../../../lib/db';
-import { createAdminClient } from '../../../../lib/supabase';
 import type { AssetType } from '../../../../lib/db';
 import { json } from '../../../../lib/api-utils';
 
-const BUCKET = 'assets';
 const VALID_ASSET_TYPES: AssetType[] = ['logo', 'hero', 'section', 'og', 'favicon', 'font', 'menu', 'document', 'other', 'video'] as any;
 
 export const POST: APIRoute = async ({ params, locals, request }) => {
@@ -46,15 +45,14 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
     return json({ error: 'storagePath, publicUrl, contentType, filename required' }, 400);
   }
 
-  // Verify storagePath belongs to this project (prevents cross-project hijack)
-  if (!storagePath.startsWith(`${params.projectId}/`)) {
+  // Verify storagePath belongs to this project (prevents cross-project hijack).
+  // sign-upload stamps blobs at: assets/<projectId>/<folder>/<uuid>.<ext>
+  const projectPathPrefix = `assets/${params.projectId}/`;
+  if (!storagePath.startsWith(projectPathPrefix) && !storagePath.startsWith(`${params.projectId}/`)) {
     return json({ error: 'Invalid storagePath' }, 400);
   }
 
-  const supabase = createAdminClient();
-
-  // Verify the file actually exists in Storage before registering it.
-  // (HEAD via getPublicUrl + fetch — cheap and authoritative.)
+  // Verify the file actually exists in Blob before registering it.
   try {
     const head = await fetch(publicUrl, { method: 'HEAD' });
     if (!head.ok) return json({ error: `File not found in storage (${head.status})` }, 404);
@@ -67,14 +65,14 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
     try {
       const { extractZipAssets } = await import('../../../../lib/zip-extract');
       const result = await extractZipAssets({
-        projectId:   params.projectId!,
-        zipPath:     storagePath,
+        projectId:    params.projectId!,
+        zipPath:      storagePath,
         zipPublicUrl: publicUrl,
-        defaultType: (assetType as AssetType) || 'section',
+        defaultType:  (assetType as AssetType) || 'section',
       });
 
       // Best-effort: delete the original zip blob to save storage
-      try { await supabase.storage.from(BUCKET).remove([storagePath]); } catch { /* ignore */ }
+      try { await blobDel(publicUrl); } catch { /* ignore */ }
 
       return json({
         ok:           true,
@@ -102,18 +100,18 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   let asset;
   try {
     asset = await db.assets.create({
-      project_id:  params.projectId!,
-      type:        t,
-      filename:    filename,
+      project_id:   params.projectId!,
+      type:         t,
+      filename:     filename,
       storage_path: storagePath,
-      public_url:  publicUrl,
-      mime_type:   contentType,
-      size_bytes:  sizeBytes ?? 0,
-      metadata:    Object.keys(metadata).length > 0 ? metadata : undefined,
+      public_url:   publicUrl,
+      mime_type:    contentType,
+      size_bytes:   sizeBytes ?? 0,
+      metadata:     Object.keys(metadata).length > 0 ? metadata : undefined,
     });
   } catch (e: any) {
-    // Roll back the storage upload on DB failure
-    try { await supabase.storage.from(BUCKET).remove([storagePath]); } catch { /* ignore */ }
+    // Roll back the upload on DB failure
+    try { await blobDel(publicUrl); } catch { /* ignore */ }
     console.error('[finalize] DB save error:', e?.message || e);
     return json({ error: `DB save failed: ${e?.message || 'unknown'}` }, 500);
   }

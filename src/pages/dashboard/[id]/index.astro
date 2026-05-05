@@ -2642,26 +2642,17 @@ if (hasPreview) {
         imgUploadingEl.style.display = '';
         imgSaveBtn.disabled = true;
         try {
-          // Step 1: Get signed upload URL from server
-          var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: file.name, contentType: file.type }),
+          // Stream directly to Vercel Blob via client-direct upload.
+          var mod = await import('@vercel/blob/client');
+          var blob = await mod.upload(file.name, file, {
+            access: 'public',
+            handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',
+            clientPayload: JSON.stringify({ kind: 'image', assetType: 'section' }),
+            contentType: file.type,
           });
-          var signData = await signRes.json();
-          if (!signData.signedUrl) { alert(signData.error || 'Upload failed'); imgUploadingEl.style.display = 'none'; return; }
-
-          // Step 2: Upload directly to Supabase Storage from browser
-          var upRes = await fetch(signData.signedUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type },
-            body: file,
-          });
-          if (!upRes.ok) { alert('Upload failed: ' + upRes.statusText); imgUploadingEl.style.display = 'none'; return; }
-
-          setImagePreview(signData.publicUrl);
+          setImagePreview(blob.url);
         } catch (e) {
-          alert('Upload failed');
+          alert((e && e.message) || 'Upload failed');
         }
         imgUploadingEl.style.display = 'none';
       }

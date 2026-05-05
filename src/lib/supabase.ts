@@ -424,8 +424,12 @@ class BlobBucket {
   constructor(public bucket: string) {}
 
   private prefixed(path: string) {
-    // Namespace blob keys by bucket so multiple Supabase buckets can coexist.
-    return `${this.bucket}/${path.replace(/^\/+/, '')}`;
+    // Namespace blob keys by bucket so multiple Supabase buckets can coexist —
+    // unless the caller already passed a path that starts with the bucket
+    // (e.g. handleUpload-stamped paths like "assets/<projectId>/...").
+    const clean = path.replace(/^\/+/, '');
+    if (clean.startsWith(`${this.bucket}/`)) return clean;
+    return `${this.bucket}/${clean}`;
   }
 
   async upload(path: string, body: Blob | ArrayBuffer | Buffer | Uint8Array, opts: { contentType?: string; upsert?: boolean } = {}) {

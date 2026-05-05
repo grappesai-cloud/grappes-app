@@ -1,10 +1,8 @@
 import type { APIRoute } from 'astro';
+import { del as blobDel } from '@vercel/blob';
 import { db } from '../../../../../lib/db';
-import { createAdminClient } from '../../../../../lib/supabase';
 
 import { json } from '../../../../../lib/api-utils';
-const BUCKET = 'assets';
-
 
 export const DELETE: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
@@ -16,21 +14,19 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
   const asset = await db.assets.findById(params.assetId!);
   if (!asset || asset.project_id !== params.projectId) return json({ error: 'Asset not found' }, 404);
 
-  // Remove primary file + responsive variants from storage
-  const supabase = createAdminClient();
-  const pathsToDelete = [asset.storage_path];
-  const variantPaths = (asset.metadata as any)?.variantPaths as string[] | undefined;
-  if (variantPaths?.length) {
-    pathsToDelete.push(...variantPaths);
-  }
+  // Remove primary file + responsive variants from Vercel Blob.
+  const urlsToDelete: string[] = [];
+  if (asset.public_url) urlsToDelete.push(asset.public_url);
+  const variantUrls = (asset.metadata as any)?.variants as Record<string, string> | undefined;
+  if (variantUrls) urlsToDelete.push(...Object.values(variantUrls));
 
-  const { error: storageErr } = await supabase.storage
-    .from(BUCKET)
-    .remove(pathsToDelete);
-
-  if (storageErr) {
-    console.error('[DELETE asset] Storage error:', storageErr);
-    // Continue to delete DB record — orphaned files are preferable to orphaned DB records
+  if (urlsToDelete.length > 0) {
+    try {
+      await blobDel(urlsToDelete);
+    } catch (e) {
+      console.error('[DELETE asset] Blob delete error (continuing):', e);
+      // Orphaned blobs are preferable to orphaned DB rows.
+    }
   }
 
   await db.assets.delete(asset.id);
