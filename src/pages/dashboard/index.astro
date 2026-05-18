@@ -48,40 +48,12 @@ try {
   console.error('[studio] press_kits count error:', e);
 }
 
-// Activity feed: 5 most recent project updates, newest first.
-const recent = [...projects]
-  .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-  .slice(0, 5);
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  const h = Math.floor(diff / 3600000);
-  const d = Math.floor(diff / 86400000);
-  if (m < 1) return 'just now';
-  if (h < 1) return `${m}m ago`;
-  if (d < 1) return `${h}h ago`;
-  return `${d}d ago`;
-}
-
-function statusLabel(status: string): string {
-  if (status === 'live') return 'Live';
-  if (status === 'generating') return 'Generating';
-  if (status === 'deploying') return 'Deploying';
-  if (status === 'generated') return 'Ready to publish';
-  if (status === 'brief_ready') return 'Brief ready';
-  if (status === 'onboarding') return 'Brief in progress';
-  if (status === 'failed') return 'Failed';
-  return status;
-}
-
 const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
 
 const sitesIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>`;
 const reelsIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
 const auditIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-7"/></svg>`;
 const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`;
-const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
 ---
 
 <Dashboard title="Studio">
@@ -145,44 +117,8 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
           accent="#f97316"
           isNew={true}
         />
-        <ProductTile
-          name="More tools soon"
-          tagline="We're shipping new AI products every month. Lead enrichment, brand kits, copywriting — tell us what you need."
-          href="mailto:hello@grappes.dev?subject=Tool%20request"
-          icon={soonIcon}
-          meter="Roadmap"
-          cta=""
-          comingSoon={true}
-        />
       </div>
     </section>
-
-    <aside class="studio-aside">
-      <div class="section-head">
-        <span class="section-label">Recent activity</span>
-      </div>
-      {recent.length === 0 ? (
-        <div class="empty-feed">
-          <p>No activity yet.</p>
-          <p class="empty-feed-sub">Spin up your first site or upload a reel to see things appear here.</p>
-        </div>
-      ) : (
-        <ul class="activity-list">
-          {recent.map(p => (
-            <li class="activity-item">
-              <a href={`/dashboard/${p.id}`} class="activity-link">
-                <div class="activity-main">
-                  <span class="activity-name">{p.name}</span>
-                  <span class={`activity-status activity-status--${p.status}`}>{statusLabel(p.status)}</span>
-                </div>
-                <div class="activity-time">{timeAgo(p.updated_at)}</div>
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-      <a href="/dashboard/sites" class="aside-cta">View all sites →</a>
-    </aside>
   </div>
 
   <style>
@@ -233,13 +169,8 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
     }
 
     .studio-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-      gap: 26px;
-      align-items: start;
-    }
-    @media (max-width: 960px) {
-      .studio-grid { grid-template-columns: 1fr; gap: 32px; }
+      max-width: 920px;
+      margin: 0 auto;
     }
 
     .section-head { margin-bottom: 16px; }
@@ -256,8 +187,12 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
     .tile-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 16px;
+      justify-content: center;
+    }
+    @media (max-width: 640px) {
+      .tile-grid { grid-template-columns: 1fr; }
     }
     .tile-grid :global(.pt-card) {
       animation: studio-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -268,72 +203,5 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
     .tile-grid :global(.pt-card:nth-child(4)) { animation-delay: 0.34s; }
     .tile-grid :global(.pt-card:nth-child(5)) { animation-delay: 0.42s; }
 
-    .studio-aside {
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),
-        rgba(18, 18, 22, 0.92);
-      backdrop-filter: blur(24px) saturate(1.3);
-      -webkit-backdrop-filter: blur(24px) saturate(1.3);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 20px;
-      padding: 22px 20px 18px;
-      box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 28px -16px rgba(0,0,0,0.5);
-      animation: studio-fade-up 0.7s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-      position: relative;
-      overflow: hidden;
-    }
-    .studio-aside::before {
-      content: '';
-      position: absolute; inset: 0; z-index: 0; pointer-events: none;
-      background: radial-gradient(circle at 0% 0%, rgba(6,191,221,0.1) 0%, transparent 60%);
-    }
-    .studio-aside > * { position: relative; z-index: 1; }
-
-    .empty-feed {
-      padding: 14px 4px 18px;
-      color: rgba(255,255,255,0.45);
-      font-size: 13px;
-    }
-    .empty-feed p { margin: 0 0 4px; }
-    .empty-feed-sub { font-size: 12px; color: rgba(255,255,255,0.35); }
-
-    .activity-list { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-    .activity-item { margin: 0; }
-    .activity-link {
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      padding: 10px 10px;
-      border-radius: 10px;
-      text-decoration: none;
-      transition: background 0.18s ease;
-    }
-    .activity-link:hover { background: rgba(255,255,255,0.05); }
-    .activity-main {
-      display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1;
-    }
-    .activity-name {
-      font-size: 13.5px; font-weight: 600; color: #fff;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .activity-status {
-      font-size: 10.5px; font-weight: 600;
-      text-transform: uppercase; letter-spacing: 0.05em;
-      color: rgba(255,255,255,0.45);
-    }
-    .activity-status--live      { color: #6ee7a3; }
-    .activity-status--generating, .activity-status--deploying { color: #f6c547; }
-    .activity-status--failed    { color: #ff8a8a; }
-    .activity-time {
-      font-size: 11.5px; color: rgba(255,255,255,0.4);
-      flex-shrink: 0;
-    }
-    .aside-cta {
-      display: block; text-align: center; padding: 8px 12px;
-      font-size: 12.5px; font-weight: 600;
-      color: rgba(255,255,255,0.6); text-decoration: none;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      margin-top: 6px; padding-top: 14px;
-      transition: color 0.18s ease;
-    }
-    .aside-cta:hover { color: #06bfdd; }
   </style>
 </Dashboard>

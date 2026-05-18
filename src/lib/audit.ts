@@ -36,6 +36,25 @@ export interface PerfReport {
   lhSeoScore: number;
 }
 
+/**
+ * SimClusters-inspired view: a site that sits clearly in ONE topical
+ * community ranks better than one that's smeared across many. We classify
+ * the visible body text into canonical web niches with confidence per
+ * niche, then derive how concentrated that distribution is.
+ *
+ * coherenceScore = round(100 * (top - mean(rest))) — high gap = clear
+ * positioning; flat distribution = ambiguous (the X heavy-ranker would
+ * struggle to find a community to amplify into).
+ */
+export interface NicheCoherence {
+  primary: { id: string; label: string; confidence: number };
+  secondary: { id: string; label: string; confidence: number }[];
+  coherenceScore: number; // 0-100
+  ambiguity: "low" | "medium" | "high";
+  positioning: string; // one-sentence verdict
+  recommendation: string; // one-sentence concrete fix
+}
+
 export interface ContentReport {
   score: number;
   summary: string;
@@ -45,6 +64,8 @@ export interface ContentReport {
   issues: AuditCheck[];
   /** Specific suggestions */
   suggestions: string[];
+  /** SimClusters-style niche-fit lens; optional so legacy reports still render */
+  nicheCoherence?: NicheCoherence;
 }
 
 export interface AuditReport {
@@ -209,9 +230,18 @@ async function runContentAnalysis(params: {
       "detail": "one sentence", "fix": "one-sentence concrete fix" }
   ],
   "suggestions": ["up to 3 concrete improvements"],
-  "score": 0-100
+  "score": 0-100,
+  "nicheFit": [
+    { "id": "kebab-id", "label": "Human-readable", "confidence": 0-100 }
+  ]
 }
-Check for: clear primary topic, keyword stuffing, thin content, missing structured sections (no clear intro/value-prop), readability, generic copy that could fit any business, mismatch between title and body.`;
+
+For "nicheFit": pick the 3 niches this page best fits, ordered by confidence desc, from this canonical list:
+saas-product, dev-tool, ai-tool, ecommerce-store, marketplace, fashion-apparel, food-restaurant, food-recipe, food-supplier-b2b, fitness-gym, fitness-coach, health-wellness, beauty-cosmetics, beauty-salon, travel-hotel, travel-agency, real-estate, automotive-dealer, automotive-service, finance-fintech, legal-services, education-course, education-school, agency-creative, agency-marketing, agency-dev, freelancer-portfolio, artist-musician, artist-visual, photographer, news-media, blog-personal, community-forum, nonprofit, b2b-services, b2b-manufacturing, local-business, event-conference, healthcare-clinic, gaming, podcast.
+
+If the page truly doesn't fit any, return ONE entry with id "other" confidence 50. Confidence must sum to a value that reflects actual belief; if the site is clearly one niche, top should be ≥70 and the rest ≤30.
+
+Also check for: clear primary topic, keyword stuffing, thin content, missing structured sections (no clear intro/value-prop), readability, generic copy that could fit any business, mismatch between title and body.`;
 
   const user = `URL: ${params.url}
 Page title: ${params.title}
@@ -242,6 +272,65 @@ Return the JSON object now.`;
     primaryKeywords: Array.isArray(parsed.primaryKeywords) ? parsed.primaryKeywords.slice(0, 5) : [],
     issues: Array.isArray(parsed.issues) ? parsed.issues.slice(0, 6) : [],
     suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 3) : [],
+    nicheCoherence: deriveNicheCoherence(parsed.nicheFit),
+  };
+}
+
+function deriveNicheCoherence(raw: unknown): NicheCoherence | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  const cleaned = raw
+    .filter(
+      (n): n is { id: string; label: string; confidence: number } =>
+        n != null &&
+        typeof n.id === "string" &&
+        typeof n.label === "string" &&
+        typeof n.confidence === "number",
+    )
+    .map((n) => ({
+      id: n.id,
+      label: n.label,
+      confidence: Math.max(0, Math.min(100, Math.round(n.confidence))),
+    }))
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 3);
+
+  if (cleaned.length === 0) return undefined;
+
+  const primary = cleaned[0];
+  const secondary = cleaned.slice(1);
+  const restMean =
+    secondary.length === 0
+      ? 0
+      : secondary.reduce((a, n) => a + n.confidence, 0) / secondary.length;
+  const coherenceScore = Math.max(
+    0,
+    Math.min(100, Math.round(primary.confidence - restMean)),
+  );
+
+  const ambiguity: NicheCoherence["ambiguity"] =
+    coherenceScore >= 50 ? "low" : coherenceScore >= 25 ? "medium" : "high";
+
+  const positioning =
+    ambiguity === "low"
+      ? `Sits clearly in "${primary.label}" — Google can confidently classify this in one topical cluster.`
+      : ambiguity === "medium"
+        ? `Leans toward "${primary.label}" but bleeds into ${secondary.map((s) => `"${s.label}"`).join(" / ")}, which weakens topical authority.`
+        : `Spread across ${[primary, ...secondary].map((s) => `"${s.label}"`).join(", ")} — no single niche to amplify into; ranking signals fragment.`;
+
+  const recommendation =
+    ambiguity === "low"
+      ? `Hold the line: every new page should reinforce "${primary.label}" terminology.`
+      : ambiguity === "medium"
+        ? `Pick "${primary.label}" or "${secondary[0]?.label ?? "the secondary niche"}" and rewrite the hero + about copy to commit fully — kill the dual-positioning.`
+        : `Site is identity-confused. Rewrite the homepage around a single niche; move other offerings to dedicated subpages so the root URL signals one cluster.`;
+
+  return {
+    primary,
+    secondary,
+    coherenceScore,
+    ambiguity,
+    positioning,
+    recommendation,
   };
 }
 
