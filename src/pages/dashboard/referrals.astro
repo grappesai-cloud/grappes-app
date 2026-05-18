@@ -14,212 +14,394 @@ const planLabel = (p: string | null) =>
 ---
 
 <Dashboard title="Referrals">
-  <div style="max-width:800px;">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+  </style>
 
-    <!-- Header -->
-    <div style="margin-bottom:2.5rem;">
-      <h1 style="font-size:clamp(1.75rem,3vw,2.25rem);font-weight:700;letter-spacing:-0.04em;margin:0 0 8px;">
-        <span>Referral program</span>
-      </h1>
-      <p style="color:rgba(255,255,255,0.5);font-size:15px;margin:0;">Earn cash for every person you bring to Grappes.</p>
-    </div>
+  <div class="ref-wrap">
+    <header class="ref-head">
+      <a href="/dashboard" class="ref-back">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Studio</span>
+      </a>
+      <span class="ref-eyebrow">Referrals</span>
+      <h1 class="ref-title">Earn for every friend you <strong>bring along.</strong></h1>
+      <p class="ref-sub">Share your link, your code, or both. Cash payouts via bank transfer when your balance reaches €50.</p>
+    </header>
 
     <!-- Stats row -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:2rem;">
+    <div class="ref-stats">
       {[
-        { label: 'Available balance', value: `${stats.balance.toFixed(2)}€`, highlight: stats.balance >= 50 },
-        { label: 'Total earned', value: `${stats.totalEarned.toFixed(2)}€`, highlight: false },
-        { label: 'Confirmed referrals', value: String(stats.confirmedCount), highlight: false },
-        { label: 'Pending referrals', value: String(stats.pendingCount), highlight: false },
+        { label: 'Available balance', value: `€${stats.balance.toFixed(2)}`, highlight: stats.balance >= 50, accent: '#06bfdd' },
+        { label: 'Total earned',      value: `€${stats.totalEarned.toFixed(2)}`, highlight: false, accent: '#a78bfa' },
+        { label: 'Confirmed',         value: String(stats.confirmedCount), highlight: false, accent: '#22d3ee' },
+        { label: 'Pending',           value: String(stats.pendingCount), highlight: false, accent: '#f97316' },
       ].map(s => (
-        <div style={`background:rgba(255,255,255,0.04);border:1px solid ${s.highlight ? 'rgba(6,191,221,0.3)' : 'rgba(255,255,255,0.07)'};border-radius:16px;padding:20px;`}>
-          <p style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;margin:0 0 8px;">{s.label}</p>
-          <p style={`font-size:1.75rem;font-weight:700;font-family:'Inter',sans-serif;margin:0;color:${s.highlight ? '#06bfdd' : '#fff'};`}>{s.value}</p>
+        <div class={`ref-stat${s.highlight ? ' ref-stat--hot' : ''}`} style={`--s-accent:${s.accent};`}>
+          <span class="ref-stat-label">{s.label}</span>
+          <span class="ref-stat-value">{s.value}</span>
         </div>
       ))}
     </div>
 
     <!-- Link & Code card -->
-    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-      <h2 style="font-size:16px;font-weight:700;margin:0 0 20px;">Your referral link & code</h2>
+    <section class="ref-card">
+      <div class="ref-card-head">
+        <span class="ref-label">Your link & code</span>
+      </div>
 
-      <!-- Link -->
-      <div style="margin-bottom:16px;">
-        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Link (for social media, bio, articles)</label>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <input id="ref-link" type="text" value={refLink} readonly
-            style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;color:#fff;font-size:14px;font-family:monospace;outline:none;" />
-          <button id="copy-link" onclick="navigator.clipboard.writeText(document.getElementById('ref-link').value);this.textContent='✓';setTimeout(()=>this.textContent='Copy',1500);"
-            style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
-            Copy
-          </button>
+      <div class="ref-field">
+        <span class="ref-field-label">Link, for social, bio, articles</span>
+        <div class="ref-input-row">
+          <input id="ref-link" type="text" value={refLink} readonly class="ref-input ref-input--mono" />
+          <button id="copy-link" class="ref-btn ref-btn--primary">Copy</button>
         </div>
       </div>
 
-      <!-- Code -->
-      <div>
-        <label style="font-size:12px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;display:block;margin-bottom:6px;">Code (mention verbally — podcast, video)</label>
+      <div class="ref-field">
+        <span class="ref-field-label">Code, to mention on podcasts or videos</span>
 
-        <!-- Display mode -->
-        <div id="code-display" style="display:flex;gap:10px;align-items:center;">
-          <div id="code-value" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 20px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#06bfdd;">
-            {stats.code.toUpperCase()}
-          </div>
-          <button id="copy-code"
-            style="background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 18px;font-weight:700;font-size:13px;cursor:pointer;">
-            Copy
-          </button>
-          <button id="edit-code-btn"
-            style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 18px;font-size:13px;cursor:pointer;">
-            ✎ Edit
-          </button>
+        <div id="code-display" class="ref-input-row">
+          <div id="code-value" class="ref-code-pill">{stats.code.toUpperCase()}</div>
+          <button id="copy-code" class="ref-btn ref-btn--ghost">Copy</button>
+          <button id="edit-code-btn" class="ref-btn ref-btn--ghost">✎ Edit</button>
         </div>
 
-        <!-- Edit mode (hidden initially) -->
-        <div id="code-edit" style="display:none;flex-direction:column;gap:10px;">
-          <div style="display:flex;gap:10px;align-items:center;">
-            <input id="code-input" type="text" value={stats.code.toUpperCase()} maxlength="20"
-              style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:12px 16px;font-size:18px;font-weight:700;font-family:monospace;letter-spacing:0.15em;color:#fff;outline:none;width:180px;text-transform:uppercase;transition:border-color 0.2s;" />
-            <span id="code-status" style="font-size:13px;font-weight:600;min-width:80px;"></span>
+        <div id="code-edit" class="ref-edit" style="display:none;">
+          <div class="ref-input-row">
+            <input id="code-input" type="text" value={stats.code.toUpperCase()} maxlength="20" class="ref-input ref-input--mono ref-input--code" />
+            <span id="code-status" class="ref-code-status"></span>
           </div>
-          <div style="display:flex;gap:8px;">
-            <button id="save-code-btn"
-              style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:10px;padding:10px 20px;font-weight:700;font-size:13px;cursor:pointer;opacity:0.5;" disabled>
-              Save
-            </button>
-            <button id="cancel-code-btn"
-              style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 18px;font-size:13px;cursor:pointer;">
-              Cancel
-            </button>
+          <div class="ref-edit-actions">
+            <button id="save-code-btn" class="ref-btn ref-btn--primary" disabled>Save</button>
+            <button id="cancel-code-btn" class="ref-btn ref-btn--ghost">Cancel</button>
           </div>
-          <p id="code-error" style="font-size:12px;color:#f87171;margin:0;display:none;"></p>
+          <p id="code-error" class="ref-error" style="display:none;"></p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Rewards table -->
-    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-      <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">How rewards work</h2>
-      <table style="width:100%;border-collapse:collapse;font-size:14px;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Plan</th>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Your reward</th>
-            <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[
-            { plan: 'Annual (€99/yr)', reward: '€10', when: 'Per conversion' },
-            { plan: 'Lifetime (€399)', reward: '€40', when: 'Per conversion' },
-          ].map(row => (
-            <tr>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);">{row.plan}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#06bfdd;font-weight:700;">{row.reward}</td>
-              <td style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);">{row.when}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p style="margin:16px 0 0;font-size:13px;color:rgba(255,255,255,0.35);">Payout in cash via bank transfer when balance reaches €50.</p>
-    </div>
+    <!-- Rewards card -->
+    <section class="ref-card">
+      <div class="ref-card-head">
+        <span class="ref-label">Rewards</span>
+      </div>
+      <div class="ref-rewards">
+        {[
+          { plan: 'Annual (€99/yr)',   reward: '€10', when: 'Per conversion' },
+          { plan: 'Lifetime (€399)',   reward: '€40', when: 'Per conversion' },
+        ].map(r => (
+          <div class="ref-reward-row">
+            <span class="ref-reward-plan">{r.plan}</span>
+            <span class="ref-reward-amount">{r.reward}</span>
+            <span class="ref-reward-when">{r.when}</span>
+          </div>
+        ))}
+      </div>
+      <p class="ref-help">Payout via bank transfer when your balance hits €50.</p>
+    </section>
 
     <!-- Payout request -->
     {stats.balance >= 50 && !stats.hasPendingPayout && (
-      <div id="payout-card" style="background:rgba(6,191,221,0.06);border:1px solid rgba(6,191,221,0.2);border-radius:20px;padding:24px;margin-bottom:1.5rem;">
-        <p style="font-weight:700;color:#06bfdd;margin:0 0 4px;">You can request a payout!</p>
-        <p style="font-size:14px;color:rgba(255,255,255,0.6);margin:0 0 16px;">You have €{stats.balance.toFixed(2)} available. Enter your bank details to receive the payout within 1–3 business days.</p>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-          <input id="payout-iban" type="text" placeholder="IBAN (e.g. RO49AAAA1B31007593840000)" maxlength="34"
-            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;text-transform:uppercase;" />
-          <input id="payout-holder" type="text" placeholder="Account holder name" maxlength="120"
-            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-size:14px;outline:none;" />
+      <section class="ref-card ref-card--accent" id="payout-card">
+        <div class="ref-card-head">
+          <span class="ref-label ref-label--accent">Payout ready</span>
         </div>
-        <p id="payout-error" style="color:#f87171;font-size:13px;margin:0 0 10px;display:none;"></p>
-        <button id="payout-btn"
-          style="background:#06bfdd;color:#0a0a0a;border:none;border-radius:12px;padding:12px 24px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">Request payout</button>
-      </div>
+        <p class="ref-help">You have €{stats.balance.toFixed(2)} available. Enter your bank details and we'll wire it within 1-3 business days.</p>
+        <div class="ref-payout-grid">
+          <input id="payout-iban" type="text" placeholder="IBAN (e.g. RO49AAAA1B31007593840000)" maxlength="34" class="ref-input" style="text-transform:uppercase;" />
+          <input id="payout-holder" type="text" placeholder="Account holder name" maxlength="120" class="ref-input" />
+        </div>
+        <p id="payout-error" class="ref-error" style="display:none;"></p>
+        <button id="payout-btn" class="ref-btn ref-btn--primary ref-btn--lg">Request payout</button>
+      </section>
     )}
 
     {stats.hasPendingPayout && (
-      <div style="background:rgba(246,197,71,0.06);border:1px solid rgba(246,197,71,0.2);border-radius:20px;padding:20px;margin-bottom:1.5rem;">
-        <p style="color:#f6c547;font-weight:600;margin:0;">Payout in progress — we'll process the transfer to your provided IBAN within 1–3 business days.</p>
-      </div>
+      <section class="ref-card ref-card--pending">
+        <div class="ref-card-head">
+          <span class="ref-label ref-label--pending">Payout in progress</span>
+        </div>
+        <p class="ref-help">We'll wire the amount to your IBAN within 1-3 business days.</p>
+      </section>
     )}
 
-    <!-- Referrals history -->
+    <!-- Referral history -->
     {stats.referrals.length > 0 && (
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;margin-bottom:1.5rem;">
-        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">Referral history</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;">
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Date</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Plan</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Status</th>
-              <th style="text-align:right;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Earned</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.referrals.map(r => (
-              <tr>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);">
-                  {new Date(r.confirmed_at || r.created_at).toLocaleDateString('en-US')}
-                </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.8);">
-                  {planLabel(r.plan_type)}
-                </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${r.status === 'confirmed' ? 'background:rgba(6,191,221,0.12);color:#06bfdd;' : 'background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);'}`}>
-                    {r.status === 'confirmed' ? 'Confirmed' : 'Pending'}
-                  </span>
-                </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);text-align:right;color:#06bfdd;font-weight:700;">
-                  {r.amount_earned > 0 ? `+${r.amount_earned}€` : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section class="ref-card">
+        <div class="ref-card-head">
+          <span class="ref-label">Referral history</span>
+        </div>
+        <div class="ref-table">
+          <div class="ref-table-head">
+            <span>Date</span>
+            <span>Plan</span>
+            <span>Status</span>
+            <span style="text-align:right;">Earned</span>
+          </div>
+          {stats.referrals.map(r => (
+            <div class="ref-table-row">
+              <span class="ref-table-mute">{new Date(r.confirmed_at || r.created_at).toLocaleDateString('en-US')}</span>
+              <span>{planLabel(r.plan_type)}</span>
+              <span>
+                <span class={`ref-pill ${r.status === 'confirmed' ? 'ref-pill--ok' : 'ref-pill--idle'}`}>
+                  {r.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+                </span>
+              </span>
+              <span class="ref-table-amount">{r.amount_earned > 0 ? `+€${r.amount_earned}` : '—'}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     )}
 
     <!-- Payout history -->
     {stats.payouts.length > 0 && (
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:28px;">
-        <h2 style="font-size:16px;font-weight:700;margin:0 0 16px;">Payout history</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;">
-          <thead>
-            <tr>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Date</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Amount</th>
-              <th style="text-align:left;padding:10px 0;color:rgba(255,255,255,0.4);font-weight:500;border-bottom:1px solid rgba(255,255,255,0.06);">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stats.payouts.map(p => (
-              <tr>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.6);">
-                  {new Date(p.paid_at || p.created_at).toLocaleDateString('en-US')}
-                </td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);color:#fff;font-weight:700;">{p.amount.toFixed(2)}€</td>
-                <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <span style={`font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px;${p.status === 'paid' ? 'background:rgba(6,191,221,0.12);color:#06bfdd;' : 'background:rgba(246,197,71,0.12);color:#f6c547;'}`}>
-                    {p.status === 'paid' ? 'Paid' : 'Processing'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <section class="ref-card">
+        <div class="ref-card-head">
+          <span class="ref-label">Payout history</span>
+        </div>
+        <div class="ref-table ref-table--3col">
+          <div class="ref-table-head">
+            <span>Date</span>
+            <span>Amount</span>
+            <span>Status</span>
+          </div>
+          {stats.payouts.map(p => (
+            <div class="ref-table-row">
+              <span class="ref-table-mute">{new Date(p.paid_at || p.created_at).toLocaleDateString('en-US')}</span>
+              <span class="ref-table-amount">€{p.amount.toFixed(2)}</span>
+              <span>
+                <span class={`ref-pill ${p.status === 'paid' ? 'ref-pill--ok' : 'ref-pill--warn'}`}>
+                  {p.status === 'paid' ? 'Paid' : 'Processing'}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
     )}
-
   </div>
+
+  <style>
+    .ref-wrap { max-width: 720px; margin: 0 auto; }
+
+    .ref-head { text-align: center; margin-bottom: 32px; }
+    .ref-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+      text-transform: uppercase; color: rgba(255,255,255,0.45);
+      text-decoration: none; margin-bottom: 14px;
+      transition: color 0.2s;
+    }
+    .ref-back:hover { color: rgba(255,255,255,0.85); }
+    .ref-eyebrow {
+      display: inline-flex; align-items: center;
+      font-size: 12.5px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #06bfdd; margin-bottom: 14px;
+      padding: 6px 14px; border-radius: 999px;
+      background: rgba(6,191,221,0.08);
+      border: 1px solid rgba(6,191,221,0.22);
+    }
+    .ref-title {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(28px, 4.5vw, 44px);
+      font-weight: 300; line-height: 1.05;
+      letter-spacing: -0.045em; color: #fff; margin: 0 0 12px;
+    }
+    .ref-title strong {
+      font-weight: 700;
+      background: linear-gradient(135deg, #06bfdd 0%, #a78bfa 50%, #f97316 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .ref-sub { font-size: 14px; color: rgba(255,255,255,0.55); margin: 0 auto; max-width: 560px; line-height: 1.55; }
+
+    .ref-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .ref-stat {
+      padding: 14px 16px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),
+        rgba(18, 18, 22, 0.92);
+      backdrop-filter: blur(24px) saturate(1.3);
+      -webkit-backdrop-filter: blur(24px) saturate(1.3);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.25s ease, transform 0.25s ease;
+    }
+    .ref-stat:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--s-accent) 35%, rgba(255,255,255,0.09)); }
+    .ref-stat::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--s-accent); opacity: 0.7;
+    }
+    .ref-stat--hot { border-color: color-mix(in srgb, var(--s-accent) 35%, rgba(255,255,255,0.09)); }
+    .ref-stat-label {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--s-accent);
+    }
+    .ref-stat-value {
+      font-family: 'Inter', sans-serif;
+      font-size: 24px; font-weight: 700; letter-spacing: -0.03em;
+      color: #fff; line-height: 1;
+    }
+    .ref-stat--hot .ref-stat-value { color: var(--s-accent); }
+
+    .ref-card {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),
+        rgba(18, 18, 22, 0.92);
+      backdrop-filter: blur(24px) saturate(1.3);
+      -webkit-backdrop-filter: blur(24px) saturate(1.3);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 28px -16px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; gap: 16px;
+      margin-bottom: 14px;
+    }
+    .ref-card--accent { border-color: rgba(6,191,221,0.3); background:
+        linear-gradient(180deg, rgba(6,191,221,0.06) 0%, rgba(18,18,22,0.92) 50%); }
+    .ref-card--pending { border-color: rgba(246,197,71,0.3); }
+    .ref-card-head { margin-bottom: 2px; }
+
+    .ref-label {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: rgba(255,255,255,0.45);
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .ref-label--accent { color: #06bfdd; background: rgba(6,191,221,0.1); border-color: rgba(6,191,221,0.3); }
+    .ref-label--pending { color: #f6c547; background: rgba(246,197,71,0.1); border-color: rgba(246,197,71,0.3); }
+
+    .ref-field { display: flex; flex-direction: column; gap: 6px; }
+    .ref-field-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.1em; color: rgba(255,255,255,0.45);
+    }
+    .ref-input-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .ref-input {
+      flex: 1; min-width: 200px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 11px 14px;
+      color: #fff; font-family: inherit; font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .ref-input:focus { border-color: #06bfdd; box-shadow: 0 0 0 3px rgba(6,191,221,0.18); }
+    .ref-input--mono { font-family: 'JetBrains Mono', monospace; }
+    .ref-input--code { font-size: 16px; font-weight: 700; letter-spacing: 0.12em; max-width: 220px; flex: 0 0 auto; text-transform: uppercase; }
+
+    .ref-code-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px; font-weight: 700; letter-spacing: 0.15em;
+      color: #06bfdd;
+      background: rgba(6,191,221,0.08);
+      border: 1px solid rgba(6,191,221,0.25);
+      border-radius: 10px;
+      padding: 10px 18px;
+    }
+    .ref-code-status {
+      font-size: 12.5px; font-weight: 600;
+      min-width: 90px;
+    }
+    .ref-edit { display: flex; flex-direction: column; gap: 8px; }
+    .ref-edit-actions { display: flex; gap: 8px; }
+
+    .ref-error { font-size: 12.5px; color: #ff8a8a; margin: 0; }
+
+    .ref-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 10px 16px; border-radius: 10px;
+      font-family: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .ref-btn--primary { background: #06bfdd; color: #0a0a0a; }
+    .ref-btn--primary:hover:not(:disabled) { background: #20d5f0; box-shadow: 0 6px 18px -6px rgba(6,191,221,0.5); transform: translateY(-1px); }
+    .ref-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ref-btn--ghost {
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.78);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .ref-btn--ghost:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.18); }
+    .ref-btn--lg { padding: 12px 22px; font-size: 14px; align-self: flex-start; }
+
+    .ref-help { font-size: 13px; color: rgba(255,255,255,0.55); margin: 0; line-height: 1.55; }
+
+    .ref-rewards { display: flex; flex-direction: column; }
+    .ref-reward-row {
+      display: grid; grid-template-columns: 1.6fr 1fr 1.4fr; gap: 12px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 13.5px;
+    }
+    .ref-reward-row:last-child { border-bottom: 0; }
+    .ref-reward-plan { color: rgba(255,255,255,0.85); font-weight: 500; }
+    .ref-reward-amount { color: #06bfdd; font-weight: 700; font-family: 'Inter', sans-serif; }
+    .ref-reward-when { color: rgba(255,255,255,0.5); font-size: 12.5px; }
+
+    .ref-payout-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    @media (max-width: 560px) {
+      .ref-payout-grid { grid-template-columns: 1fr; }
+    }
+
+    .ref-table { display: flex; flex-direction: column; }
+    .ref-table-head, .ref-table-row {
+      display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
+      padding: 10px 0;
+      font-size: 13px;
+    }
+    .ref-table--3col .ref-table-head,
+    .ref-table--3col .ref-table-row { grid-template-columns: 1fr 1fr 1fr; }
+    .ref-table-head {
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: rgba(255,255,255,0.45);
+    }
+    .ref-table-row {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.85);
+    }
+    .ref-table-row:last-child { border-bottom: 0; }
+    .ref-table-mute { color: rgba(255,255,255,0.5); }
+    .ref-table-amount { color: #06bfdd; font-weight: 700; font-family: 'Inter', sans-serif; }
+
+    .ref-pill {
+      display: inline-flex; align-items: center;
+      font-size: 10.5px; font-weight: 700;
+      padding: 3px 10px; border-radius: 999px;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .ref-pill--ok   { background: rgba(110,231,163,0.1); color: #6ee7a3; border: 1px solid rgba(110,231,163,0.25); }
+    .ref-pill--warn { background: rgba(246,197,71,0.1); color: #f6c547; border: 1px solid rgba(246,197,71,0.25); }
+    .ref-pill--idle { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1); }
+  </style>
 </Dashboard>
 
 <script>
+  // ── Copy link ─────────────────────────────────────────────────────────────
+  document.getElementById('copy-link')?.addEventListener('click', () => {
+    const link = (document.getElementById('ref-link') as HTMLInputElement).value;
+    navigator.clipboard.writeText(link);
+    const btn = document.getElementById('copy-link')!;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+
   // ── Payout request ────────────────────────────────────────────────────────
   const payoutBtn = document.getElementById('payout-btn') as HTMLButtonElement | null;
   if (payoutBtn) {
@@ -252,8 +434,11 @@ const planLabel = (p: string | null) =>
           body: JSON.stringify({ iban, holder }),
         });
         if (res.ok) {
-          document.getElementById('payout-card')!.innerHTML =
-            `<p style="color:#06bfdd;font-weight:600;margin:0;">✓ Request sent. We'll transfer the amount to your IBAN within 1–3 business days.</p>`;
+          const card = document.getElementById('payout-card')!;
+          card.innerHTML = `
+            <div class="ref-card-head"><span class="ref-label ref-label--accent">Request sent</span></div>
+            <p class="ref-help">✓ We'll wire the amount to your IBAN within 1-3 business days.</p>
+          `;
         } else {
           const d = await res.json();
           errEl.textContent = d.error || 'Request failed.';
@@ -270,7 +455,7 @@ const planLabel = (p: string | null) =>
     });
   }
 
-  // ── Copy code button ──────────────────────────────────────────────────────
+  // ── Copy code ─────────────────────────────────────────────────────────────
   document.getElementById('copy-code')?.addEventListener('click', () => {
     const code = document.getElementById('code-value')!.textContent!.trim();
     navigator.clipboard.writeText(code);
@@ -289,7 +474,7 @@ const planLabel = (p: string | null) =>
   const codeError   = document.getElementById('code-error')!;
 
   let checkTimeout: ReturnType<typeof setTimeout>;
-  let currentCode   = codeInput.value; // original code
+  let currentCode   = codeInput.value;
   let isAvailable   = false;
 
   document.getElementById('edit-code-btn')?.addEventListener('click', () => {
@@ -304,24 +489,22 @@ const planLabel = (p: string | null) =>
     codeStatus.textContent = '';
     codeError.style.display = 'none';
     saveBtn.disabled = true;
-    saveBtn.style.opacity = '0.5';
     codeEdit.style.display = 'none';
     codeDisplay.style.display = 'flex';
   });
 
   codeInput.addEventListener('input', () => {
     const val = codeInput.value.trim().toUpperCase();
-    codeInput.value = val;                // force uppercase while typing
+    codeInput.value = val;
     codeStatus.textContent = '';
     codeError.style.display = 'none';
     saveBtn.disabled = true;
-    saveBtn.style.opacity = '0.5';
     isAvailable = false;
 
     if (!val || val === currentCode) return;
     if (!/^[A-Z0-9]{3,20}$/.test(val)) {
       codeStatus.textContent = '✗ 3-20 letters/digits';
-      codeStatus.style.color = '#f87171';
+      codeStatus.style.color = '#ff8a8a';
       return;
     }
 
@@ -335,18 +518,17 @@ const planLabel = (p: string | null) =>
         const d = await res.json();
         if (d.available) {
           codeStatus.textContent = '✓ Available';
-          codeStatus.style.color = '#06bfdd';
+          codeStatus.style.color = '#6ee7a3';
           isAvailable = true;
           saveBtn.disabled = false;
-          saveBtn.style.opacity = '1';
         } else {
           codeStatus.textContent = d.error ?? '✗ Unavailable';
-          codeStatus.style.color = '#f87171';
+          codeStatus.style.color = '#ff8a8a';
           isAvailable = false;
         }
       } catch {
         codeStatus.textContent = '? Check failed';
-        codeStatus.style.color = '#f87171';
+        codeStatus.style.color = '#ff8a8a';
       }
     }, 400);
   });
@@ -356,7 +538,6 @@ const planLabel = (p: string | null) =>
     const val = codeInput.value.trim().toLowerCase();
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
-
     try {
       const res = await fetch('/api/referral/update-code', {
         method: 'POST',
@@ -367,27 +548,22 @@ const planLabel = (p: string | null) =>
       if (d.ok) {
         const newCode = d.code.toUpperCase();
         currentCode = newCode;
-        // Update display + link
         document.getElementById('code-value')!.textContent = newCode;
         const newLink = window.location.origin + '/?ref=' + d.code;
         const linkInput = document.getElementById('ref-link') as HTMLInputElement;
         if (linkInput) linkInput.value = newLink;
-        // copy-link reads from the input, no need to update onclick
-        // Back to display mode
-        cancelBtn.click();
+        (cancelBtn as HTMLButtonElement).click();
         codeStatus.textContent = '';
       } else {
         codeError.textContent = d.error || 'Save failed.';
         codeError.style.display = 'block';
         saveBtn.disabled = false;
-        saveBtn.style.opacity = '1';
         saveBtn.textContent = 'Save';
       }
     } catch {
       codeError.textContent = 'Network error.';
       codeError.style.display = 'block';
       saveBtn.disabled = false;
-      saveBtn.style.opacity = '1';
       saveBtn.textContent = 'Save';
     }
   });

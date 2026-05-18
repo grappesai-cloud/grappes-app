@@ -2,6 +2,7 @@
 import Dashboard from '../../layouts/Dashboard.astro';
 import { db } from '../../lib/db';
 import { getEditQuota } from '../../lib/edit-quota';
+import { createAdminClient } from '../../lib/supabase';
 
 const authUser = Astro.locals.user!;
 const [dbUser, quota] = await Promise.all([
@@ -18,114 +19,369 @@ const quotaDisplay = quota.limit > 0
 
 const hasMultipage         = !!dbUser?.multipage_addon;
 const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
+
+const reelCredits  = dbUser?.reel_credits  ?? 0;
+const auditCredits = dbUser?.audit_credits ?? 0;
+
+// Press kits count (drafts + published) — direct count, lightweight
+let kitsTotal = 0;
+let kitsPublished = 0;
+try {
+  const c = createAdminClient();
+  const { data } = await c.from('press_kits').select('id, status').eq('user_id', authUser.id);
+  kitsTotal = data?.length ?? 0;
+  kitsPublished = data?.filter((k: { status: string }) => k.status === 'published').length ?? 0;
+} catch {}
+
+const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
 ---
 
 <Dashboard title="Account">
-  <div class="page-header">
-    <a href="/dashboard" class="back-link">← Studio</a>
-    <h1>Account</h1>
-  </div>
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+  </style>
 
-  <div class="sections">
-
-    <!-- Profile -->
-    <section class="card">
-      <h2>Profile</h2>
-      <div class="field-row">
-        <span class="field-label">Email</span>
-        <span class="field-value" data-user-email={authUser.email}>{authUser.email}</span>
-      </div>
-      <div class="divider"></div>
-      <p class="help">To change your password, we'll send a reset link to your email.</p>
-      <button id="reset-btn" class="btn-secondary">Send reset email</button>
-      <div id="reset-msg" class="reset-msg" hidden></div>
-    </section>
-
-    <!-- Language -->
-    <section class="card">
-      <h2>Language</h2>
-      <div class="lang-toggle">
-        <button class="lang-btn" id="lang-ro" data-lang="ro">🇷🇴 Română</button>
-        <button class="lang-btn" id="lang-en" data-lang="en">🇬🇧 English</button>
-      </div>
-    </section>
-
-    <!-- Usage -->
-    <section class="card">
-      <h2>Usage</h2>
-      <div class="field-row">
-        <span class="field-label">Total projects</span>
-        <span class="field-value">{totalCount}</span>
-      </div>
-      <div class="field-row">
-        <span class="field-label">AI edits this month</span>
-        <span class="field-value">{quotaDisplay}</span>
-      </div>
-      <div class="divider"></div>
-      <button id="buy-edits-btn" class="btn-secondary">Buy 10 extra edits — €5</button>
-      <div id="edits-msg" class="reset-msg" hidden></div>
-    </section>
-
-    <!-- Multipage Add-on -->
-    <section class="card">
-      <h2>Multipage Add-on</h2>
-      {hasMultipage ? (
-        <div class="addon-active">
-          <span class="badge-active" >Active</span>
-          {isMultipageLifetime
-            ? <span class="addon-type">Lifetime — never expires</span>
-            : <span class="addon-type">Subscription — renews automatically</span>
-          }
-        </div>
-        <p class="help" >You can generate unlimited pages per site.</p>
-      ) : (
-        <>
-          <p class="help">Unlock multi-page websites. Choose your plan below.</p>
-          <div class="addon-plans">
-            <button class="btn-addon" id="addon-month-btn" data-interval="month">
-              <span class="addon-plan-name">Monthly</span>
-              <span class="addon-plan-price">€9 / <span>mo</span></span>
-            </button>
-            <button class="btn-addon" id="addon-year-btn" data-interval="year">
-              <span class="addon-plan-name">Annual</span>
-              <span class="addon-plan-price">€49 / <span>yr</span></span>
-            </button>
-            <button class="btn-addon btn-addon-lifetime" id="addon-lifetime-btn" data-interval="lifetime">
-              <span class="addon-plan-name">Lifetime</span>
-              <span class="addon-plan-price">€499</span>
-            </button>
-          </div>
-          <div id="addon-msg" class="reset-msg" hidden></div>
-        </>
-      )}
-    </section>
-
-    <!-- Support -->
-    <section class="card">
-      <h2>Support</h2>
-      <p class="help">Need help? Chat with us directly on WhatsApp.</p>
-      <a href="https://wa.me/40770279935" target="_blank" rel="noopener" class="btn-whatsapp">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-        <span>Chat on WhatsApp</span>
+  <div class="acc-wrap">
+    <header class="acc-head">
+      <a href="/dashboard" class="acc-back">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Studio</span>
       </a>
-    </section>
+      <span class="acc-eyebrow">Account</span>
+      <h1 class="acc-title">{firstName ? <>Settings for <strong>{firstName}</strong>.</> : 'Account settings.'}</h1>
+      <p class="acc-sub">Plan, credits, security, language, and danger zone.</p>
+    </header>
 
-    <!-- Danger zone -->
-    <section class="card danger-zone">
-      <h2>Danger Zone</h2>
-      <p class="help">Permanently delete your account and all associated data. This action cannot be undone.</p>
-      <button id="delete-account-btn" class="btn-danger">Delete my account</button>
-      <p id="delete-msg" class="reset-msg" hidden></p>
-    </section>
+    <div class="acc-sections">
 
+      <!-- Profile -->
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span class="acc-label">Profile</span>
+        </div>
+        <div class="acc-row">
+          <span class="acc-row-label">Email</span>
+          <span class="acc-row-value" data-user-email={authUser.email}>{authUser.email}</span>
+        </div>
+        <p class="acc-help">To change your password, we send a reset link to your email.</p>
+        <button id="reset-btn" class="acc-btn acc-btn--ghost">Send reset email</button>
+        <div id="reset-msg" class="acc-msg" hidden></div>
+      </section>
+
+      <!-- Usage across all Studio products -->
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span class="acc-label">Usage</span>
+        </div>
+        <div class="acc-usage-grid">
+          <div class="acc-usage-item" style="--u-accent:#06bfdd;">
+            <span class="acc-usage-name">Sites</span>
+            <span class="acc-usage-value">{totalCount} <span class="acc-usage-unit">project{totalCount === 1 ? '' : 's'}</span></span>
+          </div>
+          <div class="acc-usage-item" style="--u-accent:#06bfdd;">
+            <span class="acc-usage-name">AI edits</span>
+            <span class="acc-usage-value">{quotaDisplay}</span>
+          </div>
+          <div class="acc-usage-item" style="--u-accent:#a78bfa;">
+            <span class="acc-usage-name">Reels Lab</span>
+            <span class="acc-usage-value">{reelCredits} <span class="acc-usage-unit">credit{reelCredits === 1 ? '' : 's'}</span></span>
+          </div>
+          <div class="acc-usage-item" style="--u-accent:#22d3ee;">
+            <span class="acc-usage-name">Audit Lab</span>
+            <span class="acc-usage-value">{auditCredits} <span class="acc-usage-unit">audit{auditCredits === 1 ? '' : 's'}</span></span>
+          </div>
+          <div class="acc-usage-item" style="--u-accent:#f97316;">
+            <span class="acc-usage-name">Press Kits</span>
+            <span class="acc-usage-value">{kitsTotal} <span class="acc-usage-unit">{kitsTotal === 1 ? 'kit' : 'kits'}{kitsPublished > 0 ? ` · ${kitsPublished} live` : ''}</span></span>
+          </div>
+        </div>
+        <div class="acc-help acc-help--top">Need more? Top up below.</div>
+        <div class="acc-topup">
+          <button id="buy-edits-btn" class="acc-chip" style="--c-accent:#06bfdd;">+10 AI edits, €5</button>
+          <a href="/dashboard/reels" class="acc-chip" style="--c-accent:#a78bfa;">+10 reel credits, €50</a>
+          <a href="/audit" class="acc-chip" style="--c-accent:#22d3ee;">+10 audit credits, €20</a>
+          <a href="/kits/new" class="acc-chip" style="--c-accent:#f97316;">New press kit, €15</a>
+        </div>
+        <div id="edits-msg" class="acc-msg" hidden></div>
+      </section>
+
+      <!-- Language -->
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span class="acc-label">Language</span>
+        </div>
+        <div class="acc-lang">
+          <button class="acc-lang-btn" id="lang-ro" data-lang="ro">🇷🇴 Română</button>
+          <button class="acc-lang-btn" id="lang-en" data-lang="en">🇬🇧 English</button>
+        </div>
+      </section>
+
+      <!-- Multipage Add-on -->
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span class="acc-label">Multipage add-on</span>
+        </div>
+        {hasMultipage ? (
+          <>
+            <div class="acc-active-row">
+              <span class="acc-active-badge">Active</span>
+              <span class="acc-active-meta">
+                {isMultipageLifetime ? 'Lifetime, never expires' : 'Subscription, renews automatically'}
+              </span>
+            </div>
+            <p class="acc-help">You can generate unlimited pages per site.</p>
+          </>
+        ) : (
+          <>
+            <p class="acc-help">Unlock multi-page websites. Pick a cadence:</p>
+            <div class="acc-plan-grid">
+              <button class="acc-plan" id="addon-month-btn" data-interval="month">
+                <span class="acc-plan-name">Monthly</span>
+                <span class="acc-plan-price">€9<span class="acc-plan-unit">/mo</span></span>
+              </button>
+              <button class="acc-plan" id="addon-year-btn" data-interval="year">
+                <span class="acc-plan-name">Annual</span>
+                <span class="acc-plan-price">€49<span class="acc-plan-unit">/yr</span></span>
+              </button>
+              <button class="acc-plan acc-plan--featured" id="addon-lifetime-btn" data-interval="lifetime">
+                <span class="acc-plan-name">Lifetime</span>
+                <span class="acc-plan-price">€499</span>
+              </button>
+            </div>
+            <div id="addon-msg" class="acc-msg" hidden></div>
+          </>
+        )}
+      </section>
+
+      <!-- Support -->
+      <section class="acc-card">
+        <div class="acc-card-head">
+          <span class="acc-label">Support</span>
+        </div>
+        <p class="acc-help">Need help? Chat with us on WhatsApp.</p>
+        <a href="https://wa.me/40770279935" target="_blank" rel="noopener" class="acc-btn acc-btn--whatsapp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          <span>Chat on WhatsApp</span>
+        </a>
+      </section>
+
+      <!-- Danger zone -->
+      <section class="acc-card acc-card--danger">
+        <div class="acc-card-head">
+          <span class="acc-label acc-label--danger">Danger zone</span>
+        </div>
+        <p class="acc-help">Permanently delete your account and all associated data. This action cannot be undone.</p>
+        <button id="delete-account-btn" class="acc-btn acc-btn--danger">Delete my account</button>
+        <p id="delete-msg" class="acc-msg" hidden></p>
+      </section>
+
+    </div>
   </div>
+
+  <style>
+    .acc-wrap { max-width: 680px; margin: 0 auto; }
+
+    .acc-head { text-align: center; margin-bottom: 38px; }
+    .acc-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+      text-transform: uppercase; color: rgba(255,255,255,0.45);
+      text-decoration: none; margin-bottom: 14px;
+      transition: color 0.2s;
+    }
+    .acc-back:hover { color: rgba(255,255,255,0.85); }
+    .acc-eyebrow {
+      display: inline-flex; align-items: center;
+      font-size: 12.5px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #06bfdd; margin-bottom: 14px;
+      padding: 6px 14px; border-radius: 999px;
+      background: rgba(6,191,221,0.08);
+      border: 1px solid rgba(6,191,221,0.22);
+    }
+    .acc-title {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(28px, 4.5vw, 44px);
+      font-weight: 300; line-height: 1.05;
+      letter-spacing: -0.045em; color: #fff; margin: 0 0 12px;
+    }
+    .acc-title strong {
+      font-weight: 700;
+      background: linear-gradient(135deg, #06bfdd 0%, #a78bfa 50%, #f97316 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .acc-sub { font-size: 14px; color: rgba(255,255,255,0.55); margin: 0; }
+
+    .acc-sections { display: flex; flex-direction: column; gap: 14px; }
+
+    .acc-card {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),
+        rgba(18, 18, 22, 0.92);
+      backdrop-filter: blur(24px) saturate(1.3);
+      -webkit-backdrop-filter: blur(24px) saturate(1.3);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 28px -16px rgba(0,0,0,0.5);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    .acc-card-head { margin-bottom: 2px; }
+    .acc-label {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: rgba(255,255,255,0.45);
+      padding: 4px 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .acc-label--danger { color: #ff8a8a; background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); }
+
+    .acc-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .acc-row-label { font-size: 13px; color: rgba(255,255,255,0.55); }
+    .acc-row-value { font-size: 13.5px; color: #fff; font-weight: 500; word-break: break-word; text-align: right; }
+
+    .acc-help { font-size: 13px; color: rgba(255,255,255,0.5); margin: 0; line-height: 1.55; }
+    .acc-help--top { margin-top: 8px; }
+
+    .acc-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: 11px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; align-self: flex-start;
+      transition: all 0.2s; text-decoration: none;
+      border: 1px solid transparent;
+    }
+    .acc-btn--ghost {
+      background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.78);
+      border-color: rgba(255,255,255,0.1);
+    }
+    .acc-btn--ghost:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.18); }
+    .acc-btn--ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+    .acc-btn--whatsapp { background: #25d366; color: #fff; }
+    .acc-btn--whatsapp:hover { background: #20c05c; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,211,102,0.3); }
+    .acc-btn--danger {
+      background: rgba(239,68,68,0.12); color: #ff8a8a;
+      border-color: rgba(239,68,68,0.3);
+    }
+    .acc-btn--danger:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
+    .acc-btn--danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .acc-msg { font-size: 13px; padding: 10px 14px; border-radius: 10px; margin: 0; }
+    .acc-msg.success { background: rgba(56,161,105,0.08); border: 1px solid rgba(56,161,105,0.2); color: #6ee7a3; }
+    .acc-msg.error   { background: rgba(229,62,62,0.06); border: 1px solid rgba(229,62,62,0.2); color: #ff8a8a; }
+
+    /* ── Usage grid ─────────────────────────────────────────────── */
+    .acc-usage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .acc-usage-item {
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      display: flex; flex-direction: column; gap: 4px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.25s ease;
+    }
+    .acc-usage-item::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: var(--u-accent);
+      opacity: 0.7;
+    }
+    .acc-usage-item:hover { border-color: color-mix(in srgb, var(--u-accent) 35%, rgba(255,255,255,0.07)); }
+    .acc-usage-name {
+      font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--u-accent);
+    }
+    .acc-usage-value {
+      font-family: 'Inter', sans-serif;
+      font-size: 18px; font-weight: 700; letter-spacing: -0.025em;
+      color: #fff; line-height: 1.1;
+    }
+    .acc-usage-unit {
+      font-size: 11.5px; font-weight: 500;
+      color: rgba(255,255,255,0.5); letter-spacing: 0;
+    }
+
+    /* ── Top-up chips ────────────────────────────────────────────── */
+    .acc-topup { display: flex; flex-wrap: wrap; gap: 8px; }
+    .acc-chip {
+      display: inline-flex; align-items: center;
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      padding: 8px 14px; border-radius: 999px;
+      background: color-mix(in srgb, var(--c-accent) 10%, transparent);
+      color: var(--c-accent);
+      border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
+      cursor: pointer; text-decoration: none;
+      transition: all 0.2s;
+    }
+    .acc-chip:hover {
+      background: color-mix(in srgb, var(--c-accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--c-accent) 50%, transparent);
+      transform: translateY(-1px);
+    }
+
+    /* ── Language toggle ────────────────────────────────────────── */
+    .acc-lang { display: flex; gap: 8px; }
+    .acc-lang-btn {
+      flex: 1; padding: 10px; border-radius: 11px;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.6);
+      border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+      transition: all 0.2s;
+    }
+    .acc-lang-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+    .acc-lang-btn.active {
+      background: rgba(6,191,221,0.1); color: #06bfdd;
+      border-color: rgba(6,191,221,0.35);
+    }
+
+    /* ── Plan cards (multipage) ──────────────────────────────────── */
+    .acc-active-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .acc-active-badge {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(110,231,163,0.12); color: #6ee7a3;
+      border: 1px solid rgba(110,231,163,0.3);
+    }
+    .acc-active-meta { font-size: 12.5px; color: rgba(255,255,255,0.55); }
+
+    .acc-plan-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .acc-plan {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px; padding: 14px 16px;
+      cursor: pointer; transition: all 0.2s;
+      font-family: inherit;
+    }
+    .acc-plan:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
+    .acc-plan:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .acc-plan--featured { background: rgba(6,191,221,0.06); border-color: rgba(6,191,221,0.22); }
+    .acc-plan--featured:hover { background: rgba(6,191,221,0.12); border-color: rgba(6,191,221,0.4); }
+    .acc-plan-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.55); }
+    .acc-plan--featured .acc-plan-name { color: rgba(6,191,221,0.85); }
+    .acc-plan-price { font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.025em; }
+    .acc-plan--featured .acc-plan-price { color: #06bfdd; }
+    .acc-plan-unit { font-size: 11.5px; color: rgba(255,255,255,0.45); font-weight: 500; margin-left: 2px; }
+
+    .acc-card--danger { border-color: rgba(239,68,68,0.18); }
+  </style>
 </Dashboard>
 
 <script>
-
   // ── Stripe checkout helper ────────────────────────────────────────────────
   async function redirectToCheckout(endpoint: string, body: object, btnEl: HTMLButtonElement, msgEl: HTMLElement, loadingText: string) {
-    const originalHtml = btnEl.innerHTML; // preserve inner HTML (spans, etc.)
+    const originalHtml = btnEl.innerHTML;
     btnEl.disabled = true;
     btnEl.textContent = loadingText;
     try {
@@ -139,21 +395,20 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
         window.location.href = data.url;
       } else {
         msgEl.hidden = false;
-        msgEl.className = 'reset-msg error';
+        msgEl.className = 'acc-msg error';
         msgEl.textContent = data.error || 'Something went wrong.';
         btnEl.disabled = false;
         btnEl.innerHTML = originalHtml;
       }
     } catch {
       msgEl.hidden = false;
-      msgEl.className = 'reset-msg error';
+      msgEl.className = 'acc-msg error';
       msgEl.textContent = 'Network error. Try again.';
       btnEl.disabled = false;
       btnEl.innerHTML = originalHtml;
     }
   }
 
-  // Multipage add-on buttons
   ['month', 'year', 'lifetime'].forEach(interval => {
     document.getElementById(`addon-${interval}-btn`)?.addEventListener('click', () => {
       const btn = document.getElementById(`addon-${interval}-btn`) as HTMLButtonElement;
@@ -162,207 +417,76 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
     });
   });
 
-  // Buy extra edits
   document.getElementById('buy-edits-btn')?.addEventListener('click', () => {
     const btn = document.getElementById('buy-edits-btn') as HTMLButtonElement;
     const msg = document.getElementById('edits-msg')!;
     redirectToCheckout('/api/billing/buy-edits', {}, btn, msg, 'Redirecting…');
   });
 
-  // Password reset
   document.getElementById('reset-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('reset-btn') as HTMLButtonElement;
     const msg = document.getElementById('reset-msg')!;
     btn.disabled = true;
     btn.textContent = 'Sending…';
-
     const email = document.querySelector<HTMLElement>('[data-user-email]')?.dataset.userEmail ?? '';
-    let ok = false;
     try {
-      const res = await fetch('/api/auth/forget-password', {
+      const r = await fetch('/api/auth/forget-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, redirectTo: '/reset-password' }),
+        body: JSON.stringify({ email, redirectTo: `${location.origin}/reset-password` }),
       });
-      ok = res.ok;
+      if (r.ok) {
+        msg.hidden = false;
+        msg.className = 'acc-msg success';
+        msg.textContent = 'Check your email for the reset link.';
+      } else {
+        msg.hidden = false;
+        msg.className = 'acc-msg error';
+        const data = await r.json().catch(() => ({}));
+        msg.textContent = data.error || 'Could not send the reset email.';
+      }
     } catch {
-      ok = false;
-    }
-
-    msg.hidden = false;
-    if (!ok) {
-      msg.className = 'reset-msg error';
-      msg.textContent = 'Error sending email. Please try again.';
-    } else {
-      msg.className = 'reset-msg success';
-      msg.textContent = 'Email sent! Check your inbox.';
+      msg.hidden = false;
+      msg.className = 'acc-msg error';
+      msg.textContent = 'Network error.';
     }
     btn.disabled = false;
     btn.textContent = 'Send reset email';
   });
 
-  // Language toggle
-  const currentLang = (localStorage.getItem('i18nextLng')||'en').split('-')[0];
-  document.getElementById(`lang-${currentLang}`)?.classList.add('active');
-
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const lang = (btn as HTMLElement).dataset.lang!;
-      localStorage.setItem('i18nextLng', lang);
-      window.location.reload();
+  // Language toggle (cosmetic — persists via localStorage for now)
+  const savedLang = localStorage.getItem('grappes_lang') ?? 'en';
+  const langButtons = document.querySelectorAll<HTMLButtonElement>('.acc-lang-btn');
+  langButtons.forEach(b => {
+    if (b.dataset.lang === savedLang) b.classList.add('active');
+    b.addEventListener('click', () => {
+      langButtons.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      localStorage.setItem('grappes_lang', b.dataset.lang!);
     });
   });
 
-  // Delete account
   document.getElementById('delete-account-btn')?.addEventListener('click', async () => {
-    const msg1 = 'Are you sure? This will permanently delete your account, all projects, and all data. This cannot be undone.';
-    if (!confirm(msg1)) return;
-    const msg2 = 'Type DELETE to confirm:';
-    const confirmation = prompt(msg2);
-    if (confirmation !== 'DELETE') return;
-
+    if (!confirm('Permanently delete your account, sites, kits, and credits? This cannot be undone.')) return;
     const btn = document.getElementById('delete-account-btn') as HTMLButtonElement;
-    const msgEl = document.getElementById('delete-msg')!;
+    const msg = document.getElementById('delete-msg')!;
     btn.disabled = true;
     btn.textContent = 'Deleting…';
-
     try {
-      const res = await fetch('/api/account/delete', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        window.location.href = '/sign-in';
-      } else {
-        msgEl.hidden = false;
-        msgEl.className = 'reset-msg error';
-        msgEl.textContent = data.error || 'Deletion failed.';
-        btn.disabled = false;
-        btn.textContent = 'Delete my account';
-      }
+      const r = await fetch('/api/account/delete', { method: 'POST' });
+      if (r.ok) { window.location.href = '/'; return; }
+      const data = await r.json().catch(() => ({}));
+      msg.hidden = false;
+      msg.className = 'acc-msg error';
+      msg.textContent = data.error || 'Could not delete account.';
+      btn.disabled = false;
+      btn.textContent = 'Delete my account';
     } catch {
-      msgEl.hidden = false;
-      msgEl.className = 'reset-msg error';
-      msgEl.textContent = 'Network error.';
+      msg.hidden = false;
+      msg.className = 'acc-msg error';
+      msg.textContent = 'Network error.';
       btn.disabled = false;
       btn.textContent = 'Delete my account';
     }
   });
 </script>
-
-<style>
-  .page-header { margin-bottom: 2.5rem; }
-  .back-link {
-    color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.875rem;
-    display: inline-block; margin-bottom: 1rem;
-    transition: color 0.2s;
-  }
-  .back-link:hover { color: #fff; }
-  h1 {
-    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: clamp(1.75rem, 3vw, 2.5rem);
-    font-weight: 700; letter-spacing: -0.03em; color: #fff;
-  }
-
-  .sections { display: flex; flex-direction: column; gap: 1.5rem; max-width: 560px; }
-
-  .card {
-    background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(40px);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 24px;
-    padding: 1.75rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
-    display: flex; flex-direction: column; gap: 1rem;
-  }
-  h2 {
-    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    font-size: 0.9375rem; font-weight: 600; color: #fff; margin: 0;
-  }
-  .field-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-  .field-label { font-size: 0.875rem; color: rgba(255,255,255,0.5); }
-  .field-value { font-size: 0.875rem; color: #fff; font-weight: 500; }
-  .divider { height: 1px; background: rgba(255,255,255,0.06); }
-  .help { font-size: 0.875rem; color: rgba(255,255,255,0.45); margin: 0; line-height: 1.6; }
-
-  .btn-secondary {
-    background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8);
-    border: 1px solid rgba(255,255,255,0.1); border-radius: 14px;
-    padding: 10px 20px; font-size: 0.875rem; font-weight: 500;
-    cursor: pointer; align-self: flex-start;
-    transition: all 0.2s;
-  }
-  .btn-secondary:hover { background: rgba(255,255,255,0.1); color: #fff; }
-  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .reset-msg { font-size: 0.875rem; padding: 0.75rem 1rem; border-radius: 12px; }
-  .reset-msg.success { background: rgba(56,161,105,0.08); border: 1px solid rgba(56,161,105,0.2); color: #38a169; }
-  .reset-msg.error { background: rgba(229,62,62,0.06); border: 1px solid rgba(229,62,62,0.2); color: #e53e3e; }
-
-  /* Language toggle */
-  .lang-toggle { display: flex; gap: 0.5rem; }
-  .lang-btn {
-    flex: 1; padding: 10px; border-radius: 12px; font-size: 0.875rem; font-weight: 500;
-    background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.5);
-    border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
-    transition: all 0.2s;
-  }
-  .lang-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
-  .lang-btn.active {
-    background: rgba(6,191,221,0.1); color: #06bfdd;
-    border-color: rgba(6,191,221,0.3);
-  }
-
-  /* Multipage add-on */
-  .addon-active { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-  .badge-active {
-    display: inline-flex; align-items: center;
-    background: rgba(6,191,221,0.12); color: #06bfdd;
-    border: 1px solid rgba(6,191,221,0.25);
-    border-radius: 8px; padding: 3px 10px;
-    font-size: 0.8rem; font-weight: 600;
-  }
-  .addon-type { font-size: 0.8375rem; color: rgba(255,255,255,0.45); }
-
-  .addon-plans { display: flex; gap: 0.625rem; flex-wrap: wrap; }
-  .btn-addon {
-    display: flex; flex-direction: column; align-items: flex-start;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 14px; padding: 12px 18px;
-    cursor: pointer; transition: all 0.2s; flex: 1; min-width: 90px;
-  }
-  .btn-addon:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
-  .btn-addon:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-addon-lifetime {
-    background: rgba(6,191,221,0.06);
-    border-color: rgba(6,191,221,0.2);
-  }
-  .btn-addon-lifetime:hover { background: rgba(6,191,221,0.12); border-color: rgba(6,191,221,0.35); }
-  .addon-plan-name { font-size: 0.75rem; color: rgba(255,255,255,0.5); font-weight: 500; }
-  .addon-plan-price { font-size: 1rem; color: #fff; font-weight: 700; margin-top: 2px; }
-  .btn-addon-lifetime .addon-plan-name { color: rgba(6,191,221,0.7); }
-  .btn-addon-lifetime .addon-plan-price { color: #06bfdd; }
-
-  /* WhatsApp button */
-  .btn-whatsapp {
-    display: inline-flex; align-items: center; gap: 10px;
-    background: #25d366; color: #fff;
-    border-radius: 14px; padding: 11px 20px;
-    font-size: 0.9rem; font-weight: 600; text-decoration: none;
-    align-self: flex-start;
-    transition: all 0.2s;
-  }
-  .btn-whatsapp:hover { background: #20c05c; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,211,102,0.3); }
-
-  /* Danger zone */
-  .danger-zone { border-color: rgba(239,68,68,0.2); }
-  .danger-zone h2 { color: #f87171; }
-  .btn-danger {
-    background: rgba(239,68,68,0.12); color: #f87171;
-    border: 1px solid rgba(239,68,68,0.3); border-radius: 12px;
-    padding: 10px 20px; font-size: 0.875rem; font-weight: 600;
-    cursor: pointer; transition: all 0.2s; align-self: flex-start;
-    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  }
-  .btn-danger:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
-  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-</style>
