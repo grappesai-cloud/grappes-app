@@ -55,7 +55,7 @@ if (Astro.request.method === 'POST') {
         console.error('[sign-up] Welcome email failed:', emailErr);
       }
       Astro.cookies.delete('ref_code', { path: '/' });
-      return redirectWithCookies('/dashboard/new', result.setCookieHeaders);
+      return redirectWithCookies('/dashboard', result.setCookieHeaders);
     }
   }
 }
@@ -118,7 +118,7 @@ const appleEnabled = !!(import.meta.env.APPLE_CLIENT_ID && import.meta.env.APPLE
             {googleEnabled && (
               <form id="googleForm" method="POST" action="/api/auth/sign-in/social">
                 <input type="hidden" name="provider" value="google" />
-                <input type="hidden" name="callbackURL" value="/dashboard/new" />
+                <input type="hidden" name="callbackURL" value="/dashboard" />
                 <button type="submit" class="auth-google-btn">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.26c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg>
                   <span>Continue with Google</span>
@@ -129,7 +129,7 @@ const appleEnabled = !!(import.meta.env.APPLE_CLIENT_ID && import.meta.env.APPLE
             {appleEnabled && (
               <form id="appleForm" method="POST" action="/api/auth/sign-in/social">
                 <input type="hidden" name="provider" value="apple" />
-                <input type="hidden" name="callbackURL" value="/dashboard/new" />
+                <input type="hidden" name="callbackURL" value="/dashboard" />
                 <button type="submit" class="auth-apple-btn">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 12.5c0-2.4 1.96-3.55 2.05-3.6-1.12-1.63-2.86-1.86-3.48-1.88-1.48-.15-2.88.86-3.63.86-.75 0-1.91-.84-3.14-.82-1.62.02-3.12.94-3.95 2.38C3.65 12.4 4.94 16.66 6.61 19c.81 1.14 1.78 2.41 3.04 2.36 1.22-.05 1.68-.79 3.15-.79s1.89.79 3.17.76c1.31-.02 2.14-1.15 2.94-2.3.93-1.31 1.31-2.59 1.33-2.66-.03-.01-2.54-.98-2.57-3.87zM15.07 5.34c.66-.81 1.11-1.93.98-3.05-.95.04-2.1.63-2.79 1.43-.61.71-1.16 1.86-1.01 2.95 1.06.08 2.15-.53 2.82-1.33z"/></svg>
                   <span>Continue with Apple</span>
