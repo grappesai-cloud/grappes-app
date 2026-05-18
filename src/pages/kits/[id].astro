@@ -1,0 +1,480 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { createAdminClient } from '../../lib/supabase';
+import { googleFontsUrl, readableForeground, type PressKit } from '../../lib/press-kit';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+
+const client = createAdminClient();
+const { data: kit, error } = await client
+  .from('press_kits')
+  .select('*')
+  .eq('id', id!)
+  .eq('user_id', authUser.id)
+  .maybeSingle();
+
+if (!kit || error) return Astro.redirect('/kits');
+
+const k = kit as unknown as PressKit;
+const justPublished = Astro.url.searchParams.get('published') === '1';
+const fontsCss = googleFontsUrl(k.fonts);
+---
+
+<Dashboard title={`Edit — ${k.name}`}>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href={fontsCss} />
+
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 60px !important; max-width: 1400px !important; }
+  </style>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Press kits</span>
+    </a>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span id="save-state" style="font-size:11.5px;color:rgba(255,255,255,0.4);"></span>
+      {k.status === 'published' && k.slug ? (
+        <a href={`/kit/${k.slug}`} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(110,231,163,0.1);color:#6ee7a3;border:1px solid rgba(110,231,163,0.3);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;text-decoration:none;">
+          View live →
+        </a>
+      ) : (
+        <button type="button" id="publish-btn" style="display:inline-flex;align-items:center;gap:6px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;padding:9px 18px;font-size:13px;font-weight:700;letter-spacing:0.02em;cursor:pointer;">
+          Publish for €15
+        </button>
+      )}
+    </div>
+  </div>
+
+  {justPublished && (
+    <div style="background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:12px;padding:12px 18px;color:#6ee7a3;font-size:13.5px;margin-bottom:18px;text-align:center;">
+      ✓ Published. Your shareable link is grappes.dev/kit/{k.slug ?? '…'}
+    </div>
+  )}
+
+  <div class="kit-layout">
+    <!-- ────────────── LEFT: EDITOR ────────────── -->
+    <aside class="kit-editor">
+      <div class="ed-section">
+        <h3 class="ed-h">Basics</h3>
+        <label class="ed-label">Name</label>
+        <input data-field="name" type="text" value={k.name} maxlength="80" class="ed-input" />
+        <label class="ed-label">Tagline (one short line)</label>
+        <input data-field="tagline" type="text" value={k.tagline ?? ''} maxlength="120" class="ed-input" placeholder="e.g. House music from Cluj" />
+        <label class="ed-label">Kit type</label>
+        <select data-field="kit_type" class="ed-input">
+          {['musician','agency','photographer','founder','model','other'].map(t => (
+            <option value={t} selected={k.kit_type === t}>{t}</option>
+          ))}
+        </select>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Brand</h3>
+        <label class="ed-label">Logo</label>
+        <div class="ed-upload" data-asset="logo">
+          {k.assets?.logo ? <img src={k.assets.logo} alt="" class="ed-preview" /> : null}
+          <input type="file" accept="image/*" class="ed-file" />
+          <span class="ed-hint">PNG/SVG/JPG · we extract colors from this</span>
+        </div>
+
+        <label class="ed-label">Palette</label>
+        <div class="ed-palette">
+          {(['primary','secondary','accent','text','bg'] as const).map(key => (
+            <label class="ed-color">
+              <input type="color" data-palette={key} value={(k.palette as any)[key] ?? '#000000'} />
+              <span class="ed-color-name">{key}</span>
+            </label>
+          ))}
+        </div>
+
+        <label class="ed-label">Heading font</label>
+        <select data-font="heading" class="ed-input">
+          {['Inter','Unbounded','Space Grotesk','Playfair Display','Bricolage Grotesque','Cormorant Garamond','DM Sans','Syne','Geist','JetBrains Mono'].map(f => (
+            <option value={f} selected={k.fonts.heading === f}>{f}</option>
+          ))}
+        </select>
+        <label class="ed-label">Body font</label>
+        <select data-font="body" class="ed-input">
+          {['Inter','DM Sans','Space Grotesk','Geist','Manrope','Plus Jakarta Sans','Lato'].map(f => (
+            <option value={f} selected={k.fonts.body === f}>{f}</option>
+          ))}
+        </select>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Bio</h3>
+        <label class="ed-label">Short bio (1-2 sentences, for the hero)</label>
+        <textarea data-field="bio_short" rows="3" maxlength="280" class="ed-textarea">{k.bio_short ?? ''}</textarea>
+        <label class="ed-label">Long bio (full story, multiple paragraphs)</label>
+        <textarea data-field="bio_long" rows="8" maxlength="3000" class="ed-textarea">{k.bio_long ?? ''}</textarea>
+        <label class="ed-label">Portrait photo (optional)</label>
+        <div class="ed-upload" data-asset="portrait">
+          {k.assets?.portrait ? <img src={k.assets.portrait} alt="" class="ed-preview ed-preview--portrait" /> : null}
+          <input type="file" accept="image/*" class="ed-file" />
+        </div>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Media</h3>
+        <label class="ed-label">Photos</label>
+        <div class="ed-multi" data-multi="photos">
+          <div class="ed-multi-grid">
+            {(k.assets?.photos ?? []).map((url, i) => (
+              <div class="ed-multi-item">
+                <img src={url} alt="" />
+                <button type="button" class="ed-multi-rm" data-rm-idx={String(i)}>×</button>
+              </div>
+            ))}
+          </div>
+          <input type="file" accept="image/*" multiple class="ed-file" />
+        </div>
+        <label class="ed-label">Videos (links or upload mp4)</label>
+        <div class="ed-multi" data-multi="videos">
+          <div class="ed-multi-grid">
+            {(k.assets?.videos ?? []).map((url, i) => (
+              <div class="ed-multi-item ed-multi-item--vid">
+                <span>{url.split('/').pop()?.slice(0, 24)}</span>
+                <button type="button" class="ed-multi-rm" data-rm-idx={String(i)}>×</button>
+              </div>
+            ))}
+          </div>
+          <input type="file" accept="video/*" multiple class="ed-file" />
+        </div>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Stats</h3>
+        <p class="ed-help">Big numbers visitors should remember. e.g. "1.2M monthly listeners", "50+ shows".</p>
+        <div id="stats-list" class="ed-list">
+          {(k.stats ?? []).map((s, i) => (
+            <div class="ed-row" data-idx={String(i)}>
+              <input type="text" placeholder="Value (1.2M)" value={s.value} data-stat="value" class="ed-input ed-input--inline" />
+              <input type="text" placeholder="Label (monthly listeners)" value={s.label} data-stat="label" class="ed-input ed-input--inline" />
+              <button type="button" class="ed-rm">×</button>
+            </div>
+          ))}
+        </div>
+        <button type="button" id="add-stat" class="ed-add">+ Add stat</button>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Links</h3>
+        <div id="links-list" class="ed-list">
+          {(k.links ?? []).map((l, i) => (
+            <div class="ed-row" data-idx={String(i)}>
+              <select data-link="platform" class="ed-input ed-input--inline" style="max-width:140px;">
+                {['spotify','soundcloud','youtube','apple_music','bandcamp','instagram','tiktok','website','booking','other'].map(p => (
+                  <option value={p} selected={l.platform === p}>{p}</option>
+                ))}
+              </select>
+              <input type="url" placeholder="https://..." value={l.url} data-link="url" class="ed-input ed-input--inline" />
+              <button type="button" class="ed-rm">×</button>
+            </div>
+          ))}
+        </div>
+        <button type="button" id="add-link" class="ed-add">+ Add link</button>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Press mentions</h3>
+        <div id="press-list" class="ed-list">
+          {(k.press ?? []).map((p, i) => (
+            <div class="ed-row" data-idx={String(i)}>
+              <input type="text" placeholder="Outlet (Mixmag)" value={p.name} data-press="name" class="ed-input ed-input--inline" />
+              <input type="text" placeholder="Year" value={p.year ?? ''} data-press="year" class="ed-input ed-input--inline" style="max-width:80px;" />
+              <button type="button" class="ed-rm">×</button>
+            </div>
+          ))}
+        </div>
+        <button type="button" id="add-press" class="ed-add">+ Add press mention</button>
+      </div>
+
+      <div class="ed-section">
+        <h3 class="ed-h">Contact</h3>
+        <label class="ed-label">Booking / general email</label>
+        <input data-field="contact_email" type="email" value={k.contact_email ?? ''} class="ed-input" placeholder="booking@yourname.com" />
+        <label class="ed-label">Phone (optional)</label>
+        <input data-field="contact_phone" type="tel" value={k.contact_phone ?? ''} class="ed-input" />
+        <label class="ed-label">Other contact (optional)</label>
+        <input data-field="contact_other" type="text" value={k.contact_other ?? ''} class="ed-input" placeholder="e.g. Telegram @username" />
+      </div>
+    </aside>
+
+    <!-- ────────────── RIGHT: LIVE PREVIEW ────────────── -->
+    <div class="kit-preview-wrap">
+      <div class="kit-preview-bar">
+        <span>Live preview</span>
+        {k.status === 'published' && k.slug ? (
+          <a href={`/kit/${k.slug}?print=1`} target="_blank" class="kit-preview-print">Print / PDF</a>
+        ) : (
+          <span style="font-size:11px;color:rgba(255,255,255,0.4);">PDF available after publish</span>
+        )}
+      </div>
+      <iframe id="kit-preview" src={`/kit/preview/${k.id}`} title="Press kit preview"></iframe>
+    </div>
+  </div>
+
+  <style>
+    .kit-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 1080px) {
+      .kit-layout { grid-template-columns: 1fr; }
+    }
+    .kit-editor {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 18px;
+      max-height: calc(100vh - 160px);
+      overflow-y: auto;
+      position: sticky;
+      top: 90px;
+    }
+    .ed-section + .ed-section { margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .ed-h { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.55); margin: 0 0 12px; }
+    .ed-label { display: block; font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,0.7); margin: 10px 0 4px; }
+    .ed-help { font-size: 11.5px; color: rgba(255,255,255,0.4); margin: 0 0 8px; }
+    .ed-input, .ed-textarea {
+      width: 100%; padding: 9px 12px; font-family: inherit; font-size: 13px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 9px; color: #fff; outline: none;
+    }
+    .ed-input:focus, .ed-textarea:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
+    .ed-textarea { resize: vertical; font-family: inherit; line-height: 1.45; }
+    .ed-input--inline { padding: 7px 10px; font-size: 12.5px; }
+    .ed-upload {
+      position: relative; display: flex; flex-direction: column; gap: 6px;
+      padding: 14px; background: rgba(255,255,255,0.025); border: 1px dashed rgba(255,255,255,0.12); border-radius: 10px;
+      cursor: pointer;
+    }
+    .ed-file { font-size: 11.5px; color: rgba(255,255,255,0.65); }
+    .ed-hint { font-size: 10.5px; color: rgba(255,255,255,0.4); }
+    .ed-preview { max-width: 80px; max-height: 80px; object-fit: contain; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 6px; }
+    .ed-preview--portrait { max-width: 120px; max-height: 160px; object-fit: cover; }
+    .ed-palette { display: flex; gap: 8px; flex-wrap: wrap; }
+    .ed-color { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .ed-color input[type="color"] { width: 42px; height: 42px; padding: 0; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; background: none; cursor: pointer; }
+    .ed-color-name { font-size: 9px; text-transform: uppercase; color: rgba(255,255,255,0.5); letter-spacing: 0.05em; }
+    .ed-multi { display: flex; flex-direction: column; gap: 8px; }
+    .ed-multi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .ed-multi-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.04); }
+    .ed-multi-item img { width: 100%; height: 100%; object-fit: cover; }
+    .ed-multi-item--vid { display: flex; align-items: center; justify-content: center; padding: 6px; font-size: 10px; color: rgba(255,255,255,0.6); }
+    .ed-multi-rm { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; font-size: 14px; line-height: 1; }
+    .ed-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .ed-row { display: flex; gap: 6px; align-items: center; }
+    .ed-row .ed-input--inline { flex: 1; }
+    .ed-rm { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 0; background: rgba(239,68,68,0.1); color: #ff8a8a; cursor: pointer; font-size: 16px; line-height: 1; }
+    .ed-add { width: 100%; padding: 8px; background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.15); border-radius: 9px; color: rgba(255,255,255,0.65); font-family: inherit; font-size: 12.5px; cursor: pointer; }
+    .ed-add:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+    .kit-preview-wrap { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; }
+    .kit-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); font-weight: 600; }
+    .kit-preview-print { color: #f97316; text-decoration: none; font-size: 11.5px; font-weight: 700; }
+    #kit-preview { width: 100%; height: calc(100vh - 160px); min-height: 600px; border: 0; background: #fafafa; }
+  </style>
+
+  <script is:inline define:vars={{ kitId: k.id }}>
+    let saveTimer = null;
+    let pendingUpdate = {};
+    const saveState = document.getElementById('save-state');
+    const preview = document.getElementById('kit-preview');
+
+    function markDirty() { saveState.textContent = 'Saving…'; }
+    function markSaved() { saveState.textContent = 'Saved'; setTimeout(() => { if (saveState.textContent === 'Saved') saveState.textContent = ''; }, 1800); }
+
+    async function flushSave() {
+      if (Object.keys(pendingUpdate).length === 0) return;
+      const body = pendingUpdate;
+      pendingUpdate = {};
+      try {
+        const r = await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        if (r.ok) {
+          markSaved();
+          preview.contentWindow.location.reload();
+        } else { saveState.textContent = 'Save failed'; }
+      } catch { saveState.textContent = 'Save failed'; }
+    }
+    function queueSave(patch) {
+      Object.assign(pendingUpdate, patch);
+      markDirty();
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(flushSave, 600);
+    }
+
+    // ── Simple fields ──────────────────────────────────────────────
+    document.querySelectorAll('[data-field]').forEach((el) => {
+      el.addEventListener('input', () => queueSave({ [el.dataset.field]: el.value }));
+      el.addEventListener('change', () => queueSave({ [el.dataset.field]: el.value }));
+    });
+
+    // ── Palette colors ─────────────────────────────────────────────
+    let paletteState = {};
+    document.querySelectorAll('[data-palette]').forEach((el) => {
+      paletteState[el.dataset.palette] = el.value;
+    });
+    document.querySelectorAll('[data-palette]').forEach((el) => {
+      el.addEventListener('input', () => {
+        paletteState[el.dataset.palette] = el.value;
+        queueSave({ palette: { ...paletteState, extracted_from_logo: false } });
+      });
+    });
+
+    // ── Fonts ──────────────────────────────────────────────────────
+    let fontsState = {};
+    document.querySelectorAll('[data-font]').forEach((el) => {
+      fontsState[el.dataset.font] = el.value;
+    });
+    document.querySelectorAll('[data-font]').forEach((el) => {
+      el.addEventListener('change', () => {
+        fontsState[el.dataset.font] = el.value;
+        queueSave({ fonts: { ...fontsState, auto: false } });
+      });
+    });
+
+    // ── Asset uploads (single: logo, portrait) ─────────────────────
+    let assetsState = JSON.parse(JSON.stringify({ logo: undefined, portrait: undefined, photos: [], videos: [] }));
+    // Initial from server data — collected by reading existing previews:
+    document.querySelectorAll('[data-asset]').forEach((box) => {
+      const img = box.querySelector('img');
+      if (img) assetsState[box.dataset.asset] = img.src;
+    });
+    document.querySelectorAll('[data-multi]').forEach((box) => {
+      const urls = Array.from(box.querySelectorAll('.ed-multi-item img')).map((i) => i.src);
+      assetsState[box.dataset.multi] = urls;
+      // For videos, urls aren't in img tags — read from data attrs server-rendered. For v1 we accept that videos render after refresh.
+    });
+
+    async function uploadFile(file, assetKey) {
+      const { upload } = await import('https://cdn.jsdelivr.net/npm/@vercel/blob@2.3.3/dist/client/index.js');
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: `/api/kits/${kitId}/sign-upload`,
+      });
+      return blob.url;
+    }
+
+    document.querySelectorAll('[data-asset]').forEach((box) => {
+      const input = box.querySelector('input[type="file"]');
+      input.addEventListener('change', async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        markDirty();
+        try {
+          const url = await uploadFile(file, box.dataset.asset);
+          assetsState[box.dataset.asset] = url;
+          // Replace preview img
+          const old = box.querySelector('img');
+          if (old) old.src = url;
+          else {
+            const img = document.createElement('img');
+            img.src = url;
+            img.className = box.dataset.asset === 'portrait' ? 'ed-preview ed-preview--portrait' : 'ed-preview';
+            box.insertBefore(img, input);
+          }
+          queueSave({ assets: { ...assetsState } });
+        } catch (e) {
+          console.error(e); saveState.textContent = 'Upload failed';
+        }
+        input.value = '';
+      });
+    });
+
+    // ── Multi uploads (photos, videos) ────────────────────────────
+    document.querySelectorAll('[data-multi]').forEach((box) => {
+      const input = box.querySelector('input[type="file"]');
+      input.addEventListener('change', async () => {
+        const files = Array.from(input.files ?? []);
+        if (files.length === 0) return;
+        markDirty();
+        const key = box.dataset.multi;
+        for (const file of files) {
+          try {
+            const url = await uploadFile(file, key);
+            assetsState[key] = [...(assetsState[key] ?? []), url];
+          } catch (e) { console.error(e); }
+        }
+        queueSave({ assets: { ...assetsState } });
+        input.value = '';
+      });
+      box.querySelectorAll('.ed-multi-rm').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.rmIdx, 10);
+          const key = box.dataset.multi;
+          assetsState[key] = (assetsState[key] ?? []).filter((_, i) => i !== idx);
+          queueSave({ assets: { ...assetsState } });
+        });
+      });
+    });
+
+    // ── Dynamic lists: stats, links, press ────────────────────────
+    function readList(rootId, fields) {
+      const rows = document.querySelectorAll(`#${rootId} .ed-row`);
+      const out = [];
+      rows.forEach((row) => {
+        const obj = {};
+        fields.forEach((f) => {
+          const el = row.querySelector(`[data-${rootId.replace('-list','').replace('stats','stat').replace('links','link').replace('press','press')}="${f}"]`);
+          if (el) obj[f] = el.value;
+        });
+        if (Object.values(obj).some((v) => v)) out.push(obj);
+      });
+      return out;
+    }
+
+    function bindList(rootId, addBtnId, fieldKey, attrName, fields, templateFn) {
+      function refresh() {
+        const list = readList(rootId, fields);
+        queueSave({ [fieldKey]: list });
+      }
+      document.querySelectorAll(`#${rootId} input, #${rootId} select`).forEach((el) => {
+        el.addEventListener('input', refresh);
+        el.addEventListener('change', refresh);
+      });
+      document.querySelectorAll(`#${rootId} .ed-rm`).forEach((btn) => {
+        btn.addEventListener('click', () => { btn.closest('.ed-row').remove(); refresh(); });
+      });
+      document.getElementById(addBtnId).addEventListener('click', () => {
+        const wrap = document.createElement('div');
+        wrap.className = 'ed-row';
+        wrap.innerHTML = templateFn();
+        document.getElementById(rootId).appendChild(wrap);
+        wrap.querySelectorAll('input, select').forEach((el) => {
+          el.addEventListener('input', refresh);
+          el.addEventListener('change', refresh);
+        });
+        wrap.querySelector('.ed-rm').addEventListener('click', () => { wrap.remove(); refresh(); });
+      });
+    }
+    bindList('stats-list', 'add-stat', 'stats', 'stat', ['value', 'label'], () => `<input type="text" placeholder="Value (1.2M)" data-stat="value" class="ed-input ed-input--inline" /><input type="text" placeholder="Label (monthly listeners)" data-stat="label" class="ed-input ed-input--inline" /><button type="button" class="ed-rm">×</button>`);
+    bindList('links-list', 'add-link', 'links', 'link', ['platform', 'url'], () => {
+      const opts = ['spotify','soundcloud','youtube','apple_music','bandcamp','instagram','tiktok','website','booking','other'].map(p => `<option value="${p}">${p}</option>`).join('');
+      return `<select data-link="platform" class="ed-input ed-input--inline" style="max-width:140px;">${opts}</select><input type="url" placeholder="https://..." data-link="url" class="ed-input ed-input--inline" /><button type="button" class="ed-rm">×</button>`;
+    });
+    bindList('press-list', 'add-press', 'press', 'press', ['name', 'year'], () => `<input type="text" placeholder="Outlet (Mixmag)" data-press="name" class="ed-input ed-input--inline" /><input type="text" placeholder="Year" data-press="year" class="ed-input ed-input--inline" style="max-width:80px;" /><button type="button" class="ed-rm">×</button>`);
+
+    // ── Publish ───────────────────────────────────────────────────
+    document.getElementById('publish-btn')?.addEventListener('click', async function() {
+      this.disabled = true;
+      const old = this.textContent;
+      this.textContent = 'Opening checkout…';
+      // Flush any pending edits first
+      await flushSave();
+      try {
+        const r = await fetch(`/api/kits/${kitId}/publish`, { method: 'POST' });
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+        alert(data.error || 'Payment error.');
+      } catch { alert('Network error.'); }
+      this.disabled = false; this.textContent = old;
+    });
+  </script>
+</Dashboard>

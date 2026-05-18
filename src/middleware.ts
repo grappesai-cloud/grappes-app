@@ -24,6 +24,7 @@ const PUBLIC_PREFIXES = [
   '/assets/',
   '/_astro/',
   '/favicon',
+  '/kit/',  // published press kits — anyone with the slug can view
 ];
 
 function isPublic(path: string): boolean {

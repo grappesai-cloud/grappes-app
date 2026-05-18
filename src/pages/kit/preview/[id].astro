@@ -1,0 +1,20 @@
+---
+// Owner-only live preview of a press kit (used in the editor iframe).
+// No <Dashboard> chrome — full-page render of the template alone.
+
+import PressKitTemplate from '../../../components/PressKitTemplate.astro';
+import { createAdminClient } from '../../../lib/supabase';
+import type { PressKit } from '../../../lib/press-kit';
+
+const { id } = Astro.params;
+const authUser = Astro.locals.user!;
+const client = createAdminClient();
+const { data } = await client
+  .from('press_kits')
+  .select('*')
+  .eq('id', id!)
+  .eq('user_id', authUser.id)
+  .maybeSingle();
+if (!data) return Astro.redirect('/kits');
+---
+<PressKitTemplate kit={data as unknown as PressKit} />
