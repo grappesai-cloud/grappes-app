@@ -31,22 +31,26 @@ try {
 
 <Dashboard title="Projects">
   <style is:global>
-    html, body { overflow: hidden; height: 100%; }
+    /* Tighter top/bottom padding on the dashboard so cards breathe without going off-screen */
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+    @media (max-width: 768px) {
+      main { padding-top: 40px !important; padding-bottom: 60px !important; }
+    }
   </style>
-  <div style="text-align:center;margin-bottom:60px;">
-    <span style="display:inline-block;font-size:16px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#06bfdd;margin-bottom:14px;">Dashboard</span>
-    <h2 style="font-family:'Inter',sans-serif;font-size:72px;font-weight:400;line-height:1.1;letter-spacing:-0.08em;color:#fff;margin-bottom:14px;">Your Projects</h2>
-    <p style="font-size:20px;color:rgba(255,255,255,0.5);margin-bottom:32px;">
+  <div style="text-align:center;margin-bottom:36px;">
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#06bfdd;margin-bottom:10px;">Dashboard</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin-bottom:10px;">Your Projects</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:22px;">
       {totalCount} / {dbUser?.projects_limit ?? 1} <span>project(s) used</span>
     </p>
-    <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:10px;background:#06bfdd;color:#0a0a0a;border:none;border-radius:30px;padding:16px 32px;font-size:16px;font-weight:700;text-transform:uppercase;text-decoration:none;transition:all 0.3s;line-height:1;">
+    <a href="/dashboard/new" style="display:inline-flex;align-items:center;gap:8px;background:#06bfdd;color:#0a0a0a;border:none;border-radius:999px;padding:12px 24px;font-size:13.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;transition:all 0.3s;line-height:1;">
       <span>+ New Project</span>
-      <svg width="20" height="20" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
+      <svg width="16" height="16" viewBox="0 0 28 28" fill="none"><rect x="5.066" y="19.978" width="20.571" height="2.612" transform="rotate(-40.28 5.066 19.978)" fill="currentColor"/><rect x="7.971" y="7.245" width="2.612" height="2.612" transform="rotate(-40.28 7.971 7.245)" fill="currentColor"/><rect x="11.652" y="7.548" width="2.612" height="2.612" transform="rotate(-40.28 11.652 7.548)" fill="currentColor"/><rect x="15.334" y="7.852" width="2.612" height="2.612" transform="rotate(-40.28 15.334 7.852)" fill="currentColor"/><rect x="18.712" y="11.837" width="2.612" height="2.612" transform="rotate(-40.28 18.712 11.837)" fill="currentColor"/><rect x="18.408" y="15.52" width="2.612" height="2.612" transform="rotate(-40.28 18.408 15.52)" fill="currentColor"/><rect x="18.104" y="19.201" width="2.612" height="2.612" transform="rotate(-40.28 18.104 19.201)" fill="currentColor"/></svg>
     </a>
   </div>
 
   {projects.length > 0 && (
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,340px);gap:28px;justify-content:center;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,260px));gap:18px;justify-content:center;">
       {projects.map(p => <ProjectCard project={p} />)}
     </div>
   )}

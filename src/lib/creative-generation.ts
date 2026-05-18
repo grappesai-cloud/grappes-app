@@ -44,8 +44,8 @@ export const CREATIVE_SYSTEM_PROMPT = `You are an elite creative director and fr
 
 Single self-contained HTML file. Everything inline:
 - CSS in <style>, JS in <script>
-- GSAP 3.12 + ScrollTrigger + ScrollToPlugin (CDN: https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/)
-- Lenis smooth scroll (CDN: https://unpkg.com/lenis@1.1.18/dist/lenis.min.js)
+- GSAP 3.12 core only (CDN: https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js) — for hover, click, load-in, and timeline animations
+- NO smooth-scroll libraries. NO ScrollTrigger. NO Lenis. Native browser scroll only.
 - Google Fonts (2-3 families max, with preconnect)
 - Images: only use assets the client has uploaded (provided in "Uploaded Assets"). Never fetch from Unsplash, Pexels, or any stock photo service. If the client has no uploaded image for a section, do NOT insert a placeholder — design that section with typography, color, geometric CSS shapes, gradients, or canvas instead. If brief has media.no_photos=true, use ZERO <img> tags anywhere and build the entire experience with typography and CSS.
 
@@ -63,7 +63,7 @@ Before you write code, make three decisions:
 
 - Typography: clamp() fluid sizing, weight contrast, letter-spacing. Type alone should be beautiful.
 - Whitespace: generous. Nothing cramped.
-- Animation: dramatic, not subtle. If a visitor can't tell something was animated, you failed.
+- Animation: dramatic, not subtle, but NEVER scroll-driven. Animations live on load, hover, click, focus, timer, or intersection-observer one-shot reveals. No parallax. No scroll-scrubbed transforms. No pinned sections. No sticky-scroll choreography. The page scrolls natively — animations happen at moments in time, not as a function of scrollY.
 - Responsive: 1024/768/480px breakpoints. Mobile is first-class.
 - Color: derived from brand, never from defaults.
 
@@ -79,7 +79,7 @@ For every animation and interaction you add, ask: "Could this exist on ANY other
 
 A ceramics studio might have elements that crack and reform like clay. An electric company might have current flowing between elements. A fashion designer might have fabric-like physics on hover. The interaction IS the brand — not decoration on top of it.
 
-Use the full power of GSAP, ScrollTrigger, canvas, clip-path, CSS transforms — but in service of THIS brand's story, not as generic effects.
+Use the full power of GSAP, canvas, clip-path, CSS transforms, CSS animations, and intersection-observer reveals — but in service of THIS brand's story, not as generic effects. Do NOT use ScrollTrigger, scroll-scrubbed timelines, parallax, or any scroll-driven motion.
 
 ## Pre-built effects (available — use ONLY if one genuinely fits this brand's concept)
 
@@ -88,7 +88,6 @@ These runtime functions are auto-injected if you call them. Using zero is fine �
 - window.__textPressure(el, { text, minWeight, maxWeight, radius }) — characters respond to mouse proximity via font-variation-settings (needs variable font)
 - window.__variableProximity(el, { text, fromSettings, toSettings, radius, falloff }) — characters interpolate between font states on hover
 - window.__curvedLoop(el, { text, speed, curveAmount, direction }) — text follows a Bézier curve, loops as marquee
-- window.__scrollStack(container, { cardSelector, scaleStep, rotateStep, blurStep }) — cards stack/overlap as user scrolls (container needs height ~300vh)
 - window.__pillNav(navEl, { pillColor, pillTextColor }) — morphing pill indicator slides between nav links
 - window.__flowingMenu(ul, { speed, marqueeBg, marqueeColor, itemHeight }) — full-width menu items with marquee overlay on hover
 - window.__invertCorners(el, { tl, tr, bl, br }) — clip-path with concave (inverted) corners, responsive
@@ -99,7 +98,7 @@ These runtime functions are auto-injected if you call them. Using zero is fine �
 - One <h1>. All <img> with alt. <html lang>.
 - Wrap content areas: <!-- SECTION:name --> <div data-section="name">...</div> <!-- /SECTION:name -->
 - Mobile hamburger. @media (prefers-reduced-motion: reduce). Plain JS only.
-- Connect Lenis: lenis.on('scroll', ScrollTrigger.update)
+- Anchor navigation uses native CSS smooth scroll (html { scroll-behavior: smooth }) — do NOT load Lenis or any smooth-scroll JS library.
 - For icons use inline SVGs or Unicode — no external icon library needed.
 - Sections must not visually bleed into each other by accident. If you use position:absolute or oversized elements, ensure they stay within their section's bounds (overflow:hidden or clip). Intentional overlap between sections is fine — accidental overlap is a bug.
 
@@ -129,7 +128,9 @@ Layout bans:
 - Footer with 3-4 equal columns of links — make it minimal or integrate it into the experience
 
 Animation bans:
-- fadeIn from bottom as the ONLY scroll animation — pair with scale, clip-path, rotation, or position shift
+- ANY scroll-driven animation (parallax, scroll-scrubbed transforms, pinned/sticky scroll choreography, scroll-linked counters, ScrollTrigger anything) — pages scroll natively, motion lives on load/hover/click/timer/IO-reveal
+- Smooth-scroll libraries (Lenis, Locomotive, smooth-scrollbar) — native browser scroll only
+- fadeIn from bottom as the ONLY on-load/IO reveal — pair with scale, clip-path, rotation, or position shift
 - All elements animating identically — stagger timing, vary easing, make each reveal unique
 - Generic hover: scale(1.05) + box-shadow — create hover states that relate to the content
 
@@ -145,6 +146,7 @@ Think: "What would a creative agency with a $50K budget design?" Not three cards
 - Output ONLY the complete HTML. No explanation.
 - Every word of copy: specific to THIS brand. No generic text.
 - Be bold. Make something that stops the scroll.
+- NEVER use em dashes (—) or en dashes (–) in ANY user-visible copy: headlines, body text, taglines, nav labels, buttons, alt text, captions, footer. Use commas, periods, colons, or a new sentence instead. Zero exceptions. This rule overrides any stylistic instinct you have toward em-dashes.
 - NEVER FABRICATE REAL-WORLD ARTIFACTS: do not invent track titles, album names, book titles, product SKUs, case-study client names, project names, award names, press outlet names, or any other "thing" that would exist as a real product/release in the world. Only mention these if they are explicitly in the brief (or marked [EXACT]). Inventing them feels like a lie when the visitor recognizes them as fake — and they will. For density around real assets (audio embeds, links, images), use the artist's voice/quotes/tagline/dates from the brief instead.`;
 
 // ─── Reference Pool ──────────────────────────────────────────────────────────
@@ -162,14 +164,14 @@ Think: "What would a creative agency with a $50K budget design?" Not three cards
 const CREATIVE_ANCHORS = [
   { name: 'Brutalist Typography', directive: 'Oversized type (120px+) as architectural elements. Raw, confrontational layouts. Heavy sans-serifs. Content bleeds edge-to-edge. Visible grid lines. Anti-decoration.' },
   { name: 'Editorial Magazine', directive: 'Think Kinfolk/Cereal magazine. Extreme whitespace. Serif headlines with wide letter-spacing. Asymmetric photo-text compositions. Pull quotes as design anchors. Elegant restraint.' },
-  { name: 'Cinematic Scroll', directive: 'Full-viewport sections. Each scroll position is a scene change. Dramatic scale transitions. Parallax at 3+ depth layers. Letterbox framing. Slow, deliberate reveals.' },
+  { name: 'Cinematic Static', directive: 'Full-viewport sections, each a self-contained scene. Dramatic scale contrasts within sections. Letterbox framing. Slow, deliberate on-load reveals. Each section paints itself when it enters the viewport — no parallax, no scrub.' },
   { name: 'Swiss Precision', directive: 'Strict grid. Helvetica or geometric sans. Mathematical spacing ratios. Monochrome + one accent color. Clean, authoritative, timeless. Information hierarchy through scale alone.' },
-  { name: 'Organic Flow', directive: 'No straight lines or sharp corners. Border-radius everywhere. Blob shapes as dividers. Gentle wave animations. Colors shift like a sunset as you scroll. Soft, alive, natural.' },
+  { name: 'Organic Flow', directive: 'No straight lines or sharp corners. Border-radius everywhere. Blob shapes as dividers. Gentle ambient CSS wave animations that loop continuously (not scroll-driven). Sunset-like color palette. Soft, alive, natural.' },
   { name: 'Deconstructed Grid', directive: 'Break the grid intentionally. Overlapping elements. Text running off-screen. Images at unexpected angles. Controlled chaos that still reads clearly.' },
   { name: 'Monochrome Luxury', directive: 'Pure black and white (or one deep color + white). No gradients. Contrast through scale — whisper-small labels next to billboard headlines. Extreme restraint = extreme sophistication.' },
-  { name: 'Dimensional Layers', directive: 'Z-axis depth: background texture layer, middle content layer, foreground floating elements. Scroll reveals layers at different speeds. Sticky elements create parallax depth.' },
-  { name: 'Type as Image', directive: 'Typography IS the visual. Oversized letters as backgrounds. Text clipped to reveal images. Character-level scroll animations. Variable font weight responding to scroll. Words ARE the design.' },
-  { name: 'Horizontal Journey', directive: 'At least one section uses horizontal scroll. Content moves left-to-right like a timeline or film strip. Vertical sections bookend the horizontal moment. Memorable rhythm break.' },
+  { name: 'Dimensional Layers', directive: 'Z-axis depth through static layering: background texture layer, middle content layer, foreground floating elements. Depth comes from blur, opacity, and scale — not from scroll speed differentials. No parallax.' },
+  { name: 'Type as Image', directive: 'Typography IS the visual. Oversized letters as backgrounds. Text clipped to reveal images. Character-level entrance staggers on load/intersection. Variable font weight responding to hover/cursor proximity. Words ARE the design.' },
+  { name: 'Editorial Snap', directive: 'Each section is a magazine spread that snaps into place when scrolled to (scroll-snap-type CSS only — no JS scroll choreography). Distinct typographic personalities per section. Rhythm through contrast, not through scroll motion.' },
 ];
 
 function pickCreativeAnchor(): { name: string; directive: string } {
@@ -204,7 +206,7 @@ export function buildUserPrompt(
     pl: 'Polish', hu: 'Hungarian',
   };
   const siteLangLabel = localeNames[siteLocale] || siteLocale;
-  const languageDirective = `\n## Language — MANDATORY\nWrite ALL visible copy on the site (headlines, body text, nav labels, buttons, form placeholders, alt text, footer) in ${siteLangLabel}. The ONLY exceptions are: proper nouns, brand names, and any text marked [EXACT] in the sacred-content block — those stay verbatim. Do NOT mix languages.\n`;
+  const languageDirective = `\n## Language — MANDATORY (CRITICAL)\n\nThe site must be 100% in ${siteLangLabel}. Set <html lang="${siteLocale}">.\n\nWrite EVERY visible word in ${siteLangLabel}:\n- Headlines, sub-headlines, body paragraphs\n- Nav links (e.g. for Romanian: "Despre" not "About", "Servicii" not "Services", "Contact" stays "Contact")\n- All buttons / CTAs (e.g. for Romanian: "Trimite", "Programează", "Vezi mai mult"; NOT "Send", "Book", "See more")\n- Form labels and placeholders (e.g. "Numele tău" not "Your name")\n- Footer copy, legal links, copyright lines\n- Image alt text\n- Meta title and meta description\n- Section titles (e.g. "Mărturii" not "Testimonials")\n- Any tag, badge, pill, or microcopy\n\nExceptions (these stay in the original language):\n- Proper nouns and brand names\n- Text marked [EXACT] in the sacred-content block (use verbatim)\n- The user's own quoted words from their brief (use verbatim)\n- Technical IDs / class names / data-attributes (not visible to users)\n\nIf the brief JSON contains English text but the site language is ${siteLangLabel}, TRANSLATE it. The brief is data — you translate it into copy. Do NOT echo English fragments from the brief into ${siteLangLabel} sites or vice versa.\n\nIf Opus's creative plan contains a phrase in a language other than ${siteLangLabel}, IGNORE that specific wording and rewrite it in ${siteLangLabel}.\n\nBefore you finalize the HTML, scan your own output: every visible English word in a non-English site (or vice versa) is a bug. Zero tolerance for mixed-language pages.\n`;
 
   // Build asset lines for the prompt.
   // Split into BRAND assets (logo, og — always included even in no-photos mode)
@@ -412,7 +414,7 @@ CRITICAL — DO NOT INVENT TRACKS: Render ONLY the embeds in the URL list above 
   // Hero video flag (separate from media.videoUrl which is an actual asset)
   const heroVideoFlag = brief?.media?.hero_video === true;
   const heroVideoBlock = heroVideoFlag && allVideos.length === 0
-    ? `Hero video intent: client wants a cinematic/motion-driven hero. If no video asset is uploaded, build the hero with dramatic motion — large animated typography, CSS/canvas motion, scroll-driven transforms. Convey "video-like" energy with code.`
+    ? `Hero video intent: client wants a cinematic/motion-driven hero. If no video asset is uploaded, build the hero with dramatic on-load motion — large animated typography, CSS keyframe loops, canvas animation, cursor-reactive transforms. Convey "video-like" energy with code. No scroll-driven motion.`
     : '';
 
   // Integration hints — so Sonnet doesn't hardcode booking iframes we inject later
@@ -500,7 +502,34 @@ export function extractHtml(response: string): string {
   // GSAP / Webflow IX2 / inline animations that need 'unsafe-eval'.
   html = stripCspMeta(html);
 
+  html = stripEmDashesInHtml(html);
+
   return html.trim();
+}
+
+/**
+ * Replace em (—) and en (–) dashes in user-visible text with commas.
+ * Safe to apply globally: these characters essentially never appear in HTML
+ * syntax (tag names, attribute names, URLs). We skip <script> and <style>
+ * blocks defensively in case a developer used them in a comment.
+ */
+export function stripEmDashesInHtml(html: string): string {
+  // Protect <script> and <style> contents from substitution
+  const placeholders: string[] = [];
+  let masked = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, (m) => {
+    placeholders.push(m);
+    return ` DASH_PLACEHOLDER_${placeholders.length - 1} `;
+  });
+
+  // " — " / "—" / " – " / "–" → ", " (and cleanup of doubled punctuation)
+  masked = masked
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+,/g, ',')
+    .replace(/,(\s*[.!?:;])/g, '$1');
+
+  // Restore protected blocks
+  return masked.replace(/ DASH_PLACEHOLDER_(\d+) /g, (_m, i) => placeholders[Number(i)]);
 }
 
 /**
@@ -856,35 +885,44 @@ Your plan must include:
 
 5. THE TYPOGRAPHY — Font choices with reasoning. Scale relationships. Specify exact clamp() values.
 
-6. THE COLOR — Hex codes. Where each appears. How color shifts through the scroll journey.
+6. THE COLOR — Hex codes. Where each appears. How color contrasts across sections (static palette per section — no scroll-driven color shifts).
 
-7. THE LAYOUT CHOREOGRAPHY — How sections transition into each other. Not "fade in" — describe the spatial relationship. Does content overlap? Do images bleed into the next section? Is there a horizontal scroll moment? Does the grid break intentionally?
+7. THE LAYOUT CHOREOGRAPHY — How sections compose visually. Not "fade in" — describe the spatial relationship. Does content overlap? Do images bleed into the next section? Does the grid break intentionally? Sections are STATIC compositions — no horizontal-scroll sections, no scroll-pinned sequences.
+
+## Animation constraint — CRITICAL
+
+The developer will NOT load Lenis, ScrollTrigger, or any smooth-scroll library. The page uses native browser scroll. ALL motion you specify must be:
+- on load / on intersection (one-shot reveal when section enters viewport)
+- on hover / focus / click
+- continuous CSS or canvas loops (independent of scrollY)
+- cursor-reactive
+
+NEVER specify: parallax, scroll-scrubbed timelines, pinned sections, scroll-driven zooms/wipes/transforms, horizontal-scroll sections, sticky-scroll choreography, scroll-linked counters, or anything that uses scrollY as an input. If you catch yourself writing "as the user scrolls…" → rephrase it as "when this section enters the viewport" or "on hover."
 
 ## Your creative vocabulary (techniques to draw from — pick what serves the brand)
 
 You know these techniques exist. Use them as ingredients, not as a checklist:
-- Scroll-driven reveals: clip-path morphing, scale transitions, parallax layers at different speeds (scrub: true)
-- Text as architecture: split text with per-character stagger, text that reveals on scroll, oversized type as background texture, text clipping over images
-- Image as experience: full-viewport images with scroll-driven zoom, image sequences, reveal masks (circular wipe, diagonal clip, scale-from-center), images that parallax against text
-- Spatial depth: z-index layering where text floats over images over backgrounds, elements that move at different scroll speeds creating depth
-- Rhythm breakers: one section that breaks the vertical flow — horizontal scroll, a fullscreen takeover, a canvas moment, an unexpected layout shift
+- IO reveals: clip-path morphing, scale transitions, masked entrances — fired ONCE when a section intersects the viewport (no scrub)
+- Text as architecture: split text with per-character stagger on load/IO, oversized type as background texture, text clipping over images, cursor-reactive variable-font weight
+- Image as experience: full-viewport images with on-load zoom-in or hover-zoom, image sequences triggered on hover/click, reveal masks (circular wipe, diagonal clip, scale-from-center) on IO
+- Spatial depth: z-index layering where text floats over images over backgrounds — depth via blur, opacity, scale (NOT via scroll-speed differential)
+- Rhythm breakers: one section that breaks the vertical flow — a canvas moment, a fullscreen takeover, an unexpected layout shift (NOT horizontal scroll)
 - Micro-interactions: hover states that transform elements meaningfully (not just color change), cursor-aware elements, click reveals
 - Transition zones: the space BETWEEN sections is design — overlapping elements, gradient bleeds, shared visual elements that bridge sections
 
 Pre-built effects available to the developer (use only if one genuinely fits):
 - __textPressure: characters respond to mouse proximity with font weight changes (variable fonts)
 - __curvedLoop: text on a Bézier curve, loops as marquee
-- __scrollStack: cards stack on scroll with scale/rotate/blur
 - __flowingMenu: full-width menu items with marquee overlay on hover
 - __invertCorners: elements with concave clip-path corners
 
 Rules:
-- Think in MOMENTS and TRANSITIONS, not in sections
+- Think in MOMENTS, not in scroll positions
 - Every choice must serve THIS specific brand
 - For every interaction you describe, ask: "Could this exist on any other website?" If yes, it's not creative enough. Every animation must be BORN from the brand's identity — not applied on top of it.
-- A honey brand might have golden viscous drips. A blacksmith might have sparks that follow the cursor. A transport platform might have routes drawing themselves. The interaction IS the brand.
-- Be specific enough that there is zero ambiguity — describe exact CSS properties, exact GSAP parameters, exact scroll positions where things happen
-- Write in English`,
+- A honey brand might have golden viscous drips on hover. A blacksmith might have sparks that follow the cursor. A transport platform might have routes drawing themselves on load. The interaction IS the brand.
+- Be specific enough that there is zero ambiguity — describe exact CSS properties, exact GSAP parameters, exact triggers (load / hover / IO / click)
+- LANGUAGE LOCK: Write the WHOLE plan in the user-specified site language (see "Language:" in the user message). All copy you propose — headlines, taglines, section names, CTA text, button labels, microcopy, hero text — must be in that language. Structural/technical terminology (CSS property names, GSAP plugin names, color hex codes, sizes) stays in English; but every word a visitor would read must be in the target language. If the language is Romanian, write "Despre" not "About"; "Trimite" not "Send"; "Servicii" not "Services". Mixing languages is a critical failure — Sonnet copies your headlines verbatim into the site, so anything you write in the wrong language ends up on the live site.`,
       messages: [{
         role: 'user',
         content: `Create the creative plan for:
@@ -914,7 +952,7 @@ ${anchor.name} — ${anchor.directive}
 
 MANDATORY — include these two things in your plan:
 
-1. THE IMPOSSIBLE MOMENT: Describe ONE technical interaction that makes visitors think "how did they do that?" Something bespoke to THIS brand — a canvas animation, a physics simulation, a scroll-driven transformation, a cursor effect that changes the page. Not a generic GSAP fade. Something a developer would screenshot and share.
+1. THE IMPOSSIBLE MOMENT: Describe ONE technical interaction that makes visitors think "how did they do that?" Something bespoke to THIS brand — a canvas animation, a physics simulation, a cursor effect that changes the page, a hover that morphs an entire section, an on-load typographic choreography. NOT scroll-driven. Not a generic GSAP fade. Something a developer would screenshot and share.
 
 2. IMAGES AS EXPERIENCE (if photos allowed): Every image must be full-bleed, edge-to-edge, or overlapping with text. NEVER an image inside a box/card. Specify exact CSS: "background-size: cover; mix-blend-mode: multiply" or "position: absolute; width: 120vw; clip-path: polygon(...)". Images ARE the page, not decoration ON the page.
 
@@ -940,7 +978,7 @@ ${rawConversation}` : ''}`
       const r2 = await createMessage({
         model: OPUS_MODEL,
         max_tokens: 4000,
-        system: 'You are an elite creative director for immersive digital experiences. Write a DETAILED creative plan: concept, signature interactions (unique to THIS brand — no grain/noise, no mix-blend-mode cursor, no diagonal wipe, no text-stroke outlines), typography with exact clamp() values, color hex codes, layout choreography describing how sections transition. Think in moments and transitions, not sections. Be specific enough for a developer to build exactly your vision. Write in English.',
+        system: `You are an elite creative director for immersive digital experiences. Write a DETAILED creative plan: concept, signature interactions (unique to THIS brand — no grain/noise, no mix-blend-mode cursor, no diagonal wipe, no text-stroke outlines), typography with exact clamp() values, color hex codes, layout choreography describing how sections transition. Think in moments and transitions, not sections. Be specific enough for a developer to build exactly your vision. LANGUAGE LOCK: every word of proposed copy (headlines, taglines, section names, CTA labels, microcopy) MUST be in the site language given in the user message (Language: ${lang}). Sonnet copies your copy verbatim into the site — mixing languages is a critical failure.`,
         messages: [{ role: 'user', content: `Creative plan for "${businessName}" — ${industry}.\n${description}\nStyle: ${style || 'surprise me — make it unforgettable'}. Complexity: ${complexity}. Language: ${lang}.\n${entityType ? 'Entity: ' + (entityType === 'person' ? 'personal brand (first-person voice)' : 'organization (we/team voice)') : ''}\n${primaryGoal ? 'Primary goal: ' + primaryGoal : ''}\n${voiceTraits ? 'Voice: ' + voiceTraits : ''}\nCreative anchor: ${anchor.name} — ${anchor.directive}\n\nFull brief:\n${briefJson}${rawConversation ? '\n\nClient words:\n' + rawConversation : ''}` }],
       });
       const raw = r2.content[0]?.type === 'text' ? r2.content[0].text : '';
@@ -1105,16 +1143,16 @@ export async function grammarCheckHtml(params: {
   const response = await createMessage({
     model: HAIKU_MODEL,
     max_tokens: 2000,
-    system: `You are a ${langLabel} language proofreader. You receive text segments extracted from a website and return ONLY the corrections needed. Output a JSON array of objects: [{"from":"incorrect text","to":"corrected text"}]. If no corrections needed, output []. Rules:
-- Fix spelling, diacritics, grammar, and punctuation errors
-- Fix incorrect ${langLabel} word forms, agreements, prepositions
-- Do NOT change meaning, style, or sentence structure
-- Do NOT translate — keep the original language
-- Only include segments that actually need correction
-- Output ONLY the JSON array, nothing else`,
+    system: `You are a ${langLabel} language editor for a website. The site MUST be entirely in ${langLabel}. You receive text segments and return ONLY the corrections needed. Output a JSON array of objects: [{"from":"original text","to":"corrected text"}]. If no corrections needed, output []. Rules:
+- TRANSLATE any segment that is not in ${langLabel} into ${langLabel}. This includes nav labels, buttons, headlines, body text — anything visible. The site language is ${langLabel} and stray ${langLabel === 'English' ? 'foreign' : 'English'} or other-language words are bugs to fix.
+- EXCEPTIONS that stay untouched: proper nouns, brand names, person names, place names, product/release titles, URLs/emails, social media handles, technical/code-like tokens.
+- Fix spelling, diacritics, grammar, agreements, prepositions in ${langLabel} text.
+- Do NOT change meaning, design choices, or sentence structure of correctly-${langLabel} text.
+- Only include segments that actually need correction or translation.
+- Output ONLY the JSON array, nothing else.`,
     messages: [{
       role: 'user',
-      content: `Check these ${langLabel} text segments for errors:\n\n${textSegments.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`,
+      content: `Site language: ${langLabel}. Check these segments — translate any that are not in ${langLabel} (except proper nouns/brand names), and fix any ${langLabel} grammar/spelling errors:\n\n${textSegments.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`,
     }],
   });
 
