@@ -1,0 +1,152 @@
+---
+interface Props {
+  name: string;
+  tagline: string;
+  href: string;
+  icon: string;
+  meter?: string;        // e.g. "5 / 999999 projects" or "0 credits"
+  cta?: string;          // CTA label, default "Open"
+  accent?: string;       // accent color (CSS color)
+  comingSoon?: boolean;
+  isNew?: boolean;
+}
+
+const {
+  name,
+  tagline,
+  href,
+  icon,
+  meter,
+  cta = 'Open',
+  accent = '#06bfdd',
+  comingSoon = false,
+  isNew = false,
+} = Astro.props;
+
+const Tag = comingSoon ? 'div' : 'a';
+---
+
+<Tag
+  {...(comingSoon ? {} : { href })}
+  class={`pt-card${comingSoon ? ' pt-card--soon' : ''}`}
+  style={`--pt-accent:${accent};`}
+>
+  <div class="pt-head">
+    <div class="pt-icon" set:html={icon}></div>
+    {isNew && <span class="pt-badge">New</span>}
+    {comingSoon && <span class="pt-badge pt-badge--soon">Soon</span>}
+  </div>
+
+  <div class="pt-body">
+    <h3 class="pt-name">{name}</h3>
+    <p class="pt-tagline">{tagline}</p>
+  </div>
+
+  <div class="pt-foot">
+    {meter && <span class="pt-meter">{meter}</span>}
+    {!comingSoon && (
+      <span class="pt-cta">
+        <span>{cta}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </span>
+    )}
+  </div>
+</Tag>
+
+<style>
+  .pt-card {
+    display: flex; flex-direction: column;
+    min-height: 220px;
+    padding: 22px 22px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 18px;
+    text-decoration: none;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.25s cubic-bezier(0.16,1,0.3,1),
+                border-color 0.25s ease,
+                background 0.25s ease,
+                box-shadow 0.25s ease;
+  }
+  .pt-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 100% 0%, var(--pt-accent), transparent 55%);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .pt-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 18px 40px -16px rgba(0,0,0,0.5);
+  }
+  .pt-card:hover::before { opacity: 0.12; }
+  .pt-card--soon {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .pt-card--soon:hover { transform: none; box-shadow: none; }
+  .pt-card--soon::before { display: none; }
+
+  .pt-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .pt-icon {
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--pt-accent) 14%, transparent);
+    color: var(--pt-accent);
+  }
+  .pt-card--soon .pt-icon {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.4);
+  }
+  :global(.pt-icon svg) { width: 20px; height: 20px; }
+
+  .pt-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 3px 8px; border-radius: 999px;
+    background: var(--pt-accent); color: #0a0a0a;
+  }
+  .pt-badge--soon {
+    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
+  }
+
+  .pt-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  .pt-name {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 19px; font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0;
+  }
+  .pt-tagline {
+    font-size: 13px; line-height: 1.45;
+    color: rgba(255,255,255,0.55);
+    margin: 0;
+  }
+
+  .pt-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .pt-meter {
+    font-size: 11.5px; font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.01em;
+  }
+  .pt-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600;
+    color: var(--pt-accent);
+    margin-left: auto;
+    transition: transform 0.2s ease;
+  }
+  .pt-card:hover .pt-cta { transform: translateX(2px); }
+</style>
