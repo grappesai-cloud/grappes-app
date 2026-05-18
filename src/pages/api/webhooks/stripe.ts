@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { createAdminClient } from '../../../lib/supabase';
 import { db } from '../../../lib/db';
 import { EXTRA_PACK_EDITS } from '../../../lib/edit-quota';
-import { sendPaymentConfirmedEmail, sendReferralEarnedEmail, sendReferralPayoutAlert, sendSubscriptionCancelledEmail, sendDomainPurchaseFailedEmail } from '../../../lib/resend';
+import { sendPaymentConfirmedEmail, sendReferralEarnedEmail, sendReferralPayoutAlert, sendSubscriptionCancelledEmail, sendDomainPurchaseFailedEmail, sendKitPublishedEmail } from '../../../lib/resend';
 import { processReferralReward } from '../../../lib/referral';
 import { getExpiresAt, getFreeExpiresAt, type SiteBillingType } from '../../../lib/site-billing';
 import { purchaseDomainAndAttach } from '../../../lib/domain-purchase';
@@ -71,6 +71,20 @@ export const POST: APIRoute = async ({ request }) => {
           const REEL_PACK_SIZE = 10;
           const { data: newTotal } = await client.rpc('increment_reel_credits', { p_user_id: userId, p_amount: REEL_PACK_SIZE });
           console.log(`[Stripe webhook] +${REEL_PACK_SIZE} reel credits credited to user ${userId} (new total: ${newTotal})`);
+          try {
+            const { data: userRow } = await client.from('users').select('email').eq('id', userId).single();
+            if (userRow?.email) {
+              await sendPaymentConfirmedEmail({
+                to: userRow.email,
+                productName: 'Reels Lab',
+                amountAdded: REEL_PACK_SIZE,
+                unitLabel: 'credits',
+                newBalance: newTotal ?? 0,
+                ctaUrl: 'https://grappes.dev/reels',
+                ctaLabel: 'Open Reels Lab →',
+              });
+            }
+          } catch (emailErr) { console.error('[Stripe webhook] reel-credits email failed:', emailErr); }
           break;
         }
 
@@ -80,6 +94,20 @@ export const POST: APIRoute = async ({ request }) => {
           const AUDIT_PACK_SIZE = 10;
           const { data: newTotal } = await client.rpc('increment_audit_credits', { p_user_id: userId, p_amount: AUDIT_PACK_SIZE });
           console.log(`[Stripe webhook] +${AUDIT_PACK_SIZE} audit credits credited to user ${userId} (new total: ${newTotal})`);
+          try {
+            const { data: userRow } = await client.from('users').select('email').eq('id', userId).single();
+            if (userRow?.email) {
+              await sendPaymentConfirmedEmail({
+                to: userRow.email,
+                productName: 'Audit Lab',
+                amountAdded: AUDIT_PACK_SIZE,
+                unitLabel: 'audits',
+                newBalance: newTotal ?? 0,
+                ctaUrl: 'https://grappes.dev/audit',
+                ctaLabel: 'Run an audit →',
+              });
+            }
+          } catch (emailErr) { console.error('[Stripe webhook] audit-credits email failed:', emailErr); }
           break;
         }
 
@@ -103,6 +131,20 @@ export const POST: APIRoute = async ({ request }) => {
             updated_at: new Date().toISOString(),
           }).eq('id', kitId);
           console.log(`[Stripe webhook] kit ${kitId} published with slug ${slug}`);
+
+          try {
+            const { data: kitRow } = await client.from('press_kits').select('name, user_id').eq('id', kitId).single();
+            if (kitRow?.user_id) {
+              const { data: userRow } = await client.from('users').select('email').eq('id', kitRow.user_id).single();
+              if (userRow?.email) {
+                await sendKitPublishedEmail({
+                  to: userRow.email,
+                  kitName: kitRow.name ?? 'Your press kit',
+                  publicUrl: `https://grappes.dev/kit/${slug}`,
+                });
+              }
+            }
+          } catch (emailErr) { console.error('[Stripe webhook] kit-published email failed:', emailErr); }
           break;
         }
 
@@ -122,8 +164,11 @@ export const POST: APIRoute = async ({ request }) => {
             if (userRow?.email) {
               await sendPaymentConfirmedEmail({
                 to: userRow.email,
-                editsAdded: EXTRA_PACK_EDITS,
-                totalExtra: newTotal ?? 0,
+                productName: 'AI edits',
+                amountAdded: EXTRA_PACK_EDITS,
+                unitLabel: 'edits',
+                newBalance: newTotal ?? 0,
+                ctaLabel: 'Continue editing →',
               });
             }
           } catch (emailErr) {

@@ -97,6 +97,18 @@ export const auth = betterAuth({
           } catch (err) {
             console.warn('[auth] post-create referral hook failed:', err);
           }
+
+          // 3) Welcome email — fire-and-forget so a Resend hiccup never blocks signup.
+          try {
+            const { sendWelcomeEmail } = await import('./resend');
+            await sendWelcomeEmail({
+              to: createdUser.email,
+              name: createdUser.name ?? undefined,
+              userId: createdUser.id,
+            });
+          } catch (err) {
+            console.warn('[auth] welcome email failed:', err);
+          }
         },
       },
     },
