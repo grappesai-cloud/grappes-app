@@ -550,6 +550,26 @@ export async function sendPaymentConfirmedEmail(params: {
 /**
  * Transactional email when a user's password is changed.
  */
+export async function sendPasswordResetEmail(params: {
+  to: string;
+  resetUrl: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const html = wrapEmail('Reset your password', `
+    <p style="margin:0 0 24px;">Click the button below to reset your Grappes account password. This link expires in 1 hour.</p>
+    ${emailBtn(params.resetUrl, 'Reset password →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#666;">If you didn't request this, you can safely ignore this email.</p>
+  `);
+
+  const text = `Reset your password\n\nClick the link below to reset your Grappes account password (expires in 1 hour):\n\n${params.resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: 'Reset your Grappes password',
+    html,
+    text,
+  });
+}
+
 export async function sendPasswordChangedEmail(params: {
   to: string;
 }): Promise<{ success: boolean; id?: string; error?: string }> {

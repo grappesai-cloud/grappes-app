@@ -1,7 +1,7 @@
-// ─── ZIP extraction → Supabase assets ───────────────────────────────────────
-// Streams a zip from Supabase Storage, extracts each image entry, runs it
-// through the standard sharp → WebP pipeline, then uploads the result back
-// to Storage and inserts a row in `assets`.
+// ─── ZIP extraction → Vercel Blob assets ────────────────────────────────────
+// Streams a zip from Vercel Blob, extracts each image entry, runs it through
+// the standard sharp → WebP pipeline, then uploads the result back to Blob
+// and inserts a row in `assets`.
 //
 // Auto-tagging by subfolder convention:
 //   /logo/* → AssetType "logo"
@@ -15,11 +15,10 @@
 import yauzl from 'yauzl';
 import sharp from 'sharp';
 import type { Readable } from 'node:stream';
+import { put as blobPut, del as blobDel } from '@vercel/blob';
 import { db } from './db';
-import { createAdminClient } from './supabase';
 import type { AssetType } from './db';
 
-const BUCKET = 'assets';
 const MAX_ENTRIES   = 100;                  // hard cap on files extracted from one zip
 const MAX_PER_FILE  = 30 * 1024 * 1024;     // 30MB per individual file inside zip
 const MAX_TOTAL     = 250 * 1024 * 1024;    // 250MB total uncompressed
@@ -36,7 +35,7 @@ interface ExtractResult {
 
 interface ExtractOpts {
   projectId:    string;
-  zipPath:      string;             // storage path of the uploaded zip
+  zipPath:      string;             // blob pathname of the uploaded zip
   zipPublicUrl: string;
   defaultType:  AssetType;
 }
@@ -50,7 +49,6 @@ function classifyEntry(entryPath: string, defaultType: AssetType): { type: Asset
     return { type: defaultType };
   }
 
-  // /logo/, /logos/
   if (parts.some(p => p === 'logo' || p === 'logos')) return { type: 'logo' };
   if (parts.some(p => p === 'hero' || p === 'heroes' || p === 'header')) return { type: 'hero' };
   if (parts.some(p => p === 'og' || p === 'social' || p === 'share')) return { type: 'og' };
@@ -97,13 +95,12 @@ function streamToBuffer(stream: Readable, maxBytes: number): Promise<Buffer> {
 }
 
 export async function extractZipAssets(opts: ExtractOpts): Promise<ExtractResult> {
-  const { projectId, zipPath, defaultType } = opts;
-  const supabase = createAdminClient();
+  const { projectId, zipPublicUrl, defaultType } = opts;
 
-  // Download the zip to a buffer (we already validated max size at sign-upload).
-  const { data: blob, error: dlErr } = await supabase.storage.from(BUCKET).download(zipPath);
-  if (dlErr || !blob) throw new Error(`Failed to download zip: ${dlErr?.message ?? 'no data'}`);
-  const zipBuffer = Buffer.from(await blob.arrayBuffer());
+  // Download the zip from its public URL (already validated max size at sign-upload).
+  const dl = await fetch(zipPublicUrl);
+  if (!dl.ok) throw new Error(`Failed to download zip: HTTP ${dl.status}`);
+  const zipBuffer = Buffer.from(await dl.arrayBuffer());
 
   const result: ExtractResult = {
     extracted: 0,
@@ -183,25 +180,27 @@ export async function extractZipAssets(opts: ExtractOpts): Promise<ExtractResult
             }
           }
 
-          // Upload to Supabase Storage
+          // Upload to Vercel Blob — match the sign-upload pathname convention.
           const baseName = entry.fileName.split('/').pop()?.replace(/\.[^.]+$/, '') ?? `image-${entriesProcessed}`;
           const safeName = baseName.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 60) || `image-${entriesProcessed}`;
           const uuid = crypto.randomUUID();
-          const outPath = `${projectId}/${classification.type}/${uuid}-${safeName}.${finalExt}`;
+          const outPath = `assets/${projectId}/${classification.type}/${uuid}-${safeName}.${finalExt}`;
 
-          const { error: upErr } = await supabase.storage
-            .from(BUCKET)
-            .upload(outPath, finalBuffer, { contentType: finalMime, upsert: false });
-
-          if (upErr) {
-            result.errors.push(`${entry.fileName}: upload failed (${upErr.message})`);
+          let publicUrl: string;
+          try {
+            const blob = await blobPut(outPath, finalBuffer, {
+              access: 'public',
+              contentType: finalMime,
+              addRandomSuffix: false,
+              allowOverwrite: false,
+            });
+            publicUrl = blob.url;
+          } catch (upErr: any) {
+            result.errors.push(`${entry.fileName}: upload failed (${upErr?.message ?? 'unknown'})`);
             result.skipped++;
             zipfile.readEntry();
             return;
           }
-
-          const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(outPath);
-          const publicUrl = urlData.publicUrl;
 
           // Build metadata + DB row
           const metadata: Record<string, any> = { fromZip: true, originalPath: entry.fileName };
@@ -221,7 +220,7 @@ export async function extractZipAssets(opts: ExtractOpts): Promise<ExtractResult
             });
           } catch (dbErr: any) {
             result.errors.push(`${entry.fileName}: DB save failed (${dbErr?.message ?? 'unknown'})`);
-            try { await supabase.storage.from(BUCKET).remove([outPath]); } catch { /* ignore */ }
+            try { await blobDel(publicUrl); } catch { /* ignore */ }
             result.skipped++;
             zipfile.readEntry();
             return;

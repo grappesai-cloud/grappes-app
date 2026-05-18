@@ -122,11 +122,6 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
 </Dashboard>
 
 <script>
-  import { createClient } from '@supabase/supabase-js';
-  const supabase = createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-  );
 
   // ── Stripe checkout helper ────────────────────────────────────────────────
   async function redirectToCheckout(endpoint: string, body: object, btnEl: HTMLButtonElement, msgEl: HTMLElement, loadingText: string) {
@@ -182,12 +177,20 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
     btn.textContent = 'Sending…';
 
     const email = document.querySelector<HTMLElement>('[data-user-email]')?.dataset.userEmail ?? '';
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    let ok = false;
+    try {
+      const res = await fetch('/api/auth/forget-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, redirectTo: '/reset-password' }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
 
     msg.hidden = false;
-    if (error) {
+    if (!ok) {
       msg.className = 'reset-msg error';
       msg.textContent = 'Error sending email. Please try again.';
     } else {

@@ -742,7 +742,7 @@ function fmt(dateStr: string | null | undefined): string {
             + '<button onclick="grantEdits(\\''+userId+'\\', 50)">+50 edits</button>'
             + '<button onclick="extendTrial(\\''+userId+'\\', 7)">+7 days trial</button>'
             + '<button onclick="extendTrial(\\''+userId+'\\', 30)">+30 days trial</button>'
-            + '<button onclick="impersonate(\\''+userId+'\\')">Impersonate</button>'
+            + '<button onclick="impersonate(\\''+userId+'\\')">Send password reset</button>'
             + '<a href="mailto:' + u.email + '">Email user</a>'
           + '</div>'
           + '<div id="drawer-msg" hidden></div>'
@@ -792,14 +792,11 @@ function fmt(dateStr: string | null | undefined): string {
   };
 
   window.impersonate = async function (userId) {
+    if (!confirm('Send a password-reset email to this user?')) return;
     var res = await fetch('/api/admin/users/' + userId + '/impersonate', { method: 'POST' });
     var d = await res.json();
-    if (res.ok) {
-      var copy = confirm('Magic link generated for ' + d.email + '.\\n\\nClick OK to copy the link. Open it in an incognito window.');
-      if (copy) navigator.clipboard?.writeText(d.url).then(function () { drawerMsg('✓ Link copied', 'success'); });
-    } else {
-      drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
-    }
+    if (res.ok) drawerMsg('✓ ' + (d.message || 'Reset email sent to ' + d.email), 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
   };
 
   window.adminRetry = async function (projectId, btn) {

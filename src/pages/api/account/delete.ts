@@ -3,6 +3,7 @@
 // Art. 17 GDPR — Right to erasure.
 
 import type { APIRoute } from 'astro';
+import { del as blobDel } from '@vercel/blob';
 import { createAdminClient } from '../../../lib/supabase';
 import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';
@@ -44,21 +45,21 @@ export const POST: APIRoute = async ({ locals }) => {
         await client.from('costs').delete().eq('project_id', pid);
         await client.from('pageviews').delete().eq('project_id', pid);
 
-        // Delete assets from storage + DB
+        // Delete assets from blob storage + DB
         const { data: assets } = await client
           .from('assets')
-          .select('id, storage_path, metadata')
+          .select('id, public_url, metadata')
           .eq('project_id', pid);
 
         if (assets?.length) {
-          const storagePaths: string[] = [];
+          const urls: string[] = [];
           for (const asset of assets) {
-            storagePaths.push(asset.storage_path);
-            const variantPaths = (asset.metadata as any)?.variantPaths as string[] | undefined;
-            if (variantPaths?.length) storagePaths.push(...variantPaths);
+            if (asset.public_url) urls.push(asset.public_url);
+            const variantUrls = (asset.metadata as any)?.variants as Record<string, string> | undefined;
+            if (variantUrls) urls.push(...Object.values(variantUrls));
           }
-          if (storagePaths.length > 0) {
-            await client.storage.from('assets').remove(storagePaths);
+          if (urls.length > 0) {
+            try { await blobDel(urls); } catch (e) { console.warn('[account/delete] blob del failed:', e); }
           }
           await client.from('assets').delete().eq('project_id', pid);
         }
@@ -73,11 +74,10 @@ export const POST: APIRoute = async ({ locals }) => {
     await client.from('referrals').delete().eq('referred_id', user.id);
     await client.from('referral_payouts').delete().eq('referrer_id', user.id);
 
-    // 4. Delete user record
+    // 4. Delete the auth-managed user row (cascades via FK to public.users)
+    await client.from('user').delete().eq('id', user.id);
+    // Belt-and-braces: explicitly drop the public.users mirror row too
     await client.from('users').delete().eq('id', user.id);
-
-    // 5. Delete auth user (Supabase Auth)
-    await client.auth.admin.deleteUser(user.id);
 
     return json({ ok: true, message: 'Account and all associated data deleted.' });
   } catch (e) {

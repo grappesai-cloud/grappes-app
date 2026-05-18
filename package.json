@@ -13,7 +13,11 @@
     "test:coverage": "vitest run --coverage",
     "lighthouse": "node scripts/lighthouse.mjs",
     "visual-qa": "node scripts/visual-qa.mjs",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "db:build": "node scripts/build-neon-migration.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -25,8 +29,12 @@
     "@supabase/ssr": "^0.5.0",
     "@supabase/supabase-js": "^2.45.0",
     "@types/yauzl": "^2.10.3",
+    "@vercel/blob": "^2.3.3",
     "astro": "^6.1.5",
+    "better-auth": "^1.6.9",
+    "drizzle-orm": "^0.45.2",
     "pino": "^10.3.1",
+    "postgres": "^3.4.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "sharp": "^0.34.5",
@@ -34,9 +42,11 @@
     "yauzl": "^3.3.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.4",
+    "drizzle-kit": "^0.31.10",
     "puppeteer": "^24.39.1",
     "typescript": "^5.7.0",
     "vitest": "^4.1.4"

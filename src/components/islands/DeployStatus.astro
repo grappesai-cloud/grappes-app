@@ -1,6 +1,7 @@
 ---
-// Supabase Realtime subscription for live deployment status updates.
-// Falls back to 5s polling if Realtime connection fails.
+// Polling-based live deployment status updates.
+// (Previously used Supabase Realtime; replaced with polling after the migration
+//  to Neon — Vercel/Neon don't have a managed realtime channel.)
 
 interface Props {
   projectId: string;
@@ -17,9 +18,6 @@ interface Props {
 }
 
 const { projectId, projectStatus, initialDeployment = null } = Astro.props;
-
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
 const STATUS_STEPS = [
   { key: 'generating', label: 'Generating files', description: 'Claude is writing your site code…' },
@@ -84,7 +82,7 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
   </div>
 )}
 
-<script define:vars={{ projectId, initialStatus: projectStatus, isActive, supabaseUrl, supabaseAnonKey }}>
+<script define:vars={{ projectId, initialStatus: projectStatus, isActive }}>
   let currentStatus = initialStatus;
 
   // Toggle logs
@@ -107,59 +105,22 @@ const shouldRender = isActive || projectStatus === 'failed' || projectStatus ===
     });
   }
 
-  // Realtime subscription with polling fallback
+  // Polling — every 4s while the project is in an active state.
   if (isActive) {
-    let realtimeConnected = false;
-
-    // Try Supabase Realtime
-    if (supabaseUrl && supabaseAnonKey) {
-      import('@supabase/supabase-js').then(({ createClient }) => {
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
-        const channel = supabase
-          .channel(`project-status-${projectId}`)
-          .on('postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${projectId}` },
-            (payload) => {
-              const newStatus = payload.new.status;
-              if (newStatus !== currentStatus) {
-                currentStatus = newStatus;
-                if (!['generating', 'deploying', 'building'].includes(newStatus)) {
-                  channel.unsubscribe();
-                  window.location.reload();
-                }
-              }
-            }
-          )
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              realtimeConnected = true;
-            }
-          });
-      }).catch(() => {
-        // Realtime import failed — polling fallback will handle it
-      });
-    }
-
-    // Polling fallback: runs every 8s, only if Realtime isn't connected
     const interval = setInterval(async () => {
-      if (realtimeConnected) {
-        clearInterval(interval);
-        return;
-      }
       try {
         const res = await fetch(`/api/projects/${projectId}`);
-        if (res.ok) {
-          const data = await res.json();
-          currentStatus = data.status;
-          if (!['generating', 'deploying', 'building'].includes(data.status)) {
-            clearInterval(interval);
-            window.location.reload();
-          }
+        if (!res.ok) return;
+        const data = await res.json();
+        currentStatus = data.status;
+        if (!['generating', 'deploying', 'building'].includes(data.status)) {
+          clearInterval(interval);
+          window.location.reload();
         }
       } catch {
-        // ignore poll errors
+        // transient — let the next tick retry
       }
-    }, 8000);
+    }, 4000);
   }
 </script>
 
