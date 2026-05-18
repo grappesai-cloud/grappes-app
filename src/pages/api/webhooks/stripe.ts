@@ -64,6 +64,16 @@ export const POST: APIRoute = async ({ request }) => {
       // ── One-time purchase: extra edit pack ──────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // Reel-credits pack — 10 analyses for €50
+        if (session.metadata?.type === 'reel_credits' && session.metadata?.user_id) {
+          const userId = session.metadata.user_id;
+          const REEL_PACK_SIZE = 10;
+          const { data: newTotal } = await client.rpc('increment_reel_credits', { p_user_id: userId, p_amount: REEL_PACK_SIZE });
+          console.log(`[Stripe webhook] +${REEL_PACK_SIZE} reel credits credited to user ${userId} (new total: ${newTotal})`);
+          break;
+        }
+
         if (session.metadata?.type === 'extra_edits' && session.metadata?.user_id) {
           const userId = session.metadata.user_id;
 
