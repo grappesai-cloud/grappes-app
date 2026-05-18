@@ -95,7 +95,7 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
   <div class="studio-head">
     <span class="studio-eyebrow">Studio</span>
     <h2 class="studio-title">
-      {firstName ? `Welcome back, ${firstName}.` : 'Welcome back.'}
+      Welcome back{firstName ? ', ' : '.'}{firstName && <strong>{firstName}.</strong>}
     </h2>
     <p class="studio-sub">Your AI creative tools, all in one place.</p>
   </div>
@@ -186,49 +186,103 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
   </div>
 
   <style>
-    .studio-head { text-align: center; margin-bottom: 40px; }
+    .studio-head { text-align: center; margin-bottom: 48px; position: relative; }
     .studio-eyebrow {
-      display: inline-block; font-size: 13px; font-weight: 600;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: #06bfdd; margin-bottom: 10px;
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 12.5px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: #06bfdd; margin-bottom: 14px;
+      padding: 6px 14px; border-radius: 999px;
+      background: rgba(6,191,221,0.08);
+      border: 1px solid rgba(6,191,221,0.22);
+    }
+    .studio-eyebrow::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: #06bfdd;
+      animation: studio-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes studio-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.45; transform: scale(0.85); }
     }
     .studio-title {
       font-family: 'Inter', sans-serif;
-      font-size: 44px; font-weight: 400; line-height: 1.05;
-      letter-spacing: -0.045em; color: #fff; margin: 0 0 10px;
+      font-size: clamp(36px, 5.6vw, 64px);
+      font-weight: 300; line-height: 1.02;
+      letter-spacing: -0.05em;
+      color: #fff;
+      margin: 0 0 16px;
+      animation: studio-fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .studio-title strong {
+      font-weight: 700;
+      background: linear-gradient(135deg, #06bfdd 0%, #a78bfa 50%, #f97316 100%);
+      -webkit-background-clip: text;
+              background-clip: text;
+      color: transparent;
     }
     .studio-sub {
-      font-size: 14px; color: rgba(255,255,255,0.5); margin: 0;
+      font-size: 15px;
+      color: rgba(255,255,255,0.55);
+      margin: 0;
+      animation: studio-fade-up 0.7s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes studio-fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     .studio-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-      gap: 24px;
+      grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+      gap: 26px;
       align-items: start;
     }
     @media (max-width: 960px) {
       .studio-grid { grid-template-columns: 1fr; gap: 32px; }
     }
 
-    .section-head { margin-bottom: 14px; }
+    .section-head { margin-bottom: 16px; }
     .section-label {
-      font-size: 11px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.1em; color: rgba(255,255,255,0.4);
+      display: inline-block;
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.45);
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
     }
 
     .tile-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
     }
+    .tile-grid :global(.pt-card) {
+      animation: studio-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .tile-grid :global(.pt-card:nth-child(1)) { animation-delay: 0.10s; }
+    .tile-grid :global(.pt-card:nth-child(2)) { animation-delay: 0.18s; }
+    .tile-grid :global(.pt-card:nth-child(3)) { animation-delay: 0.26s; }
+    .tile-grid :global(.pt-card:nth-child(4)) { animation-delay: 0.34s; }
+    .tile-grid :global(.pt-card:nth-child(5)) { animation-delay: 0.42s; }
 
     .studio-aside {
-      background: rgba(255,255,255,0.03);
+      background: rgba(255,255,255,0.025);
       border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 18px;
-      padding: 20px 18px 18px;
+      border-radius: 20px;
+      padding: 22px 20px 18px;
+      animation: studio-fade-up 0.7s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+      position: relative;
+      overflow: hidden;
     }
+    .studio-aside::before {
+      content: '';
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background: radial-gradient(circle at 0% 0%, rgba(6,191,221,0.06) 0%, transparent 60%);
+    }
+    .studio-aside > * { position: relative; z-index: 1; }
 
     .empty-feed {
       padding: 14px 4px 18px;

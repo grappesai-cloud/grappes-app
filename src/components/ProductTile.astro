@@ -4,9 +4,9 @@ interface Props {
   tagline: string;
   href: string;
   icon: string;
-  meter?: string;        // e.g. "5 / 999999 projects" or "0 credits"
-  cta?: string;          // CTA label, default "Open"
-  accent?: string;       // accent color (CSS color)
+  meter?: string;
+  cta?: string;
+  accent?: string;
   comingSoon?: boolean;
   isNew?: boolean;
 }
@@ -24,129 +24,271 @@ const {
 } = Astro.props;
 
 const Tag = comingSoon ? 'div' : 'a';
+
+// Stable per-card id so animations don't collide across tiles.
+const cardId = `pt-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 ---
 
 <Tag
   {...(comingSoon ? {} : { href })}
+  id={cardId}
   class={`pt-card${comingSoon ? ' pt-card--soon' : ''}`}
   style={`--pt-accent:${accent};`}
 >
-  <div class="pt-head">
-    <div class="pt-icon" set:html={icon}></div>
-    {isNew && <span class="pt-badge">New</span>}
-    {comingSoon && <span class="pt-badge pt-badge--soon">Soon</span>}
-  </div>
+  <!-- Animated gradient border (clipped via mask, so only the ring shows) -->
+  <span class="pt-ring" aria-hidden="true"></span>
 
-  <div class="pt-body">
-    <h3 class="pt-name">{name}</h3>
-    <p class="pt-tagline">{tagline}</p>
-  </div>
+  <!-- Subtle dot-grid backdrop, more visible on hover -->
+  <span class="pt-grid" aria-hidden="true"></span>
 
-  <div class="pt-foot">
-    {meter && <span class="pt-meter">{meter}</span>}
-    {!comingSoon && (
-      <span class="pt-cta">
-        <span>{cta}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </span>
-    )}
+  <!-- Aurora blob that follows hover position -->
+  <span class="pt-aurora" aria-hidden="true"></span>
+
+  <div class="pt-inner">
+    <div class="pt-head">
+      <div class="pt-icon">
+        <div class="pt-icon-bg" aria-hidden="true"></div>
+        <div class="pt-icon-svg" set:html={icon}></div>
+      </div>
+      {isNew && <span class="pt-badge">New</span>}
+      {comingSoon && <span class="pt-badge pt-badge--soon">Soon</span>}
+    </div>
+
+    <div class="pt-body">
+      <h3 class="pt-name">{name}</h3>
+      <p class="pt-tagline">{tagline}</p>
+    </div>
+
+    <div class="pt-foot">
+      {meter && <span class="pt-meter">{meter}</span>}
+      {!comingSoon && (
+        <span class="pt-cta">
+          <span>{cta}</span>
+          <svg class="pt-cta-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </span>
+      )}
+    </div>
   </div>
 </Tag>
 
 <style>
   .pt-card {
-    display: flex; flex-direction: column;
-    min-height: 220px;
-    padding: 22px 22px 18px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 18px;
+    --pt-radius: 18px;
+    --pt-bg: rgba(255,255,255,0.025);
+    position: relative;
+    display: block;
+    min-height: 260px;
+    padding: 0;
+    background: var(--pt-bg);
+    border-radius: var(--pt-radius);
     text-decoration: none;
     color: #fff;
-    position: relative;
     overflow: hidden;
-    transition: transform 0.25s cubic-bezier(0.16,1,0.3,1),
-                border-color 0.25s ease,
-                background 0.25s ease,
-                box-shadow 0.25s ease;
+    isolation: isolate;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.35s ease;
   }
-  .pt-card::before {
-    content: '';
-    position: absolute; inset: 0;
-    background: radial-gradient(circle at 100% 0%, var(--pt-accent), transparent 55%);
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.3s ease;
+  .pt-card:hover { transform: translateY(-3px); box-shadow: 0 24px 50px -22px rgba(0,0,0,0.6); }
+
+  /* ─── Animated gradient ring (border) ─────────────────────────────── */
+  .pt-ring {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    border-radius: var(--pt-radius);
+    padding: 1px;
+    background: conic-gradient(
+      from var(--pt-angle, 0deg),
+      rgba(255,255,255,0.06) 0deg,
+      var(--pt-accent) 60deg,
+      rgba(255,255,255,0.06) 140deg,
+      rgba(255,255,255,0.06) 360deg
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+    transition: opacity 0.4s ease;
+    opacity: 0.7;
   }
-  .pt-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.06);
-    box-shadow: 0 18px 40px -16px rgba(0,0,0,0.5);
+  .pt-card:hover .pt-ring {
+    opacity: 1;
+    animation: pt-spin 6s linear infinite;
   }
-  .pt-card:hover::before { opacity: 0.12; }
-  .pt-card--soon {
+  @keyframes pt-spin {
+    to { --pt-angle: 360deg; }
+  }
+  @property --pt-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  /* ─── Dot grid texture ────────────────────────────────────────────── */
+  .pt-grid {
+    position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 18px 18px;
+    background-position: 0 0;
+    opacity: 0.35;
+    mask-image: radial-gradient(circle at 100% 0%, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%);
+    -webkit-mask-image: radial-gradient(circle at 100% 0%, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 70%);
+    transition: opacity 0.4s ease, background-position 30s linear;
+  }
+  .pt-card:hover .pt-grid {
     opacity: 0.55;
-    cursor: default;
+    background-position: -200px 0;
   }
+
+  /* ─── Aurora blob (the soft colored glow) ─────────────────────────── */
+  .pt-aurora {
+    position: absolute;
+    top: -30%; right: -30%;
+    width: 70%; aspect-ratio: 1;
+    z-index: 0; pointer-events: none;
+    background: radial-gradient(circle at center, var(--pt-accent) 0%, transparent 65%);
+    opacity: 0.18;
+    filter: blur(38px);
+    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.9) translate(0, 0);
+  }
+  .pt-card:hover .pt-aurora {
+    opacity: 0.42;
+    transform: scale(1.15) translate(-12%, 12%);
+  }
+
+  /* ─── Soon state: dim everything ──────────────────────────────────── */
+  .pt-card--soon { cursor: default; opacity: 0.5; }
   .pt-card--soon:hover { transform: none; box-shadow: none; }
-  .pt-card--soon::before { display: none; }
+  .pt-card--soon .pt-ring,
+  .pt-card--soon .pt-aurora { display: none; }
 
+  /* ─── Content layer ───────────────────────────────────────────────── */
+  .pt-inner {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column;
+    height: 100%;
+    padding: 22px 22px 18px;
+  }
+
+  /* ─── Head: icon + badge ──────────────────────────────────────────── */
   .pt-head {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 18px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 22px;
   }
-  .pt-icon {
-    width: 38px; height: 38px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--pt-accent) 14%, transparent);
-    color: var(--pt-accent);
-  }
-  .pt-card--soon .pt-icon {
-    background: rgba(255,255,255,0.06);
-    color: rgba(255,255,255,0.4);
-  }
-  :global(.pt-icon svg) { width: 20px; height: 20px; }
 
+  .pt-icon {
+    position: relative;
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .pt-icon-bg {
+    position: absolute; inset: 0;
+    border-radius: 12px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--pt-accent) 22%, transparent), color-mix(in srgb, var(--pt-accent) 6%, transparent));
+    border: 1px solid color-mix(in srgb, var(--pt-accent) 35%, transparent);
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.3s ease;
+  }
+  .pt-icon-svg {
+    position: relative;
+    color: var(--pt-accent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pt-card:hover .pt-icon { transform: scale(1.05) rotate(-2deg); }
+  .pt-card:hover .pt-icon-bg {
+    transform: rotate(8deg);
+    border-color: color-mix(in srgb, var(--pt-accent) 55%, transparent);
+  }
+  :global(.pt-icon-svg svg) { width: 22px; height: 22px; }
+
+  .pt-card--soon .pt-icon-bg {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+  }
+  .pt-card--soon .pt-icon-svg { color: rgba(255,255,255,0.4); }
+
+  /* ─── Badge ───────────────────────────────────────────────────────── */
   .pt-badge {
-    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-    padding: 3px 8px; border-radius: 999px;
-    background: var(--pt-accent); color: #0a0a0a;
+    position: relative;
+    font-size: 10px; font-weight: 800;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--pt-accent);
+    color: #0a0a0a;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pt-accent) 60%, transparent);
+    animation: pt-badge-pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  @keyframes pt-badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pt-accent) 60%, transparent); }
+    50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--pt-accent) 0%, transparent); }
   }
   .pt-badge--soon {
-    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.55);
+    animation: none;
   }
 
-  .pt-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+  /* ─── Body ────────────────────────────────────────────────────────── */
+  .pt-body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
   .pt-name {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 19px; font-weight: 700;
-    letter-spacing: -0.025em;
+    font-family: 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    color: #fff;
     margin: 0;
+    line-height: 1.05;
+    transition: transform 0.3s ease;
   }
+  .pt-card:hover .pt-name { transform: translateX(2px); }
   .pt-tagline {
-    font-size: 13px; line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.55;
     color: rgba(255,255,255,0.55);
     margin: 0;
+    max-width: 340px;
   }
 
+  /* ─── Foot: meter + CTA ───────────────────────────────────────────── */
   .pt-foot {
     display: flex; align-items: center; justify-content: space-between;
-    margin-top: 18px;
-    padding-top: 14px;
+    margin-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.3s ease;
   }
+  .pt-card:hover .pt-foot { border-top-color: color-mix(in srgb, var(--pt-accent) 30%, transparent); }
+
   .pt-meter {
-    font-size: 11.5px; font-weight: 500;
-    color: rgba(255,255,255,0.5);
-    letter-spacing: 0.01em;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
   }
   .pt-cta {
     display: inline-flex; align-items: center; gap: 6px;
-    font-size: 12.5px; font-weight: 600;
+    font-size: 13px; font-weight: 700;
     color: var(--pt-accent);
+    letter-spacing: 0.01em;
     margin-left: auto;
-    transition: transform 0.2s ease;
   }
-  .pt-card:hover .pt-cta { transform: translateX(2px); }
+  .pt-cta-arrow {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .pt-card:hover .pt-cta-arrow {
+    transform: translateX(5px);
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .pt-card, .pt-ring, .pt-aurora, .pt-grid, .pt-icon, .pt-icon-bg, .pt-name, .pt-cta-arrow, .pt-badge {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 </style>
