@@ -1,7 +1,7 @@
 -- ===========================================================================
 -- Grappes core schema — Neon-ready (auto-generated from supabase/migrations/)
 -- ===========================================================================
--- Source migrations: 001_init.sql, 002_edit_quotas.sql, 003_consume_edit_atomic.sql, 004_stripe_idempotency.sql, 005_referral_balance_atomic.sql, 006_extra_edits_atomic.sql, 007_create_pageviews.sql, 008_referrals.sql, 009_refund_edits.sql, 010_rate_limits.sql, 011_rename_commit_sha.sql, 012_referral_signup_ip.sql, 013_rls_all_tables.sql, 014_realtime_projects.sql, 015_billing_columns.sql, 016_atomic_operations.sql, 017_referral_payout_iban_holder.sql, 018_contact_submissions.sql, 019_email_hardening.sql, 020_support_chat.sql, 021_project_integrations.sql, 022_assets_metadata.sql, 023_branding_removed.sql, 024_project_iterations.sql
+-- Source migrations: 001_init.sql, 002_edit_quotas.sql, 003_consume_edit_atomic.sql, 004_stripe_idempotency.sql, 005_referral_balance_atomic.sql, 006_extra_edits_atomic.sql, 007_create_pageviews.sql, 008_referrals.sql, 009_refund_edits.sql, 010_rate_limits.sql, 011_rename_commit_sha.sql, 012_referral_signup_ip.sql, 013_rls_all_tables.sql, 014_realtime_projects.sql, 015_billing_columns.sql, 016_atomic_operations.sql, 017_referral_payout_iban_holder.sql, 018_contact_submissions.sql, 019_email_hardening.sql, 020_support_chat.sql, 021_project_integrations.sql, 022_assets_metadata.sql, 023_branding_removed.sql, 024_project_iterations.sql, 025_reel_credits.sql, 026_seo_audits.sql
 -- Generator: scripts/build-neon-migration.mjs
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -857,3 +857,197 @@ $$;
 
 
 NOTIFY pgrst, 'reload schema';
+
+
+-- ──────────────────────────────────────────────
+-- Source: 025_reel_credits.sql
+-- ──────────────────────────────────────────────
+-- ============================================
+-- Reel Lab — credit-based billing
+-- ============================================
+-- Each user has a balance of `reel_credits`. Purchasing a "10 analyses for €50"
+-- pack increments the balance via the Stripe webhook. The reel-lab Next.js
+-- app calls `consume_reel_credit_atomic` before starting a paid analysis and
+-- `refund_reel_credit` if the pipeline fails.
+-- Mirrors the existing extra_edits pattern (migration 006).
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS reel_credits INTEGER NOT NULL DEFAULT 0
+    CHECK (reel_credits >= 0);
+
+
+COMMENT ON COLUMN users.reel_credits IS
+  'Reel-analysis credits remaining. Granted by Stripe webhook on pack purchase, decremented atomically when reel-lab starts an analysis.';
+
+
+-- Atomic increment (called from Stripe webhook on checkout.session.completed)
+CREATE OR REPLACE FUNCTION increment_reel_credits(p_user_id uuid, p_amount int)
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_new int;
+BEGIN
+  UPDATE users
+  SET reel_credits = COALESCE(reel_credits, 0) + p_amount
+  WHERE id = p_user_id
+  RETURNING reel_credits INTO v_new;
+  RETURN v_new;
+END;
+$$;
+
+
+-- Atomic consume: returns the NEW balance, or NULL if user had no credits.
+-- Caller (reel-lab) refuses to start the analysis when this returns NULL.
+CREATE OR REPLACE FUNCTION consume_reel_credit_atomic(p_user_id uuid)
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_new int;
+BEGIN
+  UPDATE users
+  SET reel_credits = reel_credits - 1
+  WHERE id = p_user_id
+    AND reel_credits > 0
+  RETURNING reel_credits INTO v_new;
+  -- v_new is NULL if the WHERE clause matched 0 rows (no credits / no user)
+  RETURN v_new;
+END;
+$$;
+
+
+-- Refund a credit when the analysis pipeline fails after consumption.
+CREATE OR REPLACE FUNCTION refund_reel_credit(p_user_id uuid)
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_new int;
+BEGIN
+  UPDATE users
+  SET reel_credits = COALESCE(reel_credits, 0) + 1
+  WHERE id = p_user_id
+  RETURNING reel_credits INTO v_new;
+  RETURN v_new;
+END;
+$$;
+
+
+-- ============================================
+-- Reel analysis index (lightweight, for the Studio activity feed)
+-- ============================================
+-- Full analysis data lives in the reel-lab Neon DB. This Supabase table is
+-- just an index: who ran what, when. The Studio activity feed and the Reels
+-- dashboard tile read from here without round-tripping to Neon.
+
+CREATE TABLE IF NOT EXISTS reel_analyses_index (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- Foreign analysis ID (Neon UUID from reel-lab.analyses.id) — opaque to us
+  analysis_id TEXT NOT NULL,
+  title       TEXT,                      -- short label for the feed (e.g. filename)
+  status      TEXT NOT NULL DEFAULT 'pending'
+              CHECK (status IN ('pending', 'running', 'complete', 'failed')),
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE(user_id, analysis_id)
+);
+
+
+CREATE INDEX IF NOT EXISTS reel_analyses_index_user_created
+  ON reel_analyses_index (user_id, created_at DESC);
+
+
+-- Service role bypasses RLS automatically; writes happen from reel-lab
+-- via the service-role key, so no INSERT/UPDATE policies for authenticated.
+
+
+-- ──────────────────────────────────────────────
+-- Source: 026_seo_audits.sql
+-- ──────────────────────────────────────────────
+-- ============================================
+-- SEO Audit Lab — credit-based, 1 free per user
+-- ============================================
+-- Same pattern as reel_credits (migration 025). Each audit consumes 1 credit;
+-- new users get 1 free at signup so they can try the product immediately.
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS audit_credits INTEGER NOT NULL DEFAULT 1
+    CHECK (audit_credits >= 0);
+
+
+COMMENT ON COLUMN users.audit_credits IS
+  'SEO audit credits. Defaults to 1 (free first audit). Stripe webhook adds 10 per pack.';
+
+
+-- Grant the free first audit to existing users that were created before this column existed
+UPDATE users SET audit_credits = 1 WHERE audit_credits = 0 AND created_at < now();
+
+
+-- Update the new-user trigger so future signups also start with 1 free audit
+-- (The trigger inserts a row; the column default already sets 1, so no code change
+--  needed — this is documentation only.)
+
+-- Atomic operations (mirror reel_credits exactly)
+CREATE OR REPLACE FUNCTION increment_audit_credits(p_user_id uuid, p_amount int)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_new int;
+BEGIN
+  UPDATE users SET audit_credits = COALESCE(audit_credits, 0) + p_amount
+   WHERE id = p_user_id RETURNING audit_credits INTO v_new;
+  RETURN v_new;
+END; $$;
+
+
+CREATE OR REPLACE FUNCTION consume_audit_credit_atomic(p_user_id uuid)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_new int;
+BEGIN
+  UPDATE users SET audit_credits = audit_credits - 1
+   WHERE id = p_user_id AND audit_credits > 0
+   RETURNING audit_credits INTO v_new;
+  RETURN v_new;
+END; $$;
+
+
+CREATE OR REPLACE FUNCTION refund_audit_credit(p_user_id uuid)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_new int;
+BEGIN
+  UPDATE users SET audit_credits = COALESCE(audit_credits, 0) + 1
+   WHERE id = p_user_id RETURNING audit_credits INTO v_new;
+  RETURN v_new;
+END; $$;
+
+
+-- ============================================
+-- seo_audits — stored reports, per user
+-- ============================================
+CREATE TABLE IF NOT EXISTS seo_audits (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  url         TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'running'
+              CHECK (status IN ('running', 'complete', 'failed')),
+  -- Overall score 0-100, weighted average of the four category scores
+  overall_score INTEGER,
+  -- Per-category scores 0-100
+  perf_score    INTEGER,
+  onpage_score  INTEGER,
+  technical_score INTEGER,
+  content_score   INTEGER,
+  -- Full report payload: { perf: {...}, onpage: [...], technical: [...], content: {...} }
+  report      JSONB,
+  error       TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+
+CREATE INDEX IF NOT EXISTS seo_audits_user_created
+  ON seo_audits (user_id, created_at DESC);
