@@ -31,6 +31,7 @@ const totalSites = projects.length;
 const sitesLimit = dbUser?.projects_limit ?? 1;
 
 const reelCredits = dbUser?.reel_credits ?? 0;
+const auditCredits = dbUser?.audit_credits ?? 0;
 
 // Activity feed: 5 most recent project updates, newest first.
 const recent = [...projects]
@@ -63,6 +64,7 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
 
 const sitesIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>`;
 const reelsIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
+const auditIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-7"/></svg>`;
 const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
 ---
 
@@ -105,6 +107,16 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
           meter={`${reelCredits} credit${reelCredits === 1 ? '' : 's'} remaining`}
           cta={reelCredits > 0 ? 'Open Reels' : 'Get credits'}
           accent="#a78bfa"
+          isNew={true}
+        />
+        <ProductTile
+          name="Audit Lab"
+          tagline="Paste a URL, get a 30-second AI audit. Performance, on-page SEO, technical SEO, and content scored 0-100 with concrete fixes."
+          href="/audit"
+          icon={auditIcon}
+          meter={`${auditCredits} audit${auditCredits === 1 ? '' : 's'} remaining`}
+          cta={auditCredits > 0 ? 'Run audit' : 'Get credits'}
+          accent="#22d3ee"
           isNew={true}
         />
         <ProductTile
