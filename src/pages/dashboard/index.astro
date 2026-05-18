@@ -30,8 +30,7 @@ try {
 const totalSites = projects.length;
 const sitesLimit = dbUser?.projects_limit ?? 1;
 
-// Reel credits — coming soon. Hardcoded to 0 until the migration ships.
-const reelCredits = 0;
+const reelCredits = dbUser?.reel_credits ?? 0;
 
 // Activity feed: 5 most recent project updates, newest first.
 const recent = [...projects]
