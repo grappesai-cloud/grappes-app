@@ -17,12 +17,15 @@ if (!user) {
 const currentPath = new URL(Astro.request.url).pathname;
 const inProject = !!projectId;
 
-const projectsTourSteps = [
+const studioTourSteps = [
+  { selector: '.tile-grid', title: 'Your studio', body: 'Every AI tool you have access to lives here. Click a tile to open it.' },
+  { selector: '.studio-aside', title: 'Recent activity', body: 'A unified feed of your latest work across all tools.' },
+  { selector: '#sup-btn', title: 'Need help?', body: 'Tap the chat button anytime to message our team, we read every message.' },
+];
+
+const sitesTourSteps = [
   { selector: 'a[href="/dashboard/new"]', title: 'Start a new site', body: 'Click + New Project to launch a guided onboarding for a fresh website.' },
   { selector: '.pc-card', title: 'Open a project', body: 'Click any project card to open the editor and continue working.' },
-  { selector: 'a[href="/dashboard/referrals"]', title: 'Referrals', body: 'Earn credit by inviting friends. Manage your referral payouts here.' },
-  { selector: 'a[href="/dashboard/account"]', title: 'Account & billing', body: 'Your avatar opens billing, plan, and account settings.' },
-  { selector: '#sup-btn', title: 'Need help?', body: 'Tap the chat button anytime to message our team — we read every message.' },
 ];
 
 const projectSubpageTourSteps = [
@@ -31,10 +34,11 @@ const projectSubpageTourSteps = [
   { selector: '#sup-btn', title: 'Support', body: 'Hit a wall? Open the chat and we\'ll help you out.' },
 ];
 
-const isProjectsPage = currentPath === '/dashboard' || currentPath === '/dashboard/';
+const isStudioHome = currentPath === '/dashboard' || currentPath === '/dashboard/';
+const isSitesPage = currentPath === '/dashboard/sites' || currentPath === '/dashboard/sites/';
 const isProjectSubpage = inProject;
-const tourId = isProjectsPage ? 'projects' : isProjectSubpage ? 'project-subpage' : '';
-const tourSteps = isProjectsPage ? projectsTourSteps : isProjectSubpage ? projectSubpageTourSteps : [];
+const tourId = isStudioHome ? 'studio' : isSitesPage ? 'sites' : isProjectSubpage ? 'project-subpage' : '';
+const tourSteps = isStudioHome ? studioTourSteps : isSitesPage ? sitesTourSteps : isProjectSubpage ? projectSubpageTourSteps : [];
 ---
 
 <!DOCTYPE html>

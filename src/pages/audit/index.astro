@@ -1,0 +1,199 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { db } from '../../lib/db';
+import { createAdminClient } from '../../lib/supabase';
+
+const authUser = Astro.locals.user!;
+const dbUser = await db.users.findById(authUser.id);
+const auditCredits = dbUser?.audit_credits ?? 0;
+const justPurchased = Astro.url.searchParams.get('credits_purchased') === '1';
+
+// Last 8 audits for this user
+const client = createAdminClient();
+const { data: recentRaw } = await client
+  .from('seo_audits')
+  .select('id, url, status, overall_score, created_at')
+  .eq('user_id', authUser.id)
+  .order('created_at', { ascending: false })
+  .limit(8);
+const recent = recentRaw ?? [];
+
+function scoreColor(score: number | null): string {
+  if (score === null || score === undefined) return 'rgba(255,255,255,0.4)';
+  if (score >= 80) return '#6ee7a3';
+  if (score >= 50) return '#f6c547';
+  return '#ff8a8a';
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'just now';
+  if (h < 1) return `${m}m ago`;
+  if (d < 1) return `${h}h ago`;
+  return `${d}d ago`;
+}
+---
+
+<Dashboard title="SEO Audit">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+    @media (max-width: 768px) {
+      main { padding-top: 40px !important; padding-bottom: 60px !important; }
+    }
+  </style>
+
+  <div style="text-align:center;margin-bottom:32px;">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 19"/></svg>
+      <span>Studio</span>
+    </a>
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#22d3ee;margin-bottom:10px;">Audit Lab</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin-bottom:10px;">SEO & performance audit</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.55);margin-bottom:22px;max-width:540px;margin-left:auto;margin-right:auto;line-height:1.5;">
+      Paste any public URL. Get four scores in 30 seconds: performance (Core Web Vitals), on-page SEO, technical SEO, and AI content analysis. We tell you exactly what's broken and how to fix it.
+    </p>
+    <p style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:0.02em;">
+      {auditCredits} audit credit{auditCredits === 1 ? '' : 's'} remaining
+    </p>
+  </div>
+
+  {justPurchased && (
+    <div style="max-width:620px;margin:0 auto 18px;background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:12px 18px;color:#6ee7a3;font-size:13.5px;text-align:center;">
+      ✓ Payment received. Your credits are ready.
+    </div>
+  )}
+
+  <form id="audit-form" style="max-width:620px;margin:0 auto 40px;display:flex;gap:10px;flex-wrap:wrap;">
+    <input
+      type="url"
+      id="audit-url-input"
+      name="url"
+      required
+      placeholder="https://yoursite.com"
+      style="flex:1;min-width:240px;height:50px;padding:0 18px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;outline:none;transition:border-color 0.2s;"
+    />
+    <button
+      type="submit"
+      id="audit-submit"
+      style="height:50px;padding:0 28px;background:#22d3ee;color:#0a0a0a;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px;"
+    >
+      <span id="audit-submit-label">{auditCredits > 0 ? 'Run audit' : 'Buy credits'}</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </form>
+
+  <div id="audit-progress" style="display:none;max-width:620px;margin:0 auto 40px;text-align:center;color:rgba(255,255,255,0.7);">
+    <div style="display:inline-flex;align-items:center;gap:10px;font-size:14px;">
+      <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid rgba(34,211,238,0.2);border-top-color:#22d3ee;border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+      <span id="audit-progress-msg">Running audit — usually 10-20 seconds…</span>
+    </div>
+  </div>
+
+  <p id="audit-error" style="display:none;max-width:620px;margin:0 auto 18px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:12px;padding:12px 16px;color:#ff8a8a;font-size:13.5px;text-align:center;"></p>
+
+  <div style="max-width:760px;margin:0 auto;">
+    {auditCredits === 0 && (
+      <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.22);border-radius:14px;padding:22px;text-align:center;margin-bottom:24px;">
+        <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 12px;line-height:1.5;">
+          Out of credits? Grab a pack to keep auditing.
+        </p>
+        <button type="button" id="buy-audit-credits-btn" style="display:inline-flex;align-items:center;gap:8px;background:#22d3ee;color:#0a0a0a;border:none;border-radius:999px;padding:10px 22px;font-size:13px;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:inherit;">
+          <span>Buy 10 audits, €20</span>
+        </button>
+      </div>
+    )}
+
+    {recent.length > 0 && (
+      <section>
+        <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 14px;">Recent audits</h3>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;">
+          {recent.map(r => (
+            <li>
+              <a href={`/audit/${r.id}`} style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;text-decoration:none;transition:background 0.18s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:13.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{r.url}</div>
+                  <div style="font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:2px;">{timeAgo(r.created_at)} · {r.status}</div>
+                </div>
+                {r.status === 'complete' ? (
+                  <div style={`flex-shrink:0;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.04);border:2px solid ${scoreColor(r.overall_score)};font-size:13px;font-weight:700;color:${scoreColor(r.overall_score)};`}>
+                    {r.overall_score ?? '—'}
+                  </div>
+                ) : (
+                  <span style="flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.45);">{r.status}</span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #audit-url-input:focus { border-color: #22d3ee; box-shadow: 0 0 0 3px rgba(34,211,238,0.18); }
+    #audit-submit:hover:not(:disabled) { box-shadow: 0 6px 20px -6px rgba(34,211,238,0.5); transform: translateY(-1px); }
+    #audit-submit:disabled { opacity: 0.55; cursor: wait; }
+  </style>
+
+  <script is:inline define:vars={{ hasCredits: auditCredits > 0 }}>
+    const form = document.getElementById('audit-form');
+    const input = document.getElementById('audit-url-input');
+    const submitBtn = document.getElementById('audit-submit');
+    const progress = document.getElementById('audit-progress');
+    const errorEl = document.getElementById('audit-error');
+    const buyBtn = document.getElementById('buy-audit-credits-btn');
+
+    async function buyCredits(btn) {
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/billing/buy-audit-credits', { method: 'POST' });
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+        alert(data.error || 'Payment error.');
+      } catch { alert('Network error.'); }
+      btn.disabled = false;
+    }
+
+    buyBtn?.addEventListener('click', function() { buyCredits(this); });
+
+    form?.addEventListener('submit', async function(ev) {
+      ev.preventDefault();
+      if (!hasCredits) {
+        buyCredits(submitBtn);
+        return;
+      }
+      errorEl.style.display = 'none';
+      progress.style.display = 'block';
+      submitBtn.disabled = true;
+      try {
+        const r = await fetch('/api/audit/run', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: input.value }),
+        });
+        const data = await r.json();
+        if (r.status === 402) {
+          window.location.reload();
+          return;
+        }
+        if (!r.ok) {
+          errorEl.textContent = data.error || 'Audit failed.';
+          errorEl.style.display = 'block';
+          progress.style.display = 'none';
+          submitBtn.disabled = false;
+          return;
+        }
+        window.location.href = '/audit/' + data.id;
+      } catch (e) {
+        errorEl.textContent = 'Network error. Please try again.';
+        errorEl.style.display = 'block';
+        progress.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</Dashboard>

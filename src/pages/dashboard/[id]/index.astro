@@ -5,14 +5,13 @@ import SupportChatWidget from '../../../components/SupportChatWidget.astro';
 import OnboardingTour from '../../../components/OnboardingTour.astro';
 
 const editorTourSteps = [
-  { selector: '.topbar-link[aria-label="Back to projects"]', title: 'Back to your projects', body: 'Click the Projects link anytime to return to your project list.' },
-  { selector: '#section-list', title: 'Section list', body: 'Every section of your site appears here. Click one to select it on the canvas.' },
-  { selector: '#edit-input', title: 'Plain-English edits', body: 'Describe the change you want — Grappes rewrites the section instantly.' },
+  { selector: '.topbar-link[aria-label="Back to sites"]', title: 'Back to your sites', body: 'Click the Sites link anytime to return to your project list.' },
+  { selector: '#preview-iframe', title: 'Pick on the canvas', body: 'Scroll through your site and click any element to select it — or double-click text to edit it inline.' },
+  { selector: '#edit-input', title: 'Plain-English edits', body: 'Describe the change you want — Grappes rewrites the selection instantly.' },
   { selector: '#ve-bg-toggle-btn', title: 'Section backgrounds', body: 'Pick this toggle to recolor a section background without leaving the editor.' },
   { selector: '#ve-bgimg-toggle-btn', title: 'Background images', body: 'Swap any background image directly from this panel.' },
-  { selector: '#history-toggle-btn', title: 'Version history', body: 'Every edit is versioned. Open this to compare and roll back.' },
   { selector: '.topbar-btn--share', title: 'Share preview', body: 'Copy a private preview URL to share with teammates or clients before going live.' },
-  { selector: '#publish-btn, #launch-btn, #activate-btn', title: 'Publish', body: 'When the brief and edits look good, this button pushes your site live to the world.' },
+  { selector: '#activate-btn, #launch-btn', title: 'Publish', body: 'When the brief and edits look good, this button pushes your site live to the world.' },
   { selector: '#domain-strip', title: 'Custom domain', body: 'Connect (or buy) a custom domain from this strip — no DNS knowledge required.' },
 ];
 import { db } from '../../../lib/db';
@@ -172,20 +171,47 @@ if (hasPreview) {
     }
     .topbar-signout:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
     .topbar-avatar {
-      width: 38px; height: 38px; border-radius: 50%;
+      width: 36px; height: 36px; border-radius: 50%;
       background: linear-gradient(135deg, #06bfdd, #00a4af);
       display: flex; align-items: center; justify-content: center;
-      font-size: 15px; font-weight: 700; color: #0a0a0a;
-      text-transform: uppercase; flex-shrink: 0;
-      text-decoration: none; transition: opacity 0.2s;
+      font-size: 14px; font-weight: 700; color: #0a0a0a;
+      text-transform: uppercase; flex-shrink: 0; border: 0; padding: 0;
+      text-decoration: none; cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
     }
-    .topbar-avatar:hover { opacity: 0.85; }
-    .topbar-signout--dash {
-      background: none; border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 30px; color: rgba(255,255,255,0.7);
-      font-size: 13px; font-weight: 600; padding: 7px 18px; cursor: pointer;
+    .topbar-avatar:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -8px rgba(6,191,221,0.6); }
+    .topbar-profile { position: relative; display: inline-flex; }
+    .profile-menu {
+      position: absolute; right: 0; top: calc(100% + 10px);
+      min-width: 220px; padding: 6px;
+      background: rgba(20,20,22,0.96);
+      backdrop-filter: blur(20px) saturate(1.2);
+      -webkit-backdrop-filter: blur(20px) saturate(1.2);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px -12px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
+      display: none; flex-direction: column; gap: 2px; z-index: 200;
+      animation: profileMenuIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .topbar-signout--dash:hover { color: #fff; border-color: rgba(255,255,255,0.45); }
+    @keyframes profileMenuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .topbar-profile.open .profile-menu { display: flex; }
+    .profile-menu-email {
+      padding: 8px 12px 10px; font-size: 11.5px; font-weight: 500;
+      color: rgba(255,255,255,0.45); border-bottom: 1px solid rgba(255,255,255,0.06);
+      margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .profile-menu-item {
+      display: block; width: 100%; text-align: left;
+      padding: 9px 12px; border-radius: 9px;
+      background: none; border: 0; cursor: pointer;
+      color: rgba(255,255,255,0.78); font-size: 13px; font-weight: 500;
+      text-decoration: none; font-family: inherit;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .profile-menu-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .profile-menu-item--danger { color: #ff8a8a; }
+    .profile-menu-item--danger:hover { background: rgba(239,68,68,0.12); color: #ff6b6b; }
     .topbar-project { color: #fff; font-size: 15px; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.01em; }
     .topbar-status { margin-left: 4px; }
     .status-pill {
@@ -208,14 +234,16 @@ if (hasPreview) {
     .status-pill--failed .dot   { background: #ff6b6b; }
     @keyframes statusPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-    .topbar-center { display: flex; align-items: center; gap: 8px; }
-    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .topbar-center { display: flex; align-items: center; gap: 10px; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .topbar-right > * + .topbar-profile { margin-left: 4px; }
     .topbar-quota {
-      display: flex; align-items: center; gap: 5px;
-      padding: 5px 12px; border-radius: 20px;
-      border: 1px solid rgba(6,191,221,0.2);
-      background: rgba(6,191,221,0.06);
-      color: rgba(255,255,255,0.65); font-size: 12px; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 999px;
+      border: 1px solid rgba(6,191,221,0.22);
+      background: rgba(6,191,221,0.07);
+      color: rgba(255,255,255,0.72); font-size: 12px; font-weight: 500;
+      letter-spacing: 0.01em; white-space: nowrap;
     }
     .topbar-quota svg { color: #06bfdd; flex-shrink: 0; }
     .topbar-quota.warn { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
@@ -223,11 +251,13 @@ if (hasPreview) {
     .topbar-quota.empty { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.06); }
     .topbar-quota.empty svg { color: #ef4444; }
     .topbar-btn {
-      padding: 6px 16px; border-radius: 12px; font-size: 12px; font-weight: 500;
-      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.72);
+      cursor: pointer; text-decoration: none; letter-spacing: 0.01em;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .topbar-btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
+    .topbar-btn:hover { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.18); }
     .topbar-btn--primary { background: #06bfdd; color: #0a0a0a; border-color: transparent; font-weight: 600; }
     .topbar-btn--primary:hover { background: #00e088; box-shadow: 0 4px 16px -4px rgba(6,191,221,0.4); }
     .topbar-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -887,9 +917,9 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-center">
-        <a href="/dashboard" class="topbar-link" aria-label="Back to projects">
+        <a href="/dashboard/sites" class="topbar-link" aria-label="Back to sites">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          <span>Projects</span>
+          <span>Sites</span>
         </a>
         <div class="topbar-sep"></div>
         <span class="topbar-project" title={project.name}>{project.name}</span>
@@ -905,9 +935,6 @@ if (hasPreview) {
         {isDeploying && (
           <span class="status-pill status-pill--gen" title="Publishing"><span class="dot"></span>Publishing</span>
         )}
-        {isGenerated && !isLive && (
-          <span class="status-pill status-pill--ready" title="Generated"><span class="dot"></span>Generated</span>
-        )}
         {isLive && (
           <span class="status-pill status-pill--live" title="Site live"><span class="dot"></span>Live</span>
         )}
@@ -917,12 +944,6 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-right">
-        {hasPreview && (
-          <button type="button" class="qa-status-pill" id="qa-status-pill" title="Open QA report">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            <span id="qa-status-label">QA …</span>
-          </button>
-        )}
         {hasPreview && (
           <div class="topbar-quota" id="topbar-quota" title="AI editor iterations remaining on this project">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -934,12 +955,6 @@ if (hasPreview) {
         )}
         {hasPreview && (
           <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
-        )}
-        {hasPreview && !isBrandingRemoved && (
-          <button type="button" class="topbar-btn topbar-btn--remove-brand" id="remove-brand-btn" title="Remove the by grappes.dev badge from your site">Remove badge</button>
-        )}
-        {hasPreview && isBrandingRemoved && (
-          <span class="billing-badge billing-badge--active" title="Grappes badge removed">No badge ✓</span>
         )}
         {/* Billing status badge */}
         {isBillingActive && (
@@ -954,33 +969,26 @@ if (hasPreview) {
           <span class="billing-badge billing-badge--expired">Expired</span>
         )}
 
-        {hasPreview && isBillingActive && (
-          <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-            {isLive ? 'Republish' : 'Publish ✦'}
-          </button>
-        )}
         {hasPreview && !isBillingActive && (
-          <>
-            <button class="topbar-btn topbar-btn--primary" id="publish-btn">
-              {isLive ? 'Republish' : 'Publish ✦'}
-            </button>
-            <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe &amp; publish</button>
-          </>
+          <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe &amp; publish</button>
         )}
         {canLaunch && !isLaunching && !hasPreview && (
           <button class={`topbar-btn topbar-btn--primary ${isBriefReady ? 'topbar-btn--ready' : ''}`} id="launch-btn">
             {isFailed ? 'Retry →' : 'Generate ✦'}
           </button>
         )}
-        {hasPreview && !isLaunching && (
-          <button class="topbar-btn" id="launch-btn" title="Re-run AI generation using the current brief and uploaded assets">
-            Regenerate
-          </button>
-        )}
-        <form method="POST" action="/api/auth/sign-out" style="margin:0;">
-          <button type="submit" class="topbar-signout--dash"><span>Sign out</span></button>
-        </form>
-        <a href="/dashboard/account" class="topbar-avatar" title="Account">{authUser.email?.[0]?.toUpperCase() ?? '?'}</a>
+
+        <div class="topbar-profile" id="topbar-profile">
+          <button type="button" class="topbar-avatar" id="topbar-avatar-btn" title="Account" aria-haspopup="menu" aria-expanded="false">{authUser.email?.[0]?.toUpperCase() ?? '?'}</button>
+          <div class="profile-menu" id="profile-menu" role="menu" aria-hidden="true">
+            <div class="profile-menu-email" title={authUser.email ?? ''}>{authUser.email}</div>
+            <a href="/dashboard/account" class="profile-menu-item" role="menuitem">Account</a>
+            <a href="/dashboard/referrals" class="profile-menu-item" role="menuitem">Referrals</a>
+            <form method="POST" action="/api/auth/signout" style="margin:0;">
+              <button type="submit" class="profile-menu-item profile-menu-item--danger" role="menuitem">Sign out</button>
+            </form>
+          </div>
+        </div>
       </div>
     </nav>
 
@@ -1061,22 +1069,6 @@ if (hasPreview) {
         {hasPreview && (
           <div class="phase-edit">
             <div class="ve-hint" id="ve-hint">Click an element to select it. Double-click to edit.</div>
-
-            <!-- Section list -->
-            <div class="section-list-header">
-              <span class="section-list-title">Sections</span>
-              <button id="history-toggle-btn" class="history-toggle-btn" type="button" title="Version history">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-                <span>History</span>
-              </button>
-            </div>
-            <div id="section-list" class="section-list">
-              {serverSectionIds.length === 0 ? (
-                <div style="color:rgba(255,255,255,0.4);font-size:12px;padding:8px 12px">Loading sections…</div>
-              ) : serverSectionIds.map((sid) => (
-                <div class="section-item" data-section-id={sid}>{sid.charAt(0).toUpperCase() + sid.slice(1)}</div>
-              ))}
-            </div>
 
             <!-- Background edit mode toggle -->
             <div class="ve-bg-toggle">
@@ -2642,17 +2634,26 @@ if (hasPreview) {
         imgUploadingEl.style.display = '';
         imgSaveBtn.disabled = true;
         try {
-          // Stream directly to Vercel Blob via client-direct upload.
-          var mod = await import('@vercel/blob/client');
-          var blob = await mod.upload(file.name, file, {
-            access: 'public',
-            handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',
-            clientPayload: JSON.stringify({ kind: 'image', assetType: 'section' }),
-            contentType: file.type,
+          // Step 1: Get signed upload URL from server
+          var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, contentType: file.type }),
           });
-          setImagePreview(blob.url);
+          var signData = await signRes.json();
+          if (!signData.signedUrl) { alert(signData.error || 'Upload failed'); imgUploadingEl.style.display = 'none'; return; }
+
+          // Step 2: Upload directly to Supabase Storage from browser
+          var upRes = await fetch(signData.signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type },
+            body: file,
+          });
+          if (!upRes.ok) { alert('Upload failed: ' + upRes.statusText); imgUploadingEl.style.display = 'none'; return; }
+
+          setImagePreview(signData.publicUrl);
         } catch (e) {
-          alert((e && e.message) || 'Upload failed');
+          alert('Upload failed');
         }
         imgUploadingEl.style.display = 'none';
       }
@@ -3061,6 +3062,28 @@ if (hasPreview) {
       btnPreview.addEventListener('click', function() { show('preview'); });
       // Initial: chat visible on mobile
       if (window.matchMedia('(max-width: 768px)').matches) show('chat');
+    })();
+  </script>
+
+  {/* Profile dropdown */}
+  <script is:inline>
+    (function(){
+      var wrap = document.getElementById('topbar-profile');
+      var btn = document.getElementById('topbar-avatar-btn');
+      var menu = document.getElementById('profile-menu');
+      if (!wrap || !btn || !menu) return;
+      function close(){ wrap.classList.remove('open'); btn.setAttribute('aria-expanded','false'); menu.setAttribute('aria-hidden','true'); }
+      function open(){ wrap.classList.add('open'); btn.setAttribute('aria-expanded','true'); menu.setAttribute('aria-hidden','false'); }
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        if (wrap.classList.contains('open')) close(); else open();
+      });
+      document.addEventListener('click', function(e){
+        if (!wrap.contains(e.target)) close();
+      });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') close();
+      });
     })();
   </script>
 
