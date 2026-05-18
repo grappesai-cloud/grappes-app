@@ -195,6 +195,29 @@ body[data-auth-bg]::before {
   border-color: rgba(255, 255, 255, 0.28);
 }
 
+/* Apple button */
+.auth-apple-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  margin-top: 8px;
+  background: var(--c-text);
+  border: 1px solid var(--c-text);
+  border-radius: var(--r-btn);
+  color: var(--c-bg);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--ease-snap);
+}
+.auth-apple-btn:hover {
+  opacity: 0.92;
+}
+
 /* Divider */
 .auth-divider {
   display: flex;

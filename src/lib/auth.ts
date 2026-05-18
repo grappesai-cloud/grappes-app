@@ -29,11 +29,32 @@ export const auth = betterAuth({
     },
   },
 
+  // Conditionally register social providers — only when their env vars are
+  // populated. Otherwise Better-Auth tries to OAuth with empty creds and the
+  // social sign-in endpoint returns 500.
   socialProviders: {
-    google: {
-      clientId: e('GOOGLE_CLIENT_ID'),
-      clientSecret: e('GOOGLE_CLIENT_SECRET'),
-    },
+    ...(e('GOOGLE_CLIENT_ID') && e('GOOGLE_CLIENT_SECRET')
+      ? {
+          google: {
+            clientId: e('GOOGLE_CLIENT_ID'),
+            clientSecret: e('GOOGLE_CLIENT_SECRET'),
+          },
+        }
+      : {}),
+    // Apple Sign In — requires a Services ID (clientId) and a signed JWT
+    // (clientSecret) generated from the Apple .p8 private key. Use
+    // `node scripts/generate-apple-jwt.mjs` to refresh the JWT every 6 months.
+    ...(e('APPLE_CLIENT_ID') && e('APPLE_CLIENT_SECRET')
+      ? {
+          apple: {
+            clientId: e('APPLE_CLIENT_ID'),
+            clientSecret: e('APPLE_CLIENT_SECRET'),
+            // appBundleIdentifier is required for native iOS app sign-in;
+            // can stay omitted for web-only flows.
+            ...(e('APPLE_APP_BUNDLE_ID') ? { appBundleIdentifier: e('APPLE_APP_BUNDLE_ID') } : {}),
+          },
+        }
+      : {}),
   },
 
   user: {
