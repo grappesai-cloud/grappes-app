@@ -1,0 +1,244 @@
+---
+import type { PressKit } from '../lib/press-kit';
+import { googleFontsUrl, readableForeground } from '../lib/press-kit';
+
+interface Props {
+  kit: PressKit;
+  printMode?: boolean;
+}
+
+const { kit: k, printMode = false } = Astro.props;
+const fontsCss = googleFontsUrl(k.fonts);
+const heroFg = readableForeground(k.palette.bg);
+const accentFg = readableForeground(k.palette.primary);
+
+const platformLabel: Record<string, string> = {
+  spotify: 'Spotify',
+  soundcloud: 'SoundCloud',
+  youtube: 'YouTube',
+  apple_music: 'Apple Music',
+  bandcamp: 'Bandcamp',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  website: 'Website',
+  booking: 'Booking',
+  other: 'Link',
+};
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{k.name} — press kit</title>
+{k.tagline && <meta name="description" content={k.tagline} />}
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href={fontsCss} />
+<style is:inline define:vars={{
+  primary: k.palette.primary,
+  secondary: k.palette.secondary,
+  accent: k.palette.accent,
+  text: k.palette.text,
+  bg: k.palette.bg,
+  heroFg,
+  accentFg,
+  headingFont: `"${k.fonts.heading}", sans-serif`,
+  bodyFont: `"${k.fonts.body}", sans-serif`,
+}}>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--bodyFont); -webkit-font-smoothing: antialiased; line-height: 1.55; }
+  h1, h2, h3, h4 { font-family: var(--headingFont); letter-spacing: -0.025em; line-height: 1.05; }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+
+  .pk-page { max-width: 880px; margin: 0 auto; padding: 64px 40px 80px; }
+  @media (max-width: 720px) { .pk-page { padding: 48px 22px 60px; } }
+
+  .pk-hero { padding-bottom: 56px; border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent); margin-bottom: 56px; }
+  .pk-hero-top { display: flex; align-items: center; gap: 22px; margin-bottom: 36px; flex-wrap: wrap; }
+  .pk-logo { width: 76px; height: 76px; flex-shrink: 0; object-fit: contain; border-radius: 14px; padding: 6px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+  .pk-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: color-mix(in srgb, var(--text) 55%, transparent); }
+  .pk-h1 { font-size: clamp(2.4rem, 7vw, 5.2rem); font-weight: 700; letter-spacing: -0.04em; line-height: 0.95; margin: 0; color: var(--text); }
+  .pk-tagline { font-size: clamp(1.05rem, 2.2vw, 1.4rem); color: color-mix(in srgb, var(--text) 70%, transparent); margin-top: 18px; max-width: 580px; line-height: 1.35; }
+  .pk-bio-short { font-size: 1.05rem; line-height: 1.6; color: var(--text); margin-top: 28px; max-width: 620px; }
+
+  .pk-section { padding: 48px 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+  .pk-section:last-of-type { border-bottom: 0; }
+  .pk-section-label { display: inline-block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: color-mix(in srgb, var(--text) 55%, transparent); background: color-mix(in srgb, var(--accent) 18%, transparent); padding: 5px 12px; border-radius: 999px; margin-bottom: 22px; }
+  .pk-section-h { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 600; letter-spacing: -0.025em; margin-bottom: 24px; }
+
+  .pk-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 28px; }
+  .pk-stat-v { font-family: var(--headingFont); font-size: clamp(2rem, 4.5vw, 3.4rem); font-weight: 800; letter-spacing: -0.04em; color: var(--primary); line-height: 1; }
+  .pk-stat-l { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.08em; color: color-mix(in srgb, var(--text) 60%, transparent); margin-top: 8px; }
+
+  .pk-bio-long { font-size: 1rem; line-height: 1.7; color: color-mix(in srgb, var(--text) 88%, transparent); max-width: 640px; }
+  .pk-bio-long p + p { margin-top: 16px; }
+
+  .pk-portrait-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 36px; align-items: start; }
+  @media (max-width: 720px) { .pk-portrait-row { grid-template-columns: 1fr; } }
+  .pk-portrait { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 14px; }
+
+  .pk-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .pk-photo { width: 100%; aspect-ratio: 4/5; object-fit: cover; border-radius: 10px; }
+  .pk-photo:nth-child(3n+1) { aspect-ratio: 1; }
+  .pk-photo:nth-child(5n+1) { aspect-ratio: 16/9; grid-column: span 2; }
+
+  .pk-videos { display: flex; flex-direction: column; gap: 14px; }
+  .pk-video { width: 100%; aspect-ratio: 16/9; border-radius: 12px; background: #000; }
+
+  .pk-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+  .pk-link {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+    border-radius: 12px; font-weight: 600; font-size: 14px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .pk-link:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); border-color: var(--primary); }
+  .pk-link svg { color: var(--primary); }
+
+  .pk-press-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .pk-press-item { padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: 10px; }
+  .pk-press-name { font-weight: 700; font-size: 14px; }
+  .pk-press-year { font-size: 11.5px; color: color-mix(in srgb, var(--text) 55%, transparent); margin-top: 2px; letter-spacing: 0.05em; }
+
+  .pk-contact { padding: 32px; border-radius: 16px; background: var(--primary); color: var(--accentFg); margin-top: 24px; }
+  .pk-contact-h { font-size: clamp(1.6rem, 3.2vw, 2.4rem); font-weight: 600; margin: 0 0 18px; }
+  .pk-contact-rows { display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+  .pk-contact-rows a { font-weight: 600; border-bottom: 1px solid currentColor; padding-bottom: 2px; }
+
+  .pk-footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: color-mix(in srgb, var(--text) 50%, transparent); }
+  .pk-footer a { font-weight: 600; }
+
+  /* Print mode */
+  @media print {
+    .pk-page { padding: 24mm 18mm; max-width: none; }
+    .pk-section { break-inside: avoid; }
+    .pk-hero { break-after: page; }
+    .pk-contact { break-before: page; }
+  }
+</style>
+</head>
+<body>
+  <div class="pk-page">
+
+    <!-- HERO -->
+    <header class="pk-hero">
+      <div class="pk-hero-top">
+        {k.assets?.logo && <img src={k.assets.logo} alt={k.name + ' logo'} class="pk-logo" />}
+        <div>
+          <div class="pk-eyebrow">{k.kit_type === 'other' ? 'Press kit' : `${k.kit_type} press kit`}</div>
+          <h1 class="pk-h1">{k.name}</h1>
+        </div>
+      </div>
+      {k.tagline && <p class="pk-tagline">{k.tagline}</p>}
+      {k.bio_short && <p class="pk-bio-short">{k.bio_short}</p>}
+    </header>
+
+    <!-- STATS -->
+    {k.stats && k.stats.length > 0 && (
+      <section class="pk-section">
+        <span class="pk-section-label">Numbers</span>
+        <div class="pk-stats">
+          {k.stats.map(s => (
+            <div>
+              <div class="pk-stat-v">{s.value}</div>
+              <div class="pk-stat-l">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- BIO -->
+    {k.bio_long && (
+      <section class="pk-section">
+        <span class="pk-section-label">About</span>
+        <h2 class="pk-section-h">The story</h2>
+        <div class="pk-portrait-row">
+          <div class="pk-bio-long">
+            {k.bio_long.split(/\n+/).filter(p => p.trim()).map(p => <p>{p}</p>)}
+          </div>
+          {k.assets?.portrait && <img src={k.assets.portrait} alt={k.name} class="pk-portrait" />}
+        </div>
+      </section>
+    )}
+
+    <!-- PHOTOS -->
+    {k.assets?.photos && k.assets.photos.length > 0 && (
+      <section class="pk-section">
+        <span class="pk-section-label">Gallery</span>
+        <div class="pk-photo-grid">
+          {k.assets.photos.map(url => <img src={url} alt="" class="pk-photo" />)}
+        </div>
+      </section>
+    )}
+
+    <!-- VIDEOS -->
+    {k.assets?.videos && k.assets.videos.length > 0 && (
+      <section class="pk-section">
+        <span class="pk-section-label">Video</span>
+        <div class="pk-videos">
+          {k.assets.videos.map(url => (
+            <video src={url} class="pk-video" controls playsinline muted />
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- LINKS -->
+    {k.links && k.links.length > 0 && (
+      <section class="pk-section">
+        <span class="pk-section-label">Listen / Follow</span>
+        <div class="pk-links">
+          {k.links.map(l => (
+            <a href={l.url} target="_blank" rel="noopener" class="pk-link">
+              <span>{platformLabel[l.platform] ?? l.platform}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- PRESS -->
+    {k.press && k.press.length > 0 && (
+      <section class="pk-section">
+        <span class="pk-section-label">Featured in</span>
+        <div class="pk-press-list">
+          {k.press.map(p => (
+            <div class="pk-press-item">
+              <div class="pk-press-name">{p.name}</div>
+              {p.year && <div class="pk-press-year">{p.year}</div>}
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- CONTACT -->
+    {(k.contact_email || k.contact_phone || k.contact_other) && (
+      <section>
+        <div class="pk-contact">
+          <h2 class="pk-contact-h">Get in touch</h2>
+          <div class="pk-contact-rows">
+            {k.contact_email && <div>Email: <a href={`mailto:${k.contact_email}`}>{k.contact_email}</a></div>}
+            {k.contact_phone && <div>Phone: <a href={`tel:${k.contact_phone}`}>{k.contact_phone}</a></div>}
+            {k.contact_other && <div>{k.contact_other}</div>}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <footer class="pk-footer">
+      <span>Press kit for {k.name}</span>
+      <a href="https://grappes.dev" target="_blank" rel="noopener">Made with Grappes</a>
+    </footer>
+  </div>
+
+  {printMode && (
+    <script is:inline>window.addEventListener('load', () => setTimeout(() => window.print(), 600));</script>
+  )}
+</body>
+</html>

@@ -1,0 +1,24 @@
+---
+// Public press kit page — accessible to anyone with the slug, no auth required.
+// `?print=1` query param triggers the print dialog on load for one-click PDF.
+
+import PressKitTemplate from '../../components/PressKitTemplate.astro';
+import { createAdminClient } from '../../lib/supabase';
+import type { PressKit } from '../../lib/press-kit';
+
+const { slug } = Astro.params;
+const printMode = Astro.url.searchParams.get('print') === '1';
+
+const client = createAdminClient();
+const { data } = await client
+  .from('press_kits')
+  .select('*')
+  .eq('slug', slug!)
+  .eq('status', 'published')
+  .maybeSingle();
+
+if (!data) {
+  return new Response('Press kit not found', { status: 404 });
+}
+---
+<PressKitTemplate kit={data as unknown as PressKit} printMode={printMode} />

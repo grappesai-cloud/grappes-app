@@ -83,6 +83,29 @@ export const POST: APIRoute = async ({ request }) => {
           break;
         }
 
+        // Press kit publish — €15 one-time per kit
+        if (session.metadata?.type === 'kit_publish' && session.metadata?.kit_id) {
+          const kitId = session.metadata.kit_id;
+          // Generate a short slug; retry once on the unlikely collision
+          let slug = '';
+          for (let i = 0; i < 3; i++) {
+            const candidate = Math.floor(Math.random() * 36 ** 5).toString(36).padStart(5, '0') +
+                              Math.floor(Math.random() * 36 ** 5).toString(36).padStart(5, '0');
+            const { count } = await client.from('press_kits').select('id', { count: 'exact', head: true }).eq('slug', candidate);
+            if (!count || count === 0) { slug = candidate; break; }
+          }
+          if (!slug) slug = kitId.replace(/-/g, '').slice(0, 10); // fallback
+
+          await client.from('press_kits').update({
+            status: 'published',
+            slug,
+            published_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }).eq('id', kitId);
+          console.log(`[Stripe webhook] kit ${kitId} published with slug ${slug}`);
+          break;
+        }
+
         if (session.metadata?.type === 'extra_edits' && session.metadata?.user_id) {
           const userId = session.metadata.user_id;
 

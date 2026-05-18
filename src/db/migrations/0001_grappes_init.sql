@@ -1,7 +1,7 @@
 -- ===========================================================================
 -- Grappes core schema — Neon-ready (auto-generated from supabase/migrations/)
 -- ===========================================================================
--- Source migrations: 001_init.sql, 002_edit_quotas.sql, 003_consume_edit_atomic.sql, 004_stripe_idempotency.sql, 005_referral_balance_atomic.sql, 006_extra_edits_atomic.sql, 007_create_pageviews.sql, 008_referrals.sql, 009_refund_edits.sql, 010_rate_limits.sql, 011_rename_commit_sha.sql, 012_referral_signup_ip.sql, 013_rls_all_tables.sql, 014_realtime_projects.sql, 015_billing_columns.sql, 016_atomic_operations.sql, 017_referral_payout_iban_holder.sql, 018_contact_submissions.sql, 019_email_hardening.sql, 020_support_chat.sql, 021_project_integrations.sql, 022_assets_metadata.sql, 023_branding_removed.sql, 024_project_iterations.sql, 025_reel_credits.sql, 026_seo_audits.sql
+-- Source migrations: 001_init.sql, 002_edit_quotas.sql, 003_consume_edit_atomic.sql, 004_stripe_idempotency.sql, 005_referral_balance_atomic.sql, 006_extra_edits_atomic.sql, 007_create_pageviews.sql, 008_referrals.sql, 009_refund_edits.sql, 010_rate_limits.sql, 011_rename_commit_sha.sql, 012_referral_signup_ip.sql, 013_rls_all_tables.sql, 014_realtime_projects.sql, 015_billing_columns.sql, 016_atomic_operations.sql, 017_referral_payout_iban_holder.sql, 018_contact_submissions.sql, 019_email_hardening.sql, 020_support_chat.sql, 021_project_integrations.sql, 022_assets_metadata.sql, 023_branding_removed.sql, 024_project_iterations.sql, 025_reel_credits.sql, 026_seo_audits.sql, 027_press_kits.sql
 -- Generator: scripts/build-neon-migration.mjs
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -1051,3 +1051,59 @@ CREATE TABLE IF NOT EXISTS seo_audits (
 
 CREATE INDEX IF NOT EXISTS seo_audits_user_created
   ON seo_audits (user_id, created_at DESC);
+
+
+-- ──────────────────────────────────────────────
+-- Source: 027_press_kits.sql
+-- ──────────────────────────────────────────────
+-- ============================================
+-- Press Kit Lab — per-kit one-time billing (€15/kit)
+-- ============================================
+-- Different billing model from credit-based products: user creates a draft
+-- for free, edits indefinitely, pays €15 when ready to publish. After payment
+-- the kit gets a public URL and PDF download. Re-editing a published kit is
+-- free; "Publish" only fires once per kit.
+
+CREATE TABLE IF NOT EXISTS press_kits (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status        TEXT NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published')),
+  -- Short shareable slug: random 10-char base36, set when published
+  slug          TEXT UNIQUE,
+  -- Type drives default fonts + section ordering: musician, agency, photographer, founder, other
+  kit_type      TEXT NOT NULL DEFAULT 'other',
+  name          TEXT NOT NULL,
+  tagline       TEXT,
+  bio_short     TEXT,
+  bio_long      TEXT,
+  contact_email TEXT,
+  contact_phone TEXT,
+  contact_other TEXT,
+  -- Color palette: { primary: '#hex', secondary, accent, text, bg, extracted_from_logo: bool }
+  palette       JSONB DEFAULT '{}',
+  -- Fonts: { heading: 'Inter', body: 'Inter', auto: bool }
+  fonts         JSONB DEFAULT '{}',
+  -- Links: [{ platform: 'spotify', url, label? }, ...]
+  links         JSONB DEFAULT '[]',
+  -- Stats: [{ value: '1.2M', label: 'monthly listeners' }, ...]
+  stats         JSONB DEFAULT '[]',
+  -- Assets: { logo: url, portrait: url, photos: [url], videos: [url], press_logos: [url] }
+  assets        JSONB DEFAULT '{}',
+  -- Press mentions: [{ name: 'Mixmag', url?, year?, quote? }, ...]
+  press         JSONB DEFAULT '[]',
+  -- Awards: [{ name, year, issuer }, ...]
+  awards        JSONB DEFAULT '[]',
+  template_version INTEGER NOT NULL DEFAULT 1,
+  stripe_session_id TEXT,
+  published_at  TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+
+CREATE INDEX IF NOT EXISTS press_kits_user_created
+  ON press_kits (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS press_kits_slug
+  ON press_kits (slug) WHERE slug IS NOT NULL;

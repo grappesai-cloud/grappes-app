@@ -33,6 +33,7 @@
     "astro": "^6.1.5",
     "better-auth": "^1.6.9",
     "drizzle-orm": "^0.45.2",
+    "node-vibrant": "^4.0.3",
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
     "react": "^19.2.4",

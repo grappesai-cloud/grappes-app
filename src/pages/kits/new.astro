@@ -1,0 +1,97 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+---
+<Dashboard title="New press kit">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+  </style>
+
+  <div style="max-width:520px;margin:0 auto;">
+    <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:22px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Press kits</span>
+    </a>
+
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#f97316;margin-bottom:10px;">Step 1 of 2</span>
+    <h1 style="font-family:'Inter',sans-serif;font-size:34px;font-weight:400;line-height:1.1;letter-spacing:-0.035em;color:#fff;margin:0 0 8px;">Let's start a press kit</h1>
+    <p style="font-size:14px;color:rgba(255,255,255,0.55);margin:0 0 28px;line-height:1.5;">
+      Just two basics here. You'll edit everything else in the next screen and only pay €15 if you decide to publish.
+    </p>
+
+    <form id="new-kit-form" style="display:flex;flex-direction:column;gap:18px;">
+      <label style="display:flex;flex-direction:column;gap:6px;">
+        <span style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.85);">Name on the kit</span>
+        <span style="font-size:11.5px;color:rgba(255,255,255,0.45);">Artist name, brand, or your own name.</span>
+        <input id="kit-name" type="text" required maxlength="80" placeholder="e.g. EdiP, Mattman Music, Ana Pop" style="margin-top:4px;height:46px;padding:0 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:11px;color:#fff;font-family:inherit;font-size:14.5px;outline:none;" />
+      </label>
+
+      <fieldset style="border:0;padding:0;margin:0;">
+        <legend style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.85);margin-bottom:8px;">What kind of kit?</legend>
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.45);margin:0 0 10px;">Drives the default font pairing and section order. You can change it anytime.</p>
+        <div id="kit-type-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+          {[
+            { v: 'musician', label: 'Musician / DJ' },
+            { v: 'agency', label: 'Agency / Studio' },
+            { v: 'photographer', label: 'Photographer' },
+            { v: 'founder', label: 'Founder' },
+            { v: 'model', label: 'Model / Talent' },
+            { v: 'other', label: 'Other' },
+          ].map((opt, i) => (
+            <label style="display:block;cursor:pointer;">
+              <input type="radio" name="kit_type" value={opt.v} checked={i === 0} style="position:absolute;opacity:0;pointer-events:none;" />
+              <span class="kt-card" style="display:block;padding:11px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);text-align:center;transition:all 0.15s;">
+                {opt.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <button type="submit" id="create-btn" style="margin-top:6px;height:48px;background:#f97316;color:#0a0a0a;border:none;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;">
+        Continue →
+      </button>
+
+      <p id="new-kit-error" style="display:none;font-size:12.5px;color:#ff8a8a;text-align:center;"></p>
+    </form>
+  </div>
+
+  <style>
+    input[name="kit_type"]:checked + .kt-card {
+      background: rgba(249,115,22,0.12);
+      border-color: #f97316;
+      color: #fff;
+    }
+    input[type="text"]:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
+  </style>
+
+  <script is:inline>
+    document.getElementById('new-kit-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById('create-btn');
+      const err = document.getElementById('new-kit-error');
+      const name = document.getElementById('kit-name').value.trim();
+      const kit_type = document.querySelector('input[name="kit_type"]:checked')?.value || 'other';
+      if (!name) return;
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+      err.style.display = 'none';
+      try {
+        const r = await fetch('/api/kits', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, kit_type }) });
+        const data = await r.json();
+        if (!r.ok) {
+          err.textContent = data.error || 'Could not create.';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Continue →';
+          return;
+        }
+        window.location.href = `/kits/${data.id}`;
+      } catch {
+        err.textContent = 'Network error.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Continue →';
+      }
+    });
+  </script>
+</Dashboard>
