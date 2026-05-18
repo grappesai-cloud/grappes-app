@@ -97,6 +97,12 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: 'grappes',
     useSecureCookies: (e('PUBLIC_APP_URL') || '').startsWith('https://'),
+    // Force UUID v4 for all Better-Auth ids. The drizzle schema uses
+    // Postgres `uuid` columns, so the default nanoid-style generator fails
+    // with "invalid input syntax for type uuid".
+    database: {
+      generateId: () => crypto.randomUUID(),
+    },
   },
 });
 
