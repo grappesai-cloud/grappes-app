@@ -78,6 +78,17 @@ export interface UiAction {
   options?: string[];
 }
 
+// Strip em (—) and en (–) dashes from a plain-text string.
+// Spaced separators → ", "; bare dashes between word chars → ", "; trailing dashes dropped.
+export function stripDashes(s: string): string {
+  return s
+    .replace(/\s*[—–]\s*/g, ', ')
+    .replace(/,\s*,/g, ',')
+    .replace(/\s+,/g, ',')
+    .replace(/,(\s*[.!?])/g, '$1')
+    .replace(/,\s*$/gm, '');
+}
+
 export function parseHaikuResponse(raw: string): {
   reply: string;
   extracted: Record<string, any>;
@@ -109,6 +120,10 @@ export function parseHaikuResponse(raw: string): {
   // Post-process: force line breaks before bullet points that Haiku inlines
   reply = reply.replace(/([^\n]) [-–—] (?=[A-Z\u00C0-\u024F])/g, '$1\n- ');
   reply = reply.replace(/([?:]) [-–—] /g, '$1\n- ');
+
+  // Strip em/en dashes — user does not want them in chat replies.
+  // Done AFTER bullet splitting so legit list separators were already converted.
+  reply = stripDashes(reply);
 
   // Safety: strip any remaining ---DATA--- or JSON that leaked into reply
   reply = reply.replace(/---DATA---[\s\S]*/g, '').replace(/---END---[\s\S]*/g, '').trim();

@@ -11,6 +11,7 @@ import {
   injectBacklink,
   injectFormHandler,
   applyBriefContent,
+  grammarCheckHtml,
   FULL_PAGE_KEY,
   SONNET_MODEL,
   type AssetData,
@@ -471,11 +472,24 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
     html = injectFormHandler(html, projectId);
   }
 
-  // Grammar check (Haiku) was previously run here for non-English locales,
-  // but the Sonnet system prompt already enforces locale strictly via the
-  // language directive. The extra Haiku pass added 10-30s to the critical
-  // path with marginal value — removed to fit within Vercel's 300s function
-  // budget on Hobby plans.
+  // Language enforcement pass (Haiku). Sonnet's language directive is strong
+  // but it still leaks foreign words occasionally (especially when Opus's
+  // creative plan or the brief contains English). Haiku translates any
+  // stray non-target-language segments back to the site language and fixes
+  // grammar in one pass. Costs ~5-10s on the critical path; users care more
+  // about a coherent single-language site than about saving those seconds.
+  const siteLocale = (freshBrief.data as any)?.business?.locale as string | undefined;
+  if (siteLocale) {
+    try {
+      const langResult = await grammarCheckHtml({ html, locale: siteLocale });
+      html = langResult.html;
+      if (langResult.corrections > 0) {
+        console.log(`[launch] Language pass (${siteLocale}): ${langResult.corrections} fixes applied`);
+      }
+    } catch (e) {
+      console.error('[launch] Language pass failed (non-fatal):', e);
+    }
+  }
 
   // Structural QA (in-memory, instant)
   const structuralReport = runStructuralQA(html);

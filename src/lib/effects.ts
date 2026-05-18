@@ -281,58 +281,6 @@ window.__curvedLoop=function(el,opts){
 };
 })();`;
 
-// ─── 5. ScrollStack ───────────────────────────────────────────────────────────
-// Cards stack on top of each other as user scrolls, with scale/rotate/blur.
-// Hooks into window.__lenis (already loaded globally).
-// Usage: window.__scrollStack(container, { cardSelector, scaleStep, rotateStep, blurStep })
-
-export const SCROLL_STACK_JS = `(function(){
-window.__scrollStack=function(container,opts){
-  var sel=opts.cardSelector||'.stack-card';
-  var scaleStep=opts.scaleStep||0.06;
-  var rotateStep=opts.rotateStep||2;
-  var blurStep=opts.blurStep||0.5;
-  var sticky=opts.stickyOffset||80;
-
-  var cards=[].slice.call(container.querySelectorAll(sel));
-  if(!cards.length) return;
-
-  cards.forEach(function(c,i){
-    c.style.cssText+='position:sticky;top:'+sticky+'px;z-index:'+(10+i)+
-      ';will-change:transform;backface-visibility:hidden;transform-origin:center top;';
-  });
-
-  var total=cards.length;
-
-  function getProgress(){
-    var r=container.getBoundingClientRect();
-    var scrolled=Math.max(0,-r.top);
-    var full=r.height-window.innerHeight;
-    return full>0?Math.min(1,scrolled/full):0;
-  }
-
-  function update(){
-    var p=getProgress();
-    var step=1/total;
-    cards.forEach(function(c,i){
-      var cardProgress=Math.max(0,Math.min(1,(p-i*step)/step));
-      var nextProgress=Math.max(0,Math.min(1,(p-(i)*step)/step));
-      var scale=1-(total-1-i)*scaleStep*nextProgress;
-      var rotate=(total-1-i)*rotateStep*nextProgress*(i%2===0?1:-1);
-      var blur=(total-1-i)*blurStep*nextProgress;
-      var ty=i<total-1?-cardProgress*20:0;
-      c.style.transform='translate3d(0,'+ty+'px,0) scale('+scale+') rotate('+rotate+'deg)';
-      c.style.filter=blur>0?'blur('+blur+'px)':'none';
-      c.style.opacity=scale<0.7?'0':'1';
-    });
-  }
-
-  window.addEventListener('scroll',update,{passive:true});
-  if(window.__lenis) window.__lenis.on('scroll',update);
-  update();
-};
-})();`;
-
 // ─── 6. PillNav ───────────────────────────────────────────────────────────────
 // Animated navigation with a morphing pill indicator that follows active link.
 // Sonnet generates: <nav data-pill-nav> with <a> links inside.
@@ -532,7 +480,6 @@ export const ALL_EFFECTS_JS =
   TEXT_PRESSURE_JS + '\n' +
   VARIABLE_PROXIMITY_JS + '\n' +
   CURVED_LOOP_JS + '\n' +
-  SCROLL_STACK_JS + '\n' +
   PILL_NAV_JS + '\n' +
   FLOWING_MENU_JS;
 
@@ -543,7 +490,6 @@ export const EFFECT_RUNTIMES: Record<string, string> = {
   __textPressure:      TEXT_PRESSURE_JS,
   __variableProximity: VARIABLE_PROXIMITY_JS,
   __curvedLoop:        CURVED_LOOP_JS,
-  __scrollStack:       SCROLL_STACK_JS,
   __pillNav:           PILL_NAV_JS,
   __flowingMenu:       FLOWING_MENU_JS,
   __videoEmbed:        VIDEO_EMBED_JS,
@@ -587,13 +533,6 @@ EFFECT: window.__curvedLoop(el, opts)
   opts: { text: string, speed: 2, curveAmount: 80, direction: 'left'|'right', interactive: true }
   The container element must have a defined width and height. Positive curveAmount = curves up, negative = curves down.
   Example: window.__curvedLoop(document.querySelector('.curved-marquee'), { text: 'Creative Agency — Award Winning — ', speed: 1.5, curveAmount: 60 });`,
-
-  scrollStack: `
-EFFECT: window.__scrollStack(container, opts)
-  Cards stack as user scrolls through the container. Container must be tall (e.g. height: 300vh).
-  opts: { cardSelector: '.stack-card', scaleStep: 0.06, rotateStep: 2, blurStep: 0.5, stickyOffset: 80 }
-  HTML structure: <div style="height:300vh"> <div class="stack-card">...</div> <div class="stack-card">...</div> </div>
-  Example: window.__scrollStack(document.querySelector('.scroll-stack-container'), { cardSelector: '.stack-card', scaleStep: 0.05 });`,
 
   pillNav: `
 EFFECT: window.__pillNav(navEl, opts)
