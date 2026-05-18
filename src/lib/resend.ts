@@ -307,17 +307,27 @@ export async function sendWelcomeEmail(params: {
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const greeting = params.name ? `Welcome, ${escapeHtml(params.name)}.` : 'Welcome.';
   const html = wrapEmail(greeting, `
-    <p style="margin:0 0 24px;">Your account is active. Generate a complete website with AI in minutes.</p>
+    <p style="margin:0 0 24px;">Your account is active. Grappes is an AI creative studio with four tools, all ready for you now.</p>
     <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">What you can do</p>
-    <ul style="margin:0 0 4px;padding-left:18px;font-size:14px;line-height:2.2;color:#6b7280;">
-      <li>Describe what you want and get a complete site</li>
-      <li>Edit any section by describing the change</li>
-      <li>Publish to your domain in one click</li>
+    <ul style="margin:0 0 4px;padding-left:18px;font-size:14px;line-height:2;color:#6b7280;">
+      <li><strong style="color:#0a0a0a;">Sites</strong> · generate a complete website from a brief in 15 minutes</li>
+      <li><strong style="color:#0a0a0a;">Reels Lab</strong> · upload a reel, get a frame-by-frame AI breakdown with hook and retention scores</li>
+      <li><strong style="color:#0a0a0a;">Audit Lab</strong> · paste any URL, get a 30-second AI audit with concrete fixes (your first audit is free)</li>
+      <li><strong style="color:#0a0a0a;">Press Kit Lab</strong> · compose a digital press kit with AI-generated logo, shareable URL and printable PDF</li>
     </ul>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Open dashboard →')}
+    ${emailBtn(`${SITE_URL}/dashboard`, 'Open Studio →')}
   `);
 
-  const text = `Welcome to Grappes!\n\nYour account is active. You can now generate a complete website with AI in minutes.\n\nWhat you can do:\n- Describe what you want and get a complete site\n- Edit any section by describing the change\n- Publish to your domain in one click\n\nOpen your dashboard: ${SITE_URL}/dashboard`;
+  const text = `Welcome to Grappes!
+
+Your account is active. Grappes is an AI creative studio with four tools, all ready for you now:
+
+- Sites: generate a complete website from a brief in 15 minutes
+- Reels Lab: upload a reel, get a frame-by-frame AI breakdown with hook and retention scores
+- Audit Lab: paste any URL, get a 30-second AI audit with concrete fixes (your first audit is free)
+- Press Kit Lab: compose a digital press kit with AI-generated logo, shareable URL and printable PDF
+
+Open Studio: ${SITE_URL}/dashboard`;
 
   const headers: Record<string, string> = {};
   if (params.userId) {
@@ -328,7 +338,7 @@ export async function sendWelcomeEmail(params: {
 
   return sendPlatformEmail({
     to: params.to,
-    subject: 'Welcome to Grappes! 🚀',
+    subject: 'Welcome to Grappes Studio',
     html,
     text,
     reply_to: 'support@grappes.dev',
@@ -518,29 +528,85 @@ export async function sendDomainPurchaseFailedEmail(params: {
  */
 export async function sendPaymentConfirmedEmail(params: {
   to: string;
-  editsAdded: number;
-  totalExtra: number;
+  // Legacy edits-only callers can still pass editsAdded + totalExtra.
+  editsAdded?: number;
+  totalExtra?: number;
+  // New generic callers pass these directly for any product.
+  productName?: string;       // e.g. "Reel Lab credits"
+  amountAdded?: number;       // e.g. 10
+  unitLabel?: string;         // e.g. "credits", "audits", "edits"
+  newBalance?: number;        // e.g. 12
+  ctaUrl?: string;            // override default dashboard URL
+  ctaLabel?: string;          // override default "Open dashboard"
 }): Promise<{ success: boolean; id?: string; error?: string }> {
+  // Resolve fields, with edits-style fallback for legacy calls
+  const productName = params.productName ?? 'AI edits';
+  const amountAdded = params.amountAdded ?? params.editsAdded ?? 0;
+  const unitLabel   = params.unitLabel ?? 'edits';
+  const newBalance  = params.newBalance ?? params.totalExtra ?? amountAdded;
+  const ctaUrl      = params.ctaUrl ?? `${SITE_URL}/dashboard`;
+  const ctaLabel    = params.ctaLabel ?? 'Open Studio →';
+
   const html = wrapEmail('Payment confirmed', `
-    <p style="margin:0 0 24px;">We've added <span style="color:#0a0a0a;font-weight:700;">+${params.editsAdded} edits</span> to your account.</p>
+    <p style="margin:0 0 24px;">We've added <span style="color:#0a0a0a;font-weight:700;">+${amountAdded} ${escapeHtml(unitLabel)}</span> to your <strong>${escapeHtml(productName)}</strong> balance.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 24px;">
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Edits added</td>
-        <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">+${params.editsAdded}</td>
+        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #f0f0f0;">Added</td>
+        <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;border-bottom:1px solid #f0f0f0;">+${amountAdded} ${escapeHtml(unitLabel)}</td>
       </tr>
       <tr>
-        <td style="padding:12px 0;color:#9ca3af;">Total edits remaining</td>
-        <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;">${params.totalExtra}</td>
+        <td style="padding:12px 0;color:#9ca3af;">Total remaining</td>
+        <td style="padding:12px 0;color:#0a0a0a;font-weight:600;text-align:right;">${newBalance} ${escapeHtml(unitLabel)}</td>
       </tr>
     </table>
-    ${emailBtn(`${SITE_URL}/dashboard`, 'Continue editing →')}
+    ${emailBtn(ctaUrl, ctaLabel)}
   `);
 
-  const text = `Payment confirmed\n\nWe've added +${params.editsAdded} edits to your account.\n\nEdits added: +${params.editsAdded}\nTotal edits remaining: ${params.totalExtra}\n\nContinue editing: ${SITE_URL}/dashboard`;
+  const text = `Payment confirmed
+
+We've added +${amountAdded} ${unitLabel} to your ${productName} balance.
+
+Added: +${amountAdded} ${unitLabel}
+Total remaining: ${newBalance} ${unitLabel}
+
+${ctaLabel.replace(/ →$/, '')}: ${ctaUrl}`;
 
   return sendPlatformEmail({
     to: params.to,
-    subject: `+${params.editsAdded} edits added to your account`,
+    subject: `+${amountAdded} ${unitLabel} added · ${productName}`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
+ * Press Kit Lab specific: kit was published successfully.
+ */
+export async function sendKitPublishedEmail(params: {
+  to: string;
+  kitName: string;
+  publicUrl: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const html = wrapEmail(`${escapeHtml(params.kitName)} is published.`, `
+    <p style="margin:0 0 24px;">Your press kit is live and ready to share. Anyone with the link can view it; nobody can edit it but you.</p>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Shareable URL</p>
+    <p style="margin:0;"><a href="${escapeHtml(params.publicUrl)}" style="color:#0a0a0a;text-decoration:underline;word-break:break-all;">${escapeHtml(params.publicUrl)}</a></p>
+    ${emailBtn(escapeHtml(params.publicUrl), 'View kit →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">You can keep editing the content anytime, or send the URL with <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;">?print=1</code> appended for a one-click PDF.</p>
+  `);
+
+  const text = `${params.kitName} is published.
+
+Your press kit is live and ready to share.
+
+URL: ${params.publicUrl}
+
+You can keep editing the content anytime. Add ?print=1 to the URL for a one-click PDF download.`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `✦ ${params.kitName} is published`,
     html,
     text,
     reply_to: 'support@grappes.dev',
