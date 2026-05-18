@@ -74,6 +74,15 @@ export const POST: APIRoute = async ({ request }) => {
           break;
         }
 
+        // Audit-credits pack — 10 audits for €20
+        if (session.metadata?.type === 'audit_credits' && session.metadata?.user_id) {
+          const userId = session.metadata.user_id;
+          const AUDIT_PACK_SIZE = 10;
+          const { data: newTotal } = await client.rpc('increment_audit_credits', { p_user_id: userId, p_amount: AUDIT_PACK_SIZE });
+          console.log(`[Stripe webhook] +${AUDIT_PACK_SIZE} audit credits credited to user ${userId} (new total: ${newTotal})`);
+          break;
+        }
+
         if (session.metadata?.type === 'extra_edits' && session.metadata?.user_id) {
           const userId = session.metadata.user_id;
 

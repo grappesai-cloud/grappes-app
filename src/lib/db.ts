@@ -38,6 +38,7 @@ export interface User {
   edits_used?: number | null;
   extra_edits?: number | null;
   reel_credits?: number | null;
+  audit_credits?: number | null;
   multipage_addon?: boolean | null;
   multipage_addon_lifetime?: boolean | null;
   multipage_addon_subscription_id?: string | null;
