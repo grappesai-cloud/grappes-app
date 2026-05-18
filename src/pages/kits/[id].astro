@@ -80,6 +80,13 @@ const fontsCss = googleFontsUrl(k.fonts);
           <input type="file" accept="image/*" class="ed-file" />
           <span class="ed-hint">PNG/SVG/JPG · we extract colors from this</span>
         </div>
+        <button type="button" id="gen-logo-btn" class="ed-gen-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="m16.24 16.24 2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="m16.24 7.76 2.83-2.83"/></svg>
+          <span>Don't have a logo? Generate one with AI</span>
+        </button>
+        {k.assets?.logo_svg && (
+          <a href={k.assets.logo_svg} download class="ed-svg-link">↓ Download SVG vector</a>
+        )}
 
         <label class="ed-label">Palette</label>
         <div class="ed-palette">
@@ -280,7 +287,88 @@ const fontsCss = googleFontsUrl(k.fonts);
     .kit-preview-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); font-weight: 600; }
     .kit-preview-print { color: #f97316; text-decoration: none; font-size: 11.5px; font-weight: 700; }
     #kit-preview { width: 100%; height: calc(100vh - 160px); min-height: 600px; border: 0; background: #fafafa; }
+
+    .ed-gen-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; margin-top: 8px; padding: 9px 12px;
+      background: linear-gradient(135deg, rgba(249,115,22,0.18), rgba(34,211,238,0.12));
+      border: 1px solid rgba(249,115,22,0.32); border-radius: 9px;
+      color: #fff; font-family: inherit; font-size: 12.5px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .ed-gen-btn:hover { background: linear-gradient(135deg, rgba(249,115,22,0.28), rgba(34,211,238,0.18)); border-color: rgba(249,115,22,0.5); }
+    .ed-gen-btn svg { color: #f97316; }
+    .ed-svg-link { display: inline-block; margin-top: 6px; font-size: 11.5px; color: #22d3ee; text-decoration: none; font-weight: 600; }
+
+    .gen-modal-backdrop {
+      position: fixed; inset: 0; z-index: 9000;
+      background: rgba(5,5,8,0.7); backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      padding: 22px;
+    }
+    .gen-modal-backdrop.open { display: flex; }
+    .gen-modal {
+      background: #141417; border: 1px solid rgba(255,255,255,0.1); border-radius: 18px;
+      padding: 26px 28px 24px; max-width: 480px; width: 100%;
+    }
+    .gen-modal h3 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 6px; color: #fff; }
+    .gen-modal p { font-size: 13px; color: rgba(255,255,255,0.55); margin: 0 0 18px; line-height: 1.5; }
+    .gen-modal label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); margin: 12px 0 4px; }
+    .gen-modal textarea, .gen-modal input { width: 100%; padding: 10px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; color: #fff; font-family: inherit; font-size: 13px; outline: none; }
+    .gen-modal textarea { resize: vertical; min-height: 70px; line-height: 1.45; }
+    .gen-modal textarea:focus, .gen-modal input:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
+    .gen-modal-row { display: flex; gap: 8px; align-items: center; }
+    .gen-modal-row input[type="color"] { width: 42px; height: 42px; padding: 0; border-radius: 8px; }
+    .gen-modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+    .gen-modal-btn { flex: 1; padding: 11px; border-radius: 10px; border: 0; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .gen-modal-btn--primary { background: #f97316; color: #0a0a0a; }
+    .gen-modal-btn--primary:hover:not(:disabled) { background: #fb923c; }
+    .gen-modal-btn--primary:disabled { opacity: 0.6; cursor: wait; }
+    .gen-modal-btn--secondary { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+    .gen-modal-progress { margin-top: 14px; font-size: 12.5px; color: rgba(255,255,255,0.65); display: none; }
+    .gen-modal-progress.show { display: block; }
+    .gen-modal-progress .step { padding: 6px 0; }
+    .gen-modal-progress .step.done { color: #6ee7a3; }
+    .gen-modal-progress .step.active { color: #f97316; }
+    .gen-modal-progress .step.pending { color: rgba(255,255,255,0.35); }
+    .gen-modal-error { margin-top: 12px; font-size: 12.5px; color: #ff8a8a; display: none; }
+    .gen-modal-error.show { display: block; }
   </style>
+
+  <!-- Logo generation modal -->
+  <div id="gen-modal" class="gen-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="gen-modal">
+      <h3>Generate a logo with AI</h3>
+      <p>Tell us what your brand is about. We'll generate a flat-vector mark, make the background transparent, and convert it to SVG so it scales perfectly.</p>
+
+      <label>Brand description</label>
+      <textarea id="gen-desc" maxlength="300" placeholder="e.g. House music DJ from Cluj. Minimal, dark, geometric."></textarea>
+
+      <div class="gen-modal-row" style="margin-top:6px;">
+        <div style="flex:1;">
+          <label>Style</label>
+          <input id="gen-style" type="text" placeholder="minimalist / bold / playful / geometric" />
+        </div>
+        <div>
+          <label>Color (optional)</label>
+          <input id="gen-color" type="color" value="#0a0a0a" />
+        </div>
+      </div>
+
+      <div class="gen-modal-actions">
+        <button type="button" id="gen-cancel" class="gen-modal-btn gen-modal-btn--secondary">Cancel</button>
+        <button type="button" id="gen-go" class="gen-modal-btn gen-modal-btn--primary">Generate</button>
+      </div>
+
+      <div id="gen-progress" class="gen-modal-progress">
+        <div class="step active" data-step="1">1. Generating logo with AI…</div>
+        <div class="step pending" data-step="2">2. Removing white background…</div>
+        <div class="step pending" data-step="3">3. Converting to SVG vector…</div>
+      </div>
+
+      <p id="gen-error" class="gen-modal-error"></p>
+    </div>
+  </div>
 
   <script is:inline define:vars={{ kitId: k.id }}>
     let saveTimer = null;
@@ -460,6 +548,78 @@ const fontsCss = googleFontsUrl(k.fonts);
       return `<select data-link="platform" class="ed-input ed-input--inline" style="max-width:140px;">${opts}</select><input type="url" placeholder="https://..." data-link="url" class="ed-input ed-input--inline" /><button type="button" class="ed-rm">×</button>`;
     });
     bindList('press-list', 'add-press', 'press', 'press', ['name', 'year'], () => `<input type="text" placeholder="Outlet (Mixmag)" data-press="name" class="ed-input ed-input--inline" /><input type="text" placeholder="Year" data-press="year" class="ed-input ed-input--inline" style="max-width:80px;" /><button type="button" class="ed-rm">×</button>`);
+
+    // ── Logo Generator modal ────────────────────────────────────
+    const genModal = document.getElementById('gen-modal');
+    const genBtn = document.getElementById('gen-logo-btn');
+    const genCancel = document.getElementById('gen-cancel');
+    const genGo = document.getElementById('gen-go');
+    const genProgress = document.getElementById('gen-progress');
+    const genError = document.getElementById('gen-error');
+
+    function setStep(n, status) {
+      genProgress.querySelectorAll('.step').forEach((el) => {
+        const s = parseInt(el.dataset.step, 10);
+        el.classList.remove('active', 'done', 'pending');
+        if (s < n) el.classList.add('done');
+        else if (s === n) el.classList.add(status === 'done' ? 'done' : 'active');
+        else el.classList.add('pending');
+      });
+    }
+
+    genBtn?.addEventListener('click', () => {
+      genModal.classList.add('open');
+      genError.classList.remove('show');
+      genProgress.classList.remove('show');
+    });
+    genCancel?.addEventListener('click', () => genModal.classList.remove('open'));
+    genModal?.addEventListener('click', (e) => { if (e.target === genModal) genModal.classList.remove('open'); });
+
+    genGo?.addEventListener('click', async () => {
+      const description = document.getElementById('gen-desc').value.trim();
+      const style = document.getElementById('gen-style').value.trim();
+      const primaryColor = document.getElementById('gen-color').value;
+      if (description.length < 4) {
+        genError.textContent = 'Describe the brand in at least 4 characters.';
+        genError.classList.add('show');
+        return;
+      }
+      genError.classList.remove('show');
+      genProgress.classList.add('show');
+      genGo.disabled = true;
+      genCancel.disabled = true;
+      setStep(1, 'active');
+
+      // Simulate step progression visually — server runs all 3 steps in one call.
+      setTimeout(() => setStep(2, 'active'), 8000);
+      setTimeout(() => setStep(3, 'active'), 18000);
+
+      try {
+        const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ description, style: style || undefined, primaryColor }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          genError.textContent = data.error || 'Generation failed.';
+          genError.classList.add('show');
+          genProgress.classList.remove('show');
+          genGo.disabled = false;
+          genCancel.disabled = false;
+          return;
+        }
+        setStep(3, 'done');
+        // Reload page to pick up the new logo + palette
+        setTimeout(() => window.location.reload(), 600);
+      } catch (e) {
+        genError.textContent = 'Network error.';
+        genError.classList.add('show');
+        genProgress.classList.remove('show');
+        genGo.disabled = false;
+        genCancel.disabled = false;
+      }
+    });
 
     // ── Publish ───────────────────────────────────────────────────
     document.getElementById('publish-btn')?.addEventListener('click', async function() {
