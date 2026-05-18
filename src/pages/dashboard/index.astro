@@ -100,10 +100,10 @@ const soonIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
         <ProductTile
           name="Reels Lab"
           tagline="Upload an Instagram reel, get a frame-by-frame AI breakdown with hook scores, pacing, and retention insights."
-          href="/dashboard/reels"
+          href={reelCredits > 0 ? '/reels' : '/dashboard/reels'}
           icon={reelsIcon}
           meter={`${reelCredits} credit${reelCredits === 1 ? '' : 's'} remaining`}
-          cta="Open Reels"
+          cta={reelCredits > 0 ? 'Open Reels' : 'Get credits'}
           accent="#a78bfa"
           isNew={true}
         />
