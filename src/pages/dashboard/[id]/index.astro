@@ -5,7 +5,7 @@ import SupportChatWidget from '../../../components/SupportChatWidget.astro';
 import OnboardingTour from '../../../components/OnboardingTour.astro';
 
 const editorTourSteps = [
-  { selector: '.topbar-link[aria-label="Back to projects"]', title: 'Back to your projects', body: 'Click the Projects link anytime to return to your project list.' },
+  { selector: '.topbar-link[aria-label="Back to sites"]', title: 'Back to your sites', body: 'Click the Sites link anytime to return to your project list.' },
   { selector: '#preview-iframe', title: 'Pick on the canvas', body: 'Scroll through your site and click any element to select it — or double-click text to edit it inline.' },
   { selector: '#edit-input', title: 'Plain-English edits', body: 'Describe the change you want — Grappes rewrites the selection instantly.' },
   { selector: '#ve-bg-toggle-btn', title: 'Section backgrounds', body: 'Pick this toggle to recolor a section background without leaving the editor.' },
@@ -917,9 +917,9 @@ if (hasPreview) {
       </div>
 
       <div class="topbar-center">
-        <a href="/dashboard" class="topbar-link" aria-label="Back to projects">
+        <a href="/dashboard/sites" class="topbar-link" aria-label="Back to sites">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          <span>Projects</span>
+          <span>Sites</span>
         </a>
         <div class="topbar-sep"></div>
         <span class="topbar-project" title={project.name}>{project.name}</span>

@@ -1,0 +1,46 @@
+---
+import Dashboard from '../../../layouts/Dashboard.astro';
+
+const authUser = Astro.locals.user!;
+// Reel credits will live on users.reel_credits once the migration ships.
+// For now we render a placeholder so the studio tile has a real destination.
+const reelCredits = 0;
+---
+
+<Dashboard title="Reels Lab">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+    @media (max-width: 768px) {
+      main { padding-top: 40px !important; padding-bottom: 60px !important; }
+    }
+  </style>
+
+  <div style="text-align:center;margin-bottom:36px;">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;transition:color 0.2s;" onmouseover="this.style.color='rgba(255,255,255,0.8)'" onmouseout="this.style.color='rgba(255,255,255,0.45)'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Studio</span>
+    </a>
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#a78bfa;margin-bottom:10px;">Reels Lab</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin-bottom:10px;">AI Reel Analysis</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.5);margin-bottom:22px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.5;">
+      Upload an Instagram or TikTok reel. Get a frame-by-frame AI breakdown: hook score, pacing, retention curve, and the three concrete fixes that will move the next reel forward.
+    </p>
+    <p style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:22px;letter-spacing:0.02em;">
+      {reelCredits} credit{reelCredits === 1 ? '' : 's'} remaining
+    </p>
+  </div>
+
+  <div style="max-width:560px;margin:0 auto;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.18);border-radius:18px;padding:36px 32px;text-align:center;">
+    <div style="width:54px;height:54px;margin:0 auto 18px;border-radius:14px;background:rgba(167,139,250,0.14);color:#c4b5fd;display:flex;align-items:center;justify-content:center;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+    </div>
+    <h3 style="font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#fff;margin:0 0 8px;">Coming soon</h3>
+    <p style="font-size:13.5px;color:rgba(255,255,255,0.55);line-height:1.55;margin:0 0 22px;">
+      We're finalizing the upload pipeline and billing. Want first access? Drop us a note and we'll let you know the second it goes live.
+    </p>
+    <a href="mailto:hello@grappes.dev?subject=Reels%20Lab%20early%20access" style="display:inline-flex;align-items:center;gap:8px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;padding:11px 22px;font-size:13px;font-weight:700;letter-spacing:0.04em;text-decoration:none;transition:all 0.25s;">
+      <span>Request early access</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+  </div>
+</Dashboard>
