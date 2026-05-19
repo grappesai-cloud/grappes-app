@@ -141,12 +141,20 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href={fontsCss} />
-<style is:inline define:vars={{
-  accentColor, coverBg, coverFg,
-  primaryColor, secondaryColor,
-  primaryFg, secondaryFg, accentFg,
-  coverNameSize,
-}}>
+<style is:inline set:html={`
+  :root {
+    --accentColor: ${accentColor};
+    --coverBg: ${coverBg};
+    --coverFg: ${coverFg};
+    --primaryColor: ${primaryColor};
+    --secondaryColor: ${secondaryColor};
+    --primaryFg: ${primaryFg};
+    --secondaryFg: ${secondaryFg};
+    --accentFg: ${accentFg};
+    --coverNameSize: ${coverNameSize};
+  }
+`} />
+<style is:inline>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: #1a1a1d;
