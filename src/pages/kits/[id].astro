@@ -451,12 +451,15 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             <button type="button" id="lg-add-ref" class="pkw-add" style="${STYLE_ADD}">+ Add reference photo</button>
             <input type="file" accept="image/*" id="lg-ref-input" style="display:none;" />
           </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <label style="font-size:12px;color:rgba(255,255,255,0.6);display:inline-flex;align-items:center;gap:8px;">
-              <span>Color override</span>
-              <input id="lg-color" type="color" value="${STATE.palette?.primary || '#f97316'}" style="width:38px;height:32px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
+          <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:rgba(255,255,255,0.78);font-weight:500;">
+              <input id="lg-force-color" type="checkbox" style="width:16px;height:16px;accent-color:#f97316;cursor:pointer;" />
+              <span>Force a specific color for the mark</span>
             </label>
-            <span style="font-size:11px;color:rgba(255,255,255,0.35);flex:1;">Leave to use your palette · violet AI for the curious.</span>
+            <div id="lg-color-row" style="display:none;align-items:center;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);">
+              <input id="lg-color" type="color" value="${STATE.palette?.primary || '#f97316'}" style="width:44px;height:34px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
+              <span style="font-size:11.5px;color:rgba(255,255,255,0.5);line-height:1.45;">Otherwise we'll use your kit palette if you have one, or pick a bold accent automatically.</span>
+            </div>
           </div>
 
           <button type="button" id="lg-go" class="pkw-primary" style="${STYLE_BTN_PRIMARY};height:52px;width:100%;margin-top:4px;background:linear-gradient(135deg,#f97316 0%, #a78bfa 140%);">
@@ -541,11 +544,19 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         });
       }
 
+      // Wire the force-color toggle: show the picker only when checked.
+      const forceColorCb = card.querySelector('#lg-force-color');
+      const colorRow = card.querySelector('#lg-color-row');
+      forceColorCb.addEventListener('change', () => {
+        colorRow.style.display = forceColorCb.checked ? 'flex' : 'none';
+      });
+
       card.querySelector('#lg-go').addEventListener('click', async () => {
         const desc = card.querySelector('#lg-desc').value.trim();
         const style = card.querySelector('#lg-style').value.trim();
         const colorEl = card.querySelector('#lg-color');
-        const primaryColor = colorEl.value && colorEl.value !== '#000000' ? colorEl.value : undefined;
+        const primaryColor = forceColorCb.checked ? colorEl.value : undefined;
+        const referenceImages = (STATE.assets?.logo_refs || []).slice(0, 3);
         const goBtn = card.querySelector('#lg-go');
         const err = card.querySelector('#lg-error');
         const prog = card.querySelector('#lg-progress');
@@ -568,7 +579,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         try {
           const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ description: baseDesc, style: style || undefined, primaryColor }),
+            body: JSON.stringify({ description: baseDesc, style: style || undefined, primaryColor, referenceImages }),
           });
           const data = await r.json();
           clearTimeout(t2); clearTimeout(t3);

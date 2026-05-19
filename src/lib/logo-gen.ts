@@ -8,7 +8,7 @@
 // Returns { pngUrl, svgUrl } — both uploaded to Vercel Blob under the kit's
 // asset prefix. Caller persists to kit.assets.logo + kit.assets.logo_svg.
 
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
 import { vectorize } from "@neplex/vectorizer";
 // Avoid importing the const-enums directly (TS verbatimModuleSyntax rejects them).
@@ -72,6 +72,12 @@ export interface GenerateLogoInput {
   paletteColors?: string[];
   /** Optional style adjective: "minimalist", "bold", "playful", etc. */
   style?: string;
+  /**
+   * Optional reference image URLs (Vercel Blob). When present we route through
+   * gpt-image-1's edit endpoint so the model uses them as visual style guidance
+   * rather than ignoring them entirely.
+   */
+  referenceImages?: string[];
 }
 
 /**
@@ -96,11 +102,45 @@ async function generateRawLogo(input: GenerateLogoInput): Promise<Buffer> {
   }
   const styleHint = input.style ? `Style: ${input.style}.` : "";
 
+  const refs = (input.referenceImages ?? []).slice(0, 3);
+  const refsHint =
+    refs.length > 0
+      ? `Use the attached reference image${refs.length > 1 ? "s" : ""} as STYLE GUIDANCE ONLY — match their visual language (silhouette weight, geometric vs organic, negative-space treatment, overall vibe) but do NOT copy their actual shapes or letters. Output an original mark for "${input.description}".`
+      : "";
+
   const prompt = `Design a flat vector LOGO MARK (no text, no wordmark) for: "${input.description}".
+${refsHint}
 ${colorHint}
 ${styleHint}
 STRICT VISUAL RULES: ${SYSTEM_PROMPT_RULES}.
 The result will be vectorized to SVG, so it must be a clean silhouette with strong contrast against the off-white background.`;
+
+  // When references are supplied, route through gpt-image-1's edit endpoint so
+  // the model actually conditions on them. Without this the URLs were captured
+  // but ignored, producing logos unrelated to what the user uploaded.
+  if (refs.length > 0) {
+    const files = await Promise.all(
+      refs.map(async (url, i) => {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`Failed to fetch reference image ${i + 1}`);
+        const ct = r.headers.get("content-type") ?? "image/png";
+        const ext = ct.includes("svg") ? "svg" : ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : "png";
+        return toFile(r.body as any, `ref-${i + 1}.${ext}`, { type: ct });
+      }),
+    );
+
+    const editRes = await openai.images.edit({
+      model: "gpt-image-1",
+      image: files.length === 1 ? files[0] : (files as any),
+      prompt,
+      size: "1024x1024",
+      n: 1,
+    });
+
+    const b64Edit = editRes.data?.[0]?.b64_json;
+    if (!b64Edit) throw new Error("OpenAI returned no image data");
+    return Buffer.from(b64Edit, "base64");
+  }
 
   const res = await openai.images.generate({
     model: "gpt-image-1",
