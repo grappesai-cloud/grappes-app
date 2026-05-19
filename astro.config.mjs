@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import vercel from '@astrojs/vercel';
 import react from '@astrojs/react';
 import sentry from '@sentry/astro';
+import tailwindcss from '@tailwindcss/vite';
 import { existsSync } from 'node:fs';
 
 // ffmpeg + ffprobe binaries are loaded by their installer packages via a
@@ -32,6 +33,7 @@ export default defineConfig({
   },
 
   vite: {
+    plugins: [tailwindcss()],
     optimizeDeps: {
       include: ['@supabase/supabase-js'],
     },

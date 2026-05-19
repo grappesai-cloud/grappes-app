@@ -129,27 +129,92 @@ function ProcessingState({ row }: { row: Analysis }) {
     pct: 0,
     message: "Queued",
   }) as ProcessingProgress;
+  const pct = Math.max(0, Math.min(100, progress.pct ?? 0));
+  const stepLabel = (progress.step ?? "queued").replace(/_/g, " ");
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center">
-      <div className="font-mono text-xs uppercase tracking-widest text-zinc-500">
-        {progress.step}
-      </div>
-      <div className="mt-3 text-5xl font-semibold tabular-nums text-zinc-100">
-        {progress.pct}%
-      </div>
-      <div className="mt-3 max-w-md text-center text-sm text-zinc-400">
-        {progress.message}
-      </div>
-      <div className="mx-auto mt-6 h-1 w-80 overflow-hidden rounded-full bg-zinc-900">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="mx-auto flex min-h-[60vh] max-w-2xl flex-col"
+    >
+      <section
+        className="relative overflow-hidden rounded-3xl border border-white/10 p-10 lg:p-14"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%), rgba(18,18,22,0.92)",
+          backdropFilter: "blur(24px) saturate(1.3)",
+          boxShadow:
+            "0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 60px -32px rgba(0,0,0,0.6)",
+        }}
+      >
         <div
-          className="h-full bg-emerald-500 transition-all duration-500"
-          style={{ width: `${progress.pct}%` }}
+          className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl"
+          style={{ background: "rgba(167,139,250,0.18)" }}
         />
-      </div>
-      <div className="mt-10 max-w-xs text-center font-mono text-[10px] uppercase tracking-widest text-zinc-600">
-        {row.fileName}
-      </div>
-    </div>
+        <div
+          className="pointer-events-none absolute -left-20 -bottom-24 h-56 w-56 rounded-full blur-3xl"
+          style={{ background: "rgba(6,191,221,0.10)" }}
+        />
+
+        <div className="relative">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 font-mono text-[10.5px] font-bold uppercase tracking-[0.18em] text-violet-300">
+            <motion.span
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
+              className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_8px_currentColor]"
+            />
+            Analysis in progress
+          </div>
+
+          <div className="flex items-end justify-between gap-6">
+            <div>
+              <div className="font-mono text-[10.5px] uppercase tracking-[0.22em] text-white/45">
+                {stepLabel}
+              </div>
+              <p className="mt-2 max-w-md text-[15px] leading-snug text-white/85">
+                {progress.message}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="bg-gradient-to-br from-white to-white/60 bg-clip-text font-serif text-6xl font-light tabular-nums leading-none text-transparent">
+                {pct}
+              </div>
+              <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.22em] text-white/40">
+                percent
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 h-[5px] w-full overflow-hidden rounded-full bg-white/[0.06]">
+            <motion.div
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              className="h-full rounded-full"
+              style={{
+                background:
+                  "linear-gradient(90deg, #a78bfa 0%, #f97316 60%, #06bfdd 100%)",
+                boxShadow: "0 0 12px rgba(167,139,250,0.45)",
+              }}
+            />
+          </div>
+
+          <div className="mt-10 flex items-center justify-between gap-4 border-t border-white/[0.07] pt-5">
+            <span className="truncate font-mono text-[10.5px] uppercase tracking-[0.18em] text-white/40">
+              {row.fileName}
+            </span>
+            <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
+              Live · auto-refreshing
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <p className="mt-6 text-center text-[12.5px] leading-relaxed text-white/45">
+        We're scoring every second across attention, emotion, memory, decision and comprehension.<br />
+        Feel free to leave this tab — we'll keep going in the background.
+      </p>
+    </motion.div>
   );
 }
 

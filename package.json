@@ -56,12 +56,14 @@
     "yauzl": "^3.3.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.4",
     "drizzle-kit": "^0.31.10",
     "puppeteer": "^24.39.1",
+    "tailwindcss": "^4.3.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.4"
   }
