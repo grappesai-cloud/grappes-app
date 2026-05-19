@@ -442,7 +442,7 @@ const fontsCss = googleFontsUrl(k.fonts);
     });
 
     async function uploadFile(file, assetKey) {
-      const { upload } = await import('https://cdn.jsdelivr.net/npm/@vercel/blob@2.3.3/dist/client/index.js');
+      const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
       const blob = await upload(file.name, file, {
         access: 'public',
         handleUploadUrl: `/api/kits/${kitId}/sign-upload`,
