@@ -1,10 +1,9 @@
 // ── POST /api/kits/[id]/generate-logo ──────────────────────────────────────
-// AI logo generation for a press kit:
-//   1. OpenAI gpt-image-1 generates a flat-vector mark on white bg
-//   2. sharp pipeline makes white transparent
-//   3. @neplex/vectorizer traces it to SVG
+// AI logo generation via Recraft V4 Vector (SVG native). With reference
+// photos we route through recraftv3_vector + style_id (V4 doesn't yet
+// support style transfer). Companion PNG is rendered from the SVG via sharp.
 // Saves both pngUrl + svgUrl to kit.assets.logo / kit.assets.logo_svg.
-// Rate-limited 3/min/user, lifetime cap 10/kit to bound OpenAI cost.
+// Rate-limited 3/min/user, lifetime cap 10/kit to bound API cost.
 
 import type { APIRoute } from "astro";
 import { createAdminClient } from "../../../../lib/supabase";
