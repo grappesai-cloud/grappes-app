@@ -8,8 +8,5 @@
       "path": "/api/cron/trial-reminders",
       "schedule": "0 9 * * *"
     }
-  ],
-  "functions": {
-    "src/pages/api/reels/analyze.ts": { "maxDuration": 800, "memory": 3008 }
-  }
+  ]
 }
