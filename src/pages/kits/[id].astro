@@ -331,7 +331,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
               const file = e.target.files?.[0]; if (!file) return;
               markDirty();
               try {
-                const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+                const { upload } = await import('/vendor/vercel-blob-client.js');
                 const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
                 STATE.assets = { ...(STATE.assets || {}), logo: blob.url };
                 await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });
@@ -381,7 +381,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             const file = e.target.files?.[0]; if (!file) return;
             markDirty();
             try {
-              const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+              const { upload } = await import('/vendor/vercel-blob-client.js');
               const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
               STATE.assets = { ...(STATE.assets || {}), mascot: blob.url };
               queueSave({ assets: STATE.assets });
@@ -1314,7 +1314,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       if (!file) return;
       markDirty();
       try {
-        const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+        const { upload } = await import('/vendor/vercel-blob-client.js');
         const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
         STATE.assets = { ...(STATE.assets || {}), logo: blob.url, logo_svg: undefined };
         await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });
@@ -1403,7 +1403,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     }
 
     async function uploadOne(file) {
-      const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+      const { upload } = await import('/vendor/vercel-blob-client.js');
       const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
       return blob.url;
     }
@@ -1915,7 +1915,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         const file = e.target.files?.[0]; if (!file) return;
         markDirty();
         try {
-          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const { upload } = await import('/vendor/vercel-blob-client.js');
           const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
           STATE.assets = { ...(STATE.assets || {}), logo_refs: [...(STATE.assets?.logo_refs || []), blob.url] };
           queueSave({ assets: STATE.assets });
@@ -2205,7 +2205,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         const file = e.target.files?.[0]; if (!file) return;
         markDirty();
         try {
-          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const { upload } = await import('/vendor/vercel-blob-client.js');
           const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
           STATE.assets = { ...(STATE.assets || {}), logo_refs: [...(STATE.assets?.logo_refs || []), blob.url] };
           queueSave({ assets: STATE.assets });
@@ -2546,7 +2546,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         const file = e.target.files?.[0]; if (!file) return;
         markDirty();
         try {
-          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const { upload } = await import('/vendor/vercel-blob-client.js');
           const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
           STATE.assets = { ...(STATE.assets || {}), logo: blob.url, logo_svg: undefined };
           await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });

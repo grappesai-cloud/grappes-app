@@ -838,7 +838,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     try {
       // CDN ESM import — bare specifier '@vercel/blob/client' isn't resolved
       // inside Astro define:vars scripts (they bypass Vite bundling).
-      var mod = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+      var mod = await import('/vendor/vercel-blob-client.js');
       blob = await mod.upload(file.name, file, {
         access: 'public',
         handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',
