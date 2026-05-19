@@ -16,16 +16,16 @@ export const POST: APIRoute = async ({ locals, request }) => {
       body,
       request,
       onBeforeGenerateToken: async (pathname: string) => {
-        const ext = pathname.split('.').pop() ?? 'mp4';
-        const safeName = `${nanoid(12)}.${ext}`;
+        // `pathname` here is the one the client passed to upload(); we keep it
+        // as a label but let Blob append a random suffix so repeat-uploads of
+        // the same filename don't collide.
         return {
           allowedContentTypes: [
             'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
           ],
           maximumSizeInBytes: 200 * 1024 * 1024,
-          tokenPayload: JSON.stringify({ userId: user.id, safeName }),
-          addRandomSuffix: false,
-          pathname: `reels/${safeName}`,
+          tokenPayload: JSON.stringify({ userId: user.id, pathname }),
+          addRandomSuffix: true,
         } as any;
       },
       onUploadCompleted: async () => {

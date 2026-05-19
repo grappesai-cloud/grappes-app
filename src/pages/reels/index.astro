@@ -145,7 +145,12 @@ function timeAgo(d: Date | string): string {
 
       try {
         const mod = await import('https://esm.sh/@vercel/blob@2.3.3/client');
-        const blob = await mod.upload(file.name, file, {
+        // Sanitize filename for Blob pathname (server adds a random suffix
+        // for uniqueness; this just keeps the human-readable base clean).
+        const ext = file.name.split('.').pop() || 'mp4';
+        const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 60) || 'reel';
+        const clientPathname = `reels/${baseName}.${ext}`;
+        const blob = await mod.upload(clientPathname, file, {
           access: 'public',
           handleUploadUrl: '/api/reels/upload',
           onUploadProgress: ({ percentage }) => { progressFill.style.width = Math.round(percentage) + '%'; },
