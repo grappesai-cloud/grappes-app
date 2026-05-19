@@ -23,9 +23,12 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     return json({ error: "Slow down, 3 logos per minute max." }, 429);
   }
 
-  let body: { description?: string; primaryColor?: string; style?: string } = {};
+  let body: { description?: string; primaryColor?: string; style?: string; referenceImages?: string[] } = {};
   try { body = await request.json(); } catch {}
   const description = (body.description ?? "").trim();
+  const referenceImages = Array.isArray(body.referenceImages)
+    ? body.referenceImages.filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 3)
+    : [];
   if (description.length < 4) {
     return json({ error: "Describe the brand in a sentence (at least 4 characters)." }, 400);
   }
@@ -59,6 +62,7 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     primaryColor: body.primaryColor,
     paletteColors: paletteColors.length > 0 ? paletteColors : undefined,
     style: body.style,
+    referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
   };
 
   try {
