@@ -144,7 +144,7 @@ function timeAgo(d: Date | string): string {
       progressBar.hidden = false;
 
       try {
-        const mod = await import('https://cdn.jsdelivr.net/npm/@vercel/blob@2.3.3/dist/client/index.js');
+        const mod = await import('https://esm.sh/@vercel/blob@2.3.3/client');
         const blob = await mod.upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/reels/upload',
