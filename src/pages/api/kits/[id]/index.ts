@@ -8,10 +8,12 @@ import { json } from "../../../../lib/api-utils";
 import { extractPaletteFromLogo, type Palette, type Fonts } from "../../../../lib/press-kit";
 
 const UPDATABLE_FIELDS = new Set([
-  "kit_type", "name", "tagline", "bio_short", "bio_long",
+  "kit_type", "mode", "name", "tagline", "bio_short", "bio_long",
   "contact_email", "contact_phone", "contact_other",
   "palette", "fonts", "links", "stats", "assets", "press", "awards",
 ]);
+
+const VALID_MODES = new Set(["press_kit", "brand_book"]);
 
 export const PATCH: APIRoute = async ({ locals, params, request }) => {
   const user = locals.user;
@@ -33,7 +35,9 @@ export const PATCH: APIRoute = async ({ locals, params, request }) => {
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const [key, val] of Object.entries(body)) {
-    if (UPDATABLE_FIELDS.has(key)) update[key] = val;
+    if (!UPDATABLE_FIELDS.has(key)) continue;
+    if (key === "mode" && (typeof val !== "string" || !VALID_MODES.has(val))) continue;
+    update[key] = val;
   }
 
   // ── Auto-extract palette when a new logo is uploaded ──────────────────

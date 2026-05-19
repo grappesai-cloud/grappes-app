@@ -1,55 +1,54 @@
 ---
 import Dashboard from '../../layouts/Dashboard.astro';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in');
 ---
-<Dashboard title="New press kit">
+<Dashboard title="New kit">
   <style is:global>
     main { padding-top: 56px !important; padding-bottom: 80px !important; }
   </style>
 
-  <div style="max-width:520px;margin:0 auto;">
+  <div style="max-width:680px;margin:0 auto;">
     <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:22px;">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       <span>Press kits</span>
     </a>
 
-    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#f97316;margin-bottom:10px;">Step 1 of 2</span>
-    <h1 style="font-family:'Inter',sans-serif;font-size:34px;font-weight:400;line-height:1.1;letter-spacing:-0.035em;color:#fff;margin:0 0 8px;">Let's start a press kit</h1>
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#f97316;margin-bottom:10px;">Press Kit Lab</span>
+    <h1 style="font-family:'Inter',sans-serif;font-size:34px;font-weight:400;line-height:1.1;letter-spacing:-0.035em;color:#fff;margin:0 0 8px;">Let's start a new kit</h1>
     <p style="font-size:14px;color:rgba(255,255,255,0.55);margin:0 0 28px;line-height:1.5;">
-      Just two basics here. You'll edit everything else in the next screen and only pay €15 if you decide to publish.
+      Two quick choices — a name and the kind of document you're making. You can change everything else later.
     </p>
 
-    <form id="new-kit-form" style="display:flex;flex-direction:column;gap:18px;">
+    <form id="new-kit-form" style="display:flex;flex-direction:column;gap:24px;">
       <label style="display:flex;flex-direction:column;gap:6px;">
         <span style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.85);">Name on the kit</span>
         <span style="font-size:11.5px;color:rgba(255,255,255,0.45);">Artist name, brand, or your own name.</span>
-        <input id="kit-name" type="text" required maxlength="80" placeholder="e.g. EdiP, Mattman Music, Ana Pop" style="margin-top:4px;height:46px;padding:0 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:11px;color:#fff;font-family:inherit;font-size:14.5px;outline:none;" />
+        <input id="kit-name" type="text" required maxlength="80" placeholder="e.g. EdiP, Mattman Music, Ana Pop" style="margin-top:4px;height:48px;padding:0 16px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;outline:none;" />
       </label>
 
       <fieldset style="border:0;padding:0;margin:0;">
-        <legend style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.85);margin-bottom:8px;">What kind of kit?</legend>
-        <p style="font-size:11.5px;color:rgba(255,255,255,0.45);margin:0 0 10px;">Drives the default font pairing and section order. You can change it anytime.</p>
-        <div id="kit-type-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
-          {[
-            { v: 'musician', label: 'Musician / DJ' },
-            { v: 'agency', label: 'Agency / Studio' },
-            { v: 'photographer', label: 'Photographer' },
-            { v: 'founder', label: 'Founder' },
-            { v: 'model', label: 'Model / Talent' },
-            { v: 'other', label: 'Other' },
-          ].map((opt, i) => (
-            <button type="button" class="kt-card" data-value={opt.v} aria-pressed={i === 0 ? 'true' : 'false'} style="padding:12px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);text-align:center;cursor:pointer;transition:all 0.15s;">
-              {opt.label}
-            </button>
-          ))}
+        <legend style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.85);margin-bottom:6px;">What are you creating?</legend>
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.45);margin:0 0 14px;">Two very different documents. Pick the one that fits today — you can always start a second kit in the other mode.</p>
+
+        <input type="hidden" id="kit-mode" value="press_kit" />
+        <div id="kit-mode-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <button type="button" class="km-tile is-active" data-mode="press_kit" data-accent="#f97316" style="position:relative;text-align:left;padding:24px 24px 22px;background:rgba(249,115,22,0.12);border:2px solid #f97316;border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;box-shadow:0 0 0 4px rgba(249,115,22,0.16);">
+            <span class="km-dot" style="position:absolute;top:14px;right:14px;width:20px;height:20px;border-radius:50%;background:#f97316;display:inline-flex;align-items:center;justify-content:center;color:#0a0a0a;font-size:12px;font-weight:900;">&#10003;</span>
+            <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#f97316;margin-bottom:14px;">A · Press Kit</div>
+            <div style="font-size:17px;font-weight:600;letter-spacing:-0.015em;margin-bottom:6px;">Press Kit</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.5;">Editorial document for journalists. Bio, stats, press mentions, contact.</div>
+          </button>
+          <button type="button" class="km-tile" data-mode="brand_book" data-accent="#a78bfa" style="position:relative;text-align:left;padding:24px 24px 22px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
+            <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#a78bfa;margin-bottom:14px;">B · Brand Book</div>
+            <div style="font-size:17px;font-weight:600;letter-spacing:-0.015em;margin-bottom:6px;">Brand Book</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.65);line-height:1.5;">Visual guidelines for your team and partners. Logo system, palette, typography, applications.</div>
+          </button>
         </div>
-        <input type="hidden" id="kit-type-value" value="musician" />
-        <label id="kit-type-other-wrap" style="display:none;flex-direction:column;gap:6px;margin-top:12px;">
-          <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);">Tell us what kind</span>
-          <input id="kit-type-other" type="text" maxlength="60" placeholder="e.g. Writer, Producer, Restaurant, Athlete…" style="height:44px;padding:0 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:11px;color:#fff;font-family:inherit;font-size:14px;outline:none;" />
-        </label>
       </fieldset>
 
-      <button type="submit" id="create-btn" style="margin-top:6px;height:48px;background:#f97316;color:#0a0a0a;border:none;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;">
+      <button type="submit" id="create-btn" style="margin-top:6px;height:50px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.04em;cursor:pointer;transition:background .15s;">
         Continue →
       </button>
 
@@ -58,73 +57,82 @@ import Dashboard from '../../layouts/Dashboard.astro';
   </div>
 
   <style>
-    .kt-card:hover { border-color: rgba(255,255,255,0.22); color: #fff; }
-    .kt-card[aria-pressed="true"] {
-      background: rgba(249,115,22,0.12);
-      border-color: #f97316;
-      color: #fff;
-      box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
-    }
+    .km-tile:hover:not(.is-active) { border-color: rgba(255,255,255,0.28); transform: translateY(-1px); }
     input[type="text"]:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
+    #create-btn:hover { background: #fb923c; }
   </style>
 
   <script is:inline>
     (function () {
-      const grid = document.getElementById('kit-type-grid');
-      const hidden = document.getElementById('kit-type-value');
-      const otherWrap = document.getElementById('kit-type-other-wrap');
-      const otherInput = document.getElementById('kit-type-other');
+      const grid = document.getElementById('kit-mode-grid');
+      const hidden = document.getElementById('kit-mode');
+      const createBtn = document.getElementById('create-btn');
+
+      function paintTile(btn) {
+        const accent = btn.dataset.accent;
+        btn.classList.add('is-active');
+        btn.style.background = accent === '#a78bfa' ? 'rgba(167,139,250,0.12)' : 'rgba(249,115,22,0.12)';
+        btn.style.border = `2px solid ${accent}`;
+        btn.style.boxShadow = accent === '#a78bfa'
+          ? '0 0 0 4px rgba(167,139,250,0.2)'
+          : '0 0 0 4px rgba(249,115,22,0.16)';
+        if (!btn.querySelector('.km-dot')) {
+          const dot = document.createElement('span');
+          dot.className = 'km-dot';
+          dot.setAttribute('style', `position:absolute;top:14px;right:14px;width:20px;height:20px;border-radius:50%;background:${accent};display:inline-flex;align-items:center;justify-content:center;color:#0a0a0a;font-size:12px;font-weight:900;`);
+          dot.innerHTML = '&#10003;';
+          btn.appendChild(dot);
+        }
+      }
+      function unpaintTile(btn) {
+        btn.classList.remove('is-active');
+        btn.style.background = 'rgba(255,255,255,0.03)';
+        btn.style.border = '1px solid rgba(255,255,255,0.12)';
+        btn.style.boxShadow = 'none';
+        const dot = btn.querySelector('.km-dot');
+        if (dot) dot.remove();
+      }
 
       grid.addEventListener('click', (e) => {
-        const btn = e.target.closest('.kt-card');
+        const btn = e.target.closest('.km-tile');
         if (!btn) return;
-        grid.querySelectorAll('.kt-card').forEach((b) => b.setAttribute('aria-pressed', 'false'));
-        btn.setAttribute('aria-pressed', 'true');
-        const v = btn.dataset.value;
-        hidden.value = v;
-        if (v === 'other') {
-          otherWrap.style.display = 'flex';
-          setTimeout(() => otherInput.focus(), 50);
-        } else {
-          otherWrap.style.display = 'none';
-        }
+        grid.querySelectorAll('.km-tile').forEach((b) => unpaintTile(b));
+        paintTile(btn);
+        hidden.value = btn.dataset.mode;
+        // Recolor the primary CTA to match the choice
+        createBtn.style.background = btn.dataset.accent;
+        createBtn.style.color = '#0a0a0a';
       });
 
       document.getElementById('new-kit-form').addEventListener('submit', async (ev) => {
         ev.preventDefault();
-        const btn = document.getElementById('create-btn');
         const err = document.getElementById('new-kit-error');
         const name = document.getElementById('kit-name').value.trim();
-        let kit_type = hidden.value || 'musician';
-        const kit_type_other = otherInput.value.trim();
+        const mode = hidden.value || 'press_kit';
         if (!name) return;
-        if (kit_type === 'other' && !kit_type_other) {
-          err.textContent = 'Tell us what kind of kit (or pick one above).';
-          err.style.display = 'block';
-          otherInput.focus();
-          return;
-        }
-        btn.disabled = true;
-        btn.textContent = 'Creating…';
+        createBtn.disabled = true;
+        createBtn.textContent = 'Creating…';
         err.style.display = 'none';
         try {
-          const body = { name, kit_type };
-          if (kit_type === 'other') body.kit_type_other = kit_type_other;
-          const r = await fetch('/api/kits', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+          const r = await fetch('/api/kits', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name, mode }),
+          });
           const data = await r.json();
           if (!r.ok) {
             err.textContent = data.error || 'Could not create.';
             err.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Continue →';
+            createBtn.disabled = false;
+            createBtn.textContent = 'Continue →';
             return;
           }
           window.location.href = `/kits/${data.id}`;
         } catch {
           err.textContent = 'Network error.';
           err.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Continue →';
+          createBtn.disabled = false;
+          createBtn.textContent = 'Continue →';
         }
       });
     })();

@@ -18,6 +18,7 @@ const { data: kit, error } = await client
 if (!kit || error) return Astro.redirect('/kits');
 
 const k = kit as unknown as PressKit;
+const kitMode: 'press_kit' | 'brand_book' = (k as any).mode === 'brand_book' ? 'brand_book' : 'press_kit';
 const justPublished = Astro.url.searchParams.get('published') === '1';
 const fontsCss = googleFontsUrl(k.fonts);
 
@@ -29,6 +30,76 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 ---
 
 <Dashboard title={`Edit — ${k.name}`}>
+  {kitMode === 'brand_book' ? (
+    <>
+      <style is:global>{`main { padding-top: 56px !important; padding-bottom: 80px !important; max-width: 760px !important; }`}</style>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+        <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          <span>Back to dashboard</span>
+        </a>
+      </div>
+
+      <section style="background:linear-gradient(180deg,rgba(167,139,250,0.1) 0%, rgba(167,139,250,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(167,139,250,0.24);border-radius:24px;padding:56px 48px;text-align:left;">
+        <span style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#a78bfa;padding:6px 14px;border-radius:999px;background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.36);margin-bottom:18px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px rgba(167,139,250,0.7);"></span>
+          Brand Book
+        </span>
+        <h1 style="font-family:'Inter',sans-serif;font-size:clamp(32px,4.6vw,46px);font-weight:300;letter-spacing:-0.035em;line-height:1.05;color:#fff;margin:0 0 18px;">
+          Your brand book studio is coming next.
+        </h1>
+        <p style="font-size:15px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 14px;max-width:580px;">
+          We're building a flow that produces a polished brand book, not just a doc. Expect: a logo system spread (primary, mono, lockups, clear space), a color palette with hex codes, typography specimens powered by Google Fonts, and AI-generated mockup applications — packaging, signage, social.
+        </p>
+        <p style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;margin:0 0 36px;max-width:580px;">
+          The kit "{k.name}" is saved and waiting in Brand Book mode. You'll be able to pick this up once the flow ships. In the meantime you can keep working in Press Kit mode.
+        </p>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button type="button" id="switch-to-press-kit" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;cursor:pointer;font-family:inherit;">
+            Switch to Press Kit instead →
+          </button>
+          <a href="/dashboard" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">
+            Back to dashboard
+          </a>
+        </div>
+        <p id="switch-error" style="display:none;font-size:12px;color:#ff8a8a;margin:14px 0 0;"></p>
+      </section>
+
+      <script is:inline define:vars={{ kitId: k.id }}>
+        document.getElementById('switch-to-press-kit').addEventListener('click', async () => {
+          const btn = document.getElementById('switch-to-press-kit');
+          const err = document.getElementById('switch-error');
+          err.style.display = 'none';
+          btn.disabled = true;
+          btn.textContent = 'Switching…';
+          try {
+            const r = await fetch(`/api/kits/${kitId}`, {
+              method: 'PATCH',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ mode: 'press_kit' }),
+            });
+            if (!r.ok) {
+              const data = await r.json().catch(() => ({}));
+              err.textContent = data.error || 'Could not switch.';
+              err.style.display = 'block';
+              btn.disabled = false;
+              btn.textContent = 'Switch to Press Kit instead →';
+              return;
+            }
+            window.location.reload();
+          } catch {
+            err.textContent = 'Network error.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Switch to Press Kit instead →';
+          }
+        });
+      </script>
+    </>
+  ) : (
+  <Fragment>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href={fontsCss} />
@@ -1450,4 +1521,6 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       if (idx !== stepIdx) goTo(idx, { skipSave: true });
     });
   </script>
+  </Fragment>
+  )}
 </Dashboard>

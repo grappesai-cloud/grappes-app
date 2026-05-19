@@ -54,6 +54,21 @@ const sitesIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const reelsIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
 const auditIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-7"/></svg>`;
 const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`;
+const logoIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>`;
+
+// Logo Lab — count standalone logos owned by this user.
+let logoCount = 0;
+try {
+  const adminClient = createAdminClient();
+  const { count } = await adminClient
+    .from('user_logos')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', authUser.id);
+  logoCount = count ?? 0;
+} catch (e) {
+  // user_logos table may not exist yet on environments where the migration
+  // hasn't been applied — fail silently rather than break the dashboard.
+}
 ---
 
 <Dashboard title="Studio">
@@ -109,12 +124,22 @@ const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
         />
         <ProductTile
           name="Press Kit Lab"
-          tagline="Compose a polished digital press kit. Upload logo, bio, photos, videos. Get a shareable URL and PDF download. €15/kit."
+          tagline="Press kits & brand books, AI-built. Editorial documents for journalists or visual guidelines for your team."
           href="/kits"
           icon={kitIcon}
           meter={kitCount === 0 ? 'No kits yet' : `${kitCount} kit${kitCount === 1 ? '' : 's'}${publishedKits > 0 ? ` · ${publishedKits} live` : ''}`}
           cta={kitCount > 0 ? 'Open kits' : 'New kit'}
           accent="#f97316"
+          isNew={true}
+        />
+        <ProductTile
+          name="Logo Lab"
+          tagline="AI vector logo, instant SVG + PNG. A conversational flow that produces a clean mark in seconds."
+          href="/logo"
+          icon={logoIcon}
+          meter={logoCount === 0 ? 'No logos yet' : `${logoCount} logo${logoCount === 1 ? '' : 's'}`}
+          cta={logoCount > 0 ? 'Open Logo Lab' : 'New logo'}
+          accent="#a78bfa"
           isNew={true}
         />
       </div>
