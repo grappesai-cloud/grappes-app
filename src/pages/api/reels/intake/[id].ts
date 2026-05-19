@@ -25,10 +25,10 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
   if (!progress?.intake) return json({ error: 'intake not in awaiting state' }, 409);
 
   // Merge intake_answers onto the progress jsonb so the pipeline picks them up.
-  const newProgress = { ...progress, intake_answers: body.answers };
+  const newProgress = JSON.stringify({ ...progress, intake_answers: body.answers });
   await sql`
     UPDATE reel_analyses
-    SET progress = ${sql.json(newProgress as any)},
+    SET progress = ${newProgress}::jsonb,
         updated_at = now()
     WHERE id = ${params.id}
   `;
