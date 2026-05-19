@@ -3,6 +3,7 @@ import { sendWelcomeEmail } from '../lib/resend';
 import { checkRateLimit, getClientIp } from '../lib/rate-limit';
 import { verifyTurnstile, turnstileSiteKey } from '../lib/turnstile';
 import { callAuthApi, redirectWithCookies } from '../lib/auth-server';
+import { e } from '../lib/env';
 
 if (Astro.locals.user) return Astro.redirect('/dashboard');
 
@@ -63,7 +64,6 @@ if (Astro.request.method === 'POST') {
 // Conditionally show social-login buttons based on which providers have envs.
 // e() falls back to process.env at runtime on Vercel SSR — import.meta.env
 // doesn't expose non-PUBLIC vars there.
-import { e } from '../lib/env';
 const googleEnabled = !!(e('GOOGLE_CLIENT_ID') && e('GOOGLE_CLIENT_SECRET'));
 const appleEnabled  = !!(e('APPLE_CLIENT_ID')  && e('APPLE_CLIENT_SECRET'));
 ---
