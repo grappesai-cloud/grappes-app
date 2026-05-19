@@ -21,9 +21,8 @@ const k = kit as unknown as PressKit;
 const justPublished = Astro.url.searchParams.get('published') === '1';
 const fontsCss = googleFontsUrl(k.fonts);
 
-// Build the master font CSS link — loads UI font + a small batch of headline
-// fonts so the picker can preview each family inline without hammering the
-// page with 150 stylesheet requests on load.
+// Preload a healthy batch of preview fonts so the picker shows each family
+// rendered in its own face without 150 stylesheet requests.
 const _families = ['Inter', ...GOOGLE_FONTS.slice(0, 64).map(f => f.family)];
 const _uniq = Array.from(new Set(_families));
 const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `family=${f.replace(/\s+/g, '+')}:wght@400;500;700`).join('&')}&display=swap`;
@@ -36,35 +35,33 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
   <link rel="stylesheet" href={previewFontsCss} />
 
   <style is:global>
-    main { padding-top: 32px !important; padding-bottom: 60px !important; max-width: 1180px !important; }
+    main { padding-top: 28px !important; padding-bottom: 80px !important; max-width: 1180px !important; }
   </style>
 
   {/* ─── Top bar ────────────────────────────────────────── */}
-  <div class="top-bar">
-    <a href="/kits" class="top-back">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       <span>Press kits</span>
     </a>
-    <div class="top-right">
-      <span id="save-state" class="save-state"></span>
+    <div style="display:flex;gap:12px;align-items:center;">
+      <span id="save-state" style="font-size:11.5px;color:rgba(255,255,255,0.5);transition:opacity .2s;"></span>
       {k.status === 'published' && k.slug ? (
-        <a href={`/kit/${k.slug}`} target="_blank" rel="noopener" class="top-live">View live →</a>
+        <a href={`/kit/${k.slug}`} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(110,231,163,0.1);color:#6ee7a3;border:1px solid rgba(110,231,163,0.3);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;text-decoration:none;">View live →</a>
       ) : null}
     </div>
   </div>
 
   {justPublished && (
-    <div class="banner-success">
+    <div style="background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:14px 18px;color:#6ee7a3;font-size:13.5px;margin-bottom:22px;text-align:center;">
       ✓ Published. Your shareable link is grappes.dev/kit/{k.slug ?? '…'}
     </div>
   )}
 
-  {/* ─── Progress chips ─────────────────────────────────── */}
-  <div id="wizard-progress" class="wiz-progress">
-    {/* dynamically rendered via JS */}
-  </div>
+  {/* ─── Slim progress bar + caption ────────────────────── */}
+  <div id="wizard-progress" style="max-width:680px;margin:0 auto 28px;"></div>
 
-  {/* ─── Wizard data island (initial kit JSON for client) */}
+  {/* ─── Bootstrap state for client ─────────────────────── */}
   <script id="kit-bootstrap" type="application/json" set:html={JSON.stringify({
     id: k.id, name: k.name, tagline: k.tagline, kit_type: k.kit_type,
     bio_short: k.bio_short, bio_long: k.bio_long,
@@ -76,253 +73,87 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
   })} />
   <script id="font-bootstrap" type="application/json" set:html={JSON.stringify(GOOGLE_FONTS)} />
 
-  {/* ─── Wizard stage ───────────────────────────────────── */}
-  <div id="wiz-stage" class="wiz-stage"></div>
+  {/* ─── Wizard stage (single-question screens) ─────────── */}
+  <div id="wiz-stage"></div>
 
-  {/* ─── Review stage (last screen) — hidden by default ── */}
-  <div id="review-stage" class="kit-layout" hidden>
-    <aside class="kit-editor" id="review-recap"></aside>
-    <div class="kit-preview-wrap">
-      <div class="kit-preview-bar">
+  {/* ─── Review stage (only screen with live preview) ──── */}
+  <div id="review-stage" hidden style="display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start;margin-top:6px;">
+    <aside id="review-recap" style="background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:24px;max-height:calc(100vh - 140px);overflow-y:auto;position:sticky;top:90px;"></aside>
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.55);font-weight:700;">
         <span>Live preview</span>
         {k.status === 'published' && k.slug ? (
-          <a href={`/kit/${k.slug}?print=1`} target="_blank" class="kit-preview-print">Print / PDF</a>
+          <a href={`/kit/${k.slug}?print=1`} target="_blank" style="color:#f97316;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:0.08em;">Print / PDF →</a>
         ) : (
-          <span style="font-size:11px;color:rgba(255,255,255,0.4);">PDF available after publish</span>
+          <span style="font-size:10.5px;color:rgba(255,255,255,0.4);letter-spacing:0.06em;">PDF after publish</span>
         )}
       </div>
-      <iframe id="kit-preview" src={`/kit/preview/${k.id}`} title="Press kit preview"></iframe>
+      <iframe id="kit-preview" src={`/kit/preview/${k.id}`} title="Press kit preview" style="width:100%;height:calc(100vh - 200px);min-height:640px;border:0;background:#fafafa;display:block;"></iframe>
     </div>
   </div>
 
-  {/* ─── Logo generation modal ──────────────────────────── */}
-  <div id="gen-modal" class="gen-modal-backdrop" role="dialog" aria-modal="true">
-    <div class="gen-modal">
-      <h3>Generate a logo with AI</h3>
-      <p>Tell us what your brand is about. We'll generate a flat-vector mark using your palette (or a curated accent), make the background transparent, and convert it to SVG so it scales perfectly.</p>
-
-      <label>Brand description</label>
-      <textarea id="gen-desc" maxlength="300" placeholder="e.g. House music DJ from Cluj. Minimal, geometric, organic shapes."></textarea>
-
-      <div class="gen-modal-row" style="margin-top:6px;">
-        <div style="flex:1;">
-          <label>Style (optional)</label>
-          <input id="gen-style" type="text" placeholder="minimal · bold · geometric · organic" />
-        </div>
-        <div>
-          <label>Override color</label>
-          <input id="gen-color" type="color" />
-        </div>
-      </div>
-      <p style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px;line-height:1.4;">Leave color unset to let the generator pick from your palette or a curated accent.</p>
-
-      <div class="gen-modal-actions">
-        <button type="button" id="gen-cancel" class="gen-modal-btn gen-modal-btn--secondary">Cancel</button>
-        <button type="button" id="gen-go" class="gen-modal-btn gen-modal-btn--primary">Generate</button>
-      </div>
-
-      <div id="gen-progress" class="gen-modal-progress">
-        <div class="step active" data-step="1">1. Generating logo with AI…</div>
-        <div class="step pending" data-step="2">2. Removing background…</div>
-        <div class="step pending" data-step="3">3. Converting to SVG vector…</div>
-      </div>
-
-      <p id="gen-error" class="gen-modal-error"></p>
-    </div>
-  </div>
-
+  {/* Focus + hover micro-states (the only place we need a stylesheet beyond inline) */}
   <style>
-    /* ── Top bar ──────────────────────────────────────── */
-    .top-bar { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap; }
-    .top-back { display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase; }
-    .top-back:hover { color:#fff; }
-    .top-right { display:flex;gap:10px;align-items:center; }
-    .save-state { font-size:11.5px;color:rgba(255,255,255,0.5); transition:opacity .2s; }
-    .top-live { display:inline-flex;align-items:center;gap:6px;background:rgba(110,231,163,0.1);color:#6ee7a3;border:1px solid rgba(110,231,163,0.3);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;text-decoration:none; }
-    .banner-success { background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:12px;padding:12px 18px;color:#6ee7a3;font-size:13.5px;margin-bottom:18px;text-align:center; }
-
-    /* ── Progress chips ──────────────────────────────── */
-    .wiz-progress { display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:18px 0 28px; }
-    .wiz-chip { display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;transition:all .15s; }
-    .wiz-chip:hover { color:#fff;border-color:rgba(255,255,255,0.18); }
-    .wiz-chip.is-active { background:rgba(249,115,22,0.14);border-color:rgba(249,115,22,0.5);color:#fff; }
-    .wiz-chip.is-done { color:#6ee7a3;border-color:rgba(110,231,163,0.32); }
-    .wiz-chip .chip-num { font-family:'JetBrains Mono',monospace;font-size:10px;opacity:.6; }
-
-    /* ── Stage card ──────────────────────────────────── */
-    .wiz-stage { max-width:680px;margin:0 auto; }
-    .wiz-card { background:rgba(14,14,18,0.65);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:42px 44px 32px;animation:wizIn .3s ease; }
-    @keyframes wizIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    @media (max-width:640px) { .wiz-card { padding:32px 22px 26px; } }
-    .wiz-eyebrow { font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#f97316;margin-bottom:10px; }
-    .wiz-question { font-family:'Inter',sans-serif;font-size:30px;font-weight:400;line-height:1.15;letter-spacing:-0.03em;color:#fff;margin:0 0 12px; }
-    .wiz-helper { font-size:13.5px;color:rgba(255,255,255,0.55);line-height:1.55;margin:0 0 26px; }
-    .wiz-body { display:flex;flex-direction:column;gap:14px; }
-
-    .wiz-input { width:100%;padding:14px 16px;font-family:inherit;font-size:15px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:12px;color:#fff;outline:none;transition:border-color .15s, box-shadow .15s; }
-    .wiz-input:focus { border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.18); }
-    .wiz-textarea { width:100%;padding:14px 16px;font-family:inherit;font-size:14.5px;line-height:1.55;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:12px;color:#fff;outline:none;resize:vertical;min-height:130px;transition:border-color .15s, box-shadow .15s; }
-    .wiz-textarea:focus { border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.18); }
-    .wiz-input-label { font-size:11.5px;font-weight:600;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;display:block; }
-
-    /* Choice grid (kit type, palette presets) */
-    .wiz-choices { display:grid;grid-template-columns:repeat(2,1fr);gap:8px; }
-    .wiz-choice { padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;color:rgba(255,255,255,0.8);font-family:inherit;font-size:14px;font-weight:600;text-align:left;cursor:pointer;transition:all .15s; }
-    .wiz-choice:hover { border-color:rgba(255,255,255,0.22);color:#fff; }
-    .wiz-choice.is-selected { background:rgba(249,115,22,0.12);border-color:#f97316;color:#fff;box-shadow:0 0 0 3px rgba(249,115,22,0.14); }
-    .wiz-choice-sub { display:block;font-size:11px;font-weight:400;color:rgba(255,255,255,0.5);margin-top:2px; }
-
-    /* Upload zone */
-    .wiz-upload { position:relative;padding:32px 24px;text-align:center;background:rgba(255,255,255,0.025);border:1px dashed rgba(255,255,255,0.16);border-radius:14px;cursor:pointer;transition:all .15s; }
-    .wiz-upload:hover { border-color:rgba(249,115,22,0.5);background:rgba(249,115,22,0.04); }
-    .wiz-upload input[type=file] { position:absolute;inset:0;opacity:0;cursor:pointer; }
-    .wiz-upload-title { font-size:14px;font-weight:600;color:#fff;margin-bottom:4px; }
-    .wiz-upload-sub { font-size:12px;color:rgba(255,255,255,0.5); }
-    .wiz-uploaded { display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px; }
-    .wiz-uploaded img { width:64px;height:64px;object-fit:contain;background:#fafafa;border-radius:10px;padding:6px; }
-    .wiz-uploaded-info { flex:1;display:flex;flex-direction:column;gap:2px; }
-    .wiz-uploaded-info strong { font-size:13.5px;color:#fff;font-weight:600; }
-    .wiz-uploaded-info span { font-size:11.5px;color:rgba(255,255,255,0.45); }
-    .wiz-uploaded-actions { display:flex;gap:6px;flex-wrap:wrap; }
-    .wiz-pill { display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);font-size:11.5px;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,0.1);cursor:pointer;font-family:inherit; }
-    .wiz-pill:hover { background:rgba(255,255,255,0.12); }
-    .wiz-pill--ai { background:linear-gradient(135deg,rgba(249,115,22,0.18),rgba(34,211,238,0.12));border-color:rgba(249,115,22,0.4); color:#fff; }
-
-    /* Palette */
-    .wiz-palette-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:10px; }
-    .wiz-pal-col { display:flex;flex-direction:column;align-items:center;gap:6px; }
-    .wiz-pal-col input[type=color] { width:100%;height:54px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:none;cursor:pointer;padding:0; }
-    .wiz-pal-col label { font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.55); }
-    .wiz-preset-row { display:flex;gap:8px;flex-wrap:wrap;margin-top:14px; }
-    .wiz-preset { display:inline-flex;gap:2px;align-items:center;padding:4px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);cursor:pointer; }
-    .wiz-preset:hover { border-color:rgba(255,255,255,0.22); }
-    .wiz-preset-sw { width:22px;height:22px;border-radius:4px; }
-
-    /* Font combobox */
-    .wiz-font-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
-    @media (max-width:640px) { .wiz-font-row { grid-template-columns:1fr; } }
-    .wiz-font-group { display:flex;flex-direction:column;gap:6px; }
-    .wiz-font-combo { position:relative; }
-    .wiz-font-input { width:100%;padding:13px 16px;font-family:inherit;font-size:14.5px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:12px;color:#fff;outline:none; }
-    .wiz-font-input:focus { border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.18); }
-    .wiz-font-list { position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:280px;overflow-y:auto;background:#15151a;border:1px solid rgba(255,255,255,0.12);border-radius:12px;z-index:60;display:none;box-shadow:0 18px 48px rgba(0,0,0,0.4); }
-    .wiz-font-list.open { display:block; }
-    .wiz-font-opt { padding:9px 14px;font-size:15px;color:rgba(255,255,255,0.85);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px; }
-    .wiz-font-opt:hover, .wiz-font-opt.is-active { background:rgba(249,115,22,0.12);color:#fff; }
-    .wiz-font-opt-tag { font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4); }
-
-    /* Repeater rows */
-    .wiz-rows { display:flex;flex-direction:column;gap:8px; }
-    .wiz-row { display:grid;gap:6px;align-items:center; }
-    .wiz-row--stat { grid-template-columns:1fr 1fr 36px; }
-    .wiz-row--link { grid-template-columns:140px 1fr 36px; }
-    .wiz-row--press { grid-template-columns:1fr 70px 36px; }
-    .wiz-row--award { grid-template-columns:1fr 70px 36px; }
-    .wiz-row input, .wiz-row select { padding:10px 12px;font-family:inherit;font-size:13px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:9px;color:#fff;outline:none; }
-    .wiz-row input:focus, .wiz-row select:focus { border-color:#f97316;box-shadow:0 0 0 2px rgba(249,115,22,0.18); }
-    .wiz-rm { width:36px;height:36px;border-radius:9px;border:0;background:rgba(239,68,68,0.1);color:#ff8a8a;cursor:pointer;font-size:16px; }
-    .wiz-add { padding:11px;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.2);border-radius:10px;color:rgba(255,255,255,0.7);font-family:inherit;font-size:13px;cursor:pointer;width:100%; }
-    .wiz-add:hover { background:rgba(255,255,255,0.08);color:#fff; }
-
-    /* Photos grid */
-    .wiz-photo-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:8px; }
-    .wiz-photo-item { position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.04); }
-    .wiz-photo-item img { width:100%;height:100%;object-fit:cover; }
-    .wiz-photo-rm { position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,0.65);color:#fff;cursor:pointer;font-size:13px; }
-
-    /* Footer / actions */
-    .wiz-footer { display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;flex-wrap:wrap; }
-    .wiz-actions { display:flex;gap:8px;align-items:center;margin-left:auto; }
-    .wiz-btn { display:inline-flex;align-items:center;gap:6px;padding:11px 22px;border-radius:11px;font-family:inherit;font-size:13.5px;font-weight:700;letter-spacing:0.02em;cursor:pointer;border:0;transition:all .15s; }
-    .wiz-btn--primary { background:#f97316;color:#0a0a0a; }
-    .wiz-btn--primary:hover { background:#fb923c; }
-    .wiz-btn--primary:disabled { opacity:.6;cursor:wait; }
-    .wiz-btn--ghost { background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.1); }
-    .wiz-btn--ghost:hover { background:rgba(255,255,255,0.1); }
-    .wiz-btn--link { background:transparent;color:rgba(255,255,255,0.55);padding:11px 8px; }
-    .wiz-btn--link:hover { color:#fff; }
-    .wiz-btn--publish { background:#f97316;color:#0a0a0a; }
-    .wiz-btn--publish:hover { background:#fb923c; }
-
-    /* Recap on review screen */
-    .kit-layout { display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start;margin-top:18px; }
-    @media (max-width: 1080px) { .kit-layout { grid-template-columns: 1fr; } }
-    .kit-editor { background:rgba(14,14,18,0.65);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:22px;max-height:calc(100vh - 160px);overflow-y:auto;position:sticky;top:90px; }
-    .recap-h { font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.55);margin:0 0 12px; }
-    .recap-row { display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px; }
-    .recap-row:last-child { border-bottom:0; }
-    .recap-label { color:rgba(255,255,255,0.55);font-weight:500;flex-shrink:0; }
-    .recap-val { color:#fff;text-align:right;max-width:60%;word-break:break-word; }
-    .recap-edit { display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#f97316;text-decoration:none;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;background:none;border:0;font-family:inherit; }
-    .recap-section { margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.08); }
-    .recap-section:first-of-type { margin-top:0;padding-top:0;border-top:0; }
-    .recap-section-h { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px; }
-
-    .kit-preview-wrap { background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;overflow:hidden; }
-    .kit-preview-bar { display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11.5px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.5);font-weight:600; }
-    .kit-preview-print { color:#f97316;text-decoration:none;font-size:11.5px;font-weight:700; }
-    #kit-preview { width:100%;height:calc(100vh - 160px);min-height:600px;border:0;background:#fafafa; }
-
-    /* ── Logo generation modal (reused) ───────────────── */
-    .gen-modal-backdrop { position:fixed;inset:0;z-index:9000;background:rgba(5,5,8,0.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:22px; }
-    .gen-modal-backdrop.open { display:flex; }
-    .gen-modal { background:#141417;border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:26px 28px 24px;max-width:480px;width:100%; }
-    .gen-modal h3 { font-family:'Inter',sans-serif;font-size:22px;font-weight:600;letter-spacing:-0.025em;margin:0 0 6px;color:#fff; }
-    .gen-modal p { font-size:13px;color:rgba(255,255,255,0.55);margin:0 0 18px;line-height:1.5; }
-    .gen-modal label { display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);margin:12px 0 4px; }
-    .gen-modal textarea, .gen-modal input { width:100%;padding:10px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);border-radius:9px;color:#fff;font-family:inherit;font-size:13px;outline:none; }
-    .gen-modal textarea { resize:vertical;min-height:70px;line-height:1.45; }
-    .gen-modal textarea:focus, .gen-modal input:focus { border-color:#f97316;box-shadow:0 0 0 3px rgba(249,115,22,0.18); }
-    .gen-modal-row { display:flex;gap:8px;align-items:center; }
-    .gen-modal-row input[type="color"] { width:42px;height:42px;padding:0;border-radius:8px; }
-    .gen-modal-actions { display:flex;gap:8px;margin-top:18px; }
-    .gen-modal-btn { flex:1;padding:11px;border-radius:10px;border:0;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer; }
-    .gen-modal-btn--primary { background:#f97316;color:#0a0a0a; }
-    .gen-modal-btn--primary:hover:not(:disabled) { background:#fb923c; }
-    .gen-modal-btn--primary:disabled { opacity:0.6;cursor:wait; }
-    .gen-modal-btn--secondary { background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8); }
-    .gen-modal-progress { margin-top:14px;font-size:12.5px;color:rgba(255,255,255,0.65);display:none; }
-    .gen-modal-progress.show { display:block; }
-    .gen-modal-progress .step { padding:6px 0; }
-    .gen-modal-progress .step.done { color:#6ee7a3; }
-    .gen-modal-progress .step.active { color:#f97316; }
-    .gen-modal-progress .step.pending { color:rgba(255,255,255,0.35); }
-    .gen-modal-error { margin-top:12px;font-size:12.5px;color:#ff8a8a;display:none; }
-    .gen-modal-error.show { display:block; }
+    .pkw-input:focus, .pkw-textarea:focus { border-color:#f97316 !important; box-shadow:0 0 0 3px rgba(249,115,22,0.18) !important; }
+    .pkw-chip:hover { border-color:rgba(255,255,255,0.28); color:#fff; }
+    .pkw-chip.is-active { background:rgba(249,115,22,0.14) !important; border-color:#f97316 !important; color:#fff !important; box-shadow:0 0 0 3px rgba(249,115,22,0.14); }
+    .pkw-tile:hover { border-color:rgba(255,255,255,0.28); transform:translateY(-1px); }
+    .pkw-tile.is-active { background:rgba(249,115,22,0.1) !important; border-color:#f97316 !important; box-shadow:0 0 0 3px rgba(249,115,22,0.14); }
+    .pkw-fadein { animation: pkwFade .28s ease both; }
+    @keyframes pkwFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .pkw-rm { width:36px;height:36px;border-radius:10px;border:0;background:rgba(239,68,68,0.1);color:#ff8a8a;cursor:pointer;font-size:16px;font-family:inherit; }
+    .pkw-rm:hover { background:rgba(239,68,68,0.18); }
+    .pkw-add:hover { background:rgba(255,255,255,0.07); color:#fff; }
+    .pkw-font-opt:hover, .pkw-font-opt.is-active { background:rgba(249,115,22,0.12); color:#fff; }
+    .pkw-secondary:hover { background:rgba(255,255,255,0.05); color:#fff; }
+    .pkw-primary:hover:not(:disabled) { background:#fb923c; }
+    .pkw-primary:disabled { opacity:.6;cursor:wait; }
+    .pkw-recap-edit:hover { color:#fb923c; }
   </style>
 
-  {/* ─── Wizard script ────────────────────────────────── */}
+  {/* ─── Client logic ─────────────────────────────────── */}
   <script is:inline define:vars={{ kitId: k.id }}>
     const STATE = JSON.parse(document.getElementById('kit-bootstrap').textContent);
     const FONTS = JSON.parse(document.getElementById('font-bootstrap').textContent);
 
-    // ── Steps definition ──────────────────────────────
-    const STEPS = [
-      { key: 'identity', label: 'Identity' },
-      { key: 'brand',    label: 'Brand' },
-      { key: 'story',    label: 'Story' },
-      { key: 'numbers',  label: 'Numbers' },
-      { key: 'press',    label: 'Press & links' },
-      { key: 'review',   label: 'Review' },
-    ];
+    // ── Step manifest ──────────────────────────────────────
+    // kit_type was chosen on /kits/new — we never re-ask it.
+    // logo-gen step is dynamically included only if needsLogoGen flag is set.
+    let needsLogoGen = false;
+
+    function buildSteps() {
+      const base = [
+        { key: 'logo-gate',     chapter: 'Brand',    title: 'Do you already have a logo?' },
+        { key: 'identity',      chapter: 'Identity', title: 'What’s the name + tagline?' },
+        ...(needsLogoGen ? [{ key: 'logo-gen', chapter: 'Brand', title: 'Let’s generate your logo' }] : []),
+        { key: 'bio-short',     chapter: 'Story',    title: 'The one-line story.' },
+        { key: 'bio-long',      chapter: 'Story',    title: 'The longer version.' },
+        { key: 'numbers',       chapter: 'Numbers',  title: 'What numbers matter?' },
+        { key: 'press',         chapter: 'Press',    title: 'Where have you been featured?' },
+        { key: 'awards',        chapter: 'Awards',   title: 'Any awards or recognition?' },
+        { key: 'links',         chapter: 'Links',    title: 'Contact + social links.' },
+        { key: 'brand',         chapter: 'Brand',    title: 'Palette & fonts.' },
+        { key: 'review',        chapter: 'Review',   title: 'Review & publish' },
+      ];
+      return base;
+    }
+    let STEPS = buildSteps();
     let stepIdx = 0;
 
-    // ── Save plumbing ─────────────────────────────────
+    // ── Save plumbing ──────────────────────────────────────
     let saveTimer = null;
     let pendingUpdate = {};
     const saveState = document.getElementById('save-state');
-    function markDirty() { saveState.textContent = 'Saving…'; saveState.style.opacity='1'; }
-    function markSaved() { saveState.textContent = 'Saved'; setTimeout(() => { if (saveState.textContent === 'Saved') saveState.style.opacity='0'; }, 1400); }
+    function markDirty() { saveState.textContent = 'Saving…'; saveState.style.opacity = '1'; }
+    function markSaved() { saveState.textContent = 'Saved'; setTimeout(() => { if (saveState.textContent === 'Saved') saveState.style.opacity = '0'; }, 1400); }
 
     async function flushSave() {
       if (Object.keys(pendingUpdate).length === 0) return;
-      const body = pendingUpdate;
-      pendingUpdate = {};
+      const body = pendingUpdate; pendingUpdate = {};
       try {
         const r = await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-        if (r.ok) markSaved();
-        else { saveState.textContent='Save failed';saveState.style.opacity='1'; }
-      } catch { saveState.textContent='Save failed';saveState.style.opacity='1'; }
+        if (r.ok) markSaved(); else { saveState.textContent = 'Save failed'; saveState.style.opacity = '1'; }
+      } catch { saveState.textContent = 'Save failed'; saveState.style.opacity = '1'; }
     }
     function queueSave(patch) {
       Object.assign(pendingUpdate, patch);
@@ -332,25 +163,35 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       saveTimer = setTimeout(flushSave, 500);
     }
 
-    // ── Progress chips ────────────────────────────────
-    function renderChips() {
+    // ── Progress bar ───────────────────────────────────────
+    function renderProgress() {
       const wrap = document.getElementById('wizard-progress');
-      wrap.innerHTML = '';
-      STEPS.forEach((s, i) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'wiz-chip' + (i === stepIdx ? ' is-active' : (i < stepIdx ? ' is-done' : ''));
-        b.innerHTML = `<span class="chip-num">${String(i + 1).padStart(2,'0')}</span><span>${s.label}</span>`;
-        b.addEventListener('click', () => goTo(i));
-        wrap.appendChild(b);
-      });
+      const total = STEPS.length;
+      const pct = Math.round(((stepIdx + 1) / total) * 100);
+      const step = STEPS[stepIdx];
+      wrap.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.55);font-variant-numeric:tabular-nums;">
+            <span style="color:#f97316;">${String(stepIdx + 1).padStart(2,'0')}</span>
+            <span style="opacity:.5;">/ ${String(total).padStart(2,'0')}</span>
+            <span style="width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,0.3);margin:0 2px;"></span>
+            <span>${step.chapter}</span>
+          </span>
+          <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);letter-spacing:0.06em;font-variant-numeric:tabular-nums;">${pct}%</span>
+        </div>
+        <div style="height:3px;width:100%;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#f97316,#fb923c);border-radius:999px;transition:width .35s cubic-bezier(.4,0,.2,1);"></div>
+        </div>
+      `;
     }
 
-    function goTo(i) {
+    // ── Navigation ─────────────────────────────────────────
+    function goTo(i, { skipSave = false } = {}) {
       if (i < 0 || i >= STEPS.length) return;
-      flushSave();
+      if (!skipSave) flushSave();
       stepIdx = i;
-      renderChips();
+      window.location.hash = `step=${STEPS[i].key}`;
+      renderProgress();
       const review = STEPS[i].key === 'review';
       document.getElementById('wiz-stage').hidden = review;
       document.getElementById('review-stage').hidden = !review;
@@ -366,192 +207,170 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       if (iframe) iframe.contentWindow.location.reload();
     }
 
-    // ── Render the active step ────────────────────────
+    function rebuildSteps(preserveKey) {
+      STEPS = buildSteps();
+      if (preserveKey) {
+        const idx = STEPS.findIndex(s => s.key === preserveKey);
+        if (idx >= 0) stepIdx = idx;
+      }
+    }
+
+    // ── Shared style fragments (inline strings) ────────────
+    const STYLE_CARD = 'background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:36px 40px 28px;max-width:680px;margin:0 auto;box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 18px 40px -22px rgba(0,0,0,0.55);';
+    const STYLE_EYEBROW = 'display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#f97316;padding:5px 12px;border-radius:999px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.28);';
+    const STYLE_EYEBROW_DOT = 'width:6px;height:6px;border-radius:50%;background:#f97316;box-shadow:0 0 8px rgba(249,115,22,0.6);';
+    const STYLE_TITLE = "font-family:'Inter',sans-serif;font-size:clamp(26px,3.4vw,34px);font-weight:300;letter-spacing:-0.028em;line-height:1.1;color:#fff;margin:18px 0 10px;";
+    const STYLE_HELPER = 'font-size:13.5px;color:rgba(255,255,255,0.55);margin:0 0 26px;line-height:1.55;max-width:580px;';
+    const STYLE_LABEL = "font-size:11px;font-weight:700;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:8px;";
+    const STYLE_INPUT = 'width:100%;height:48px;padding:0 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;outline:none;transition:border-color .15s, box-shadow .15s;';
+    const STYLE_TEXTAREA = 'width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;line-height:1.6;outline:none;resize:vertical;min-height:130px;transition:border-color .15s, box-shadow .15s;';
+    const STYLE_BTN_PRIMARY = 'height:48px;padding:0 26px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:13.5px;font-weight:700;letter-spacing:0.04em;cursor:pointer;transition:background .15s;';
+    const STYLE_BTN_GHOST = 'height:44px;padding:0 18px;background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:all .15s;';
+    const STYLE_BTN_LINK  = 'height:44px;padding:0 14px;background:transparent;color:rgba(255,255,255,0.5);border:0;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;';
+    const STYLE_ADD = 'width:100%;padding:13px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.2);border-radius:12px;color:rgba(255,255,255,0.7);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;';
+
+    function eyebrowHTML() {
+      const step = STEPS[stepIdx];
+      return `<span style="${STYLE_EYEBROW}"><span style="${STYLE_EYEBROW_DOT}"></span>Step ${stepIdx + 1} of ${STEPS.length} · ${step.chapter}</span>`;
+    }
+
+    function footerHTML({ skipText = 'Skip', nextText = 'Continue →', hideNext = false, hideSkip = false } = {}) {
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;flex-wrap:wrap;">
+          <button type="button" data-act="back" class="pkw-secondary" style="${STYLE_BTN_LINK}" ${stepIdx === 0 ? 'disabled style="visibility:hidden"' : ''}>← Back</button>
+          <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+            ${hideSkip ? '' : `<button type="button" data-act="skip" class="pkw-secondary" style="${STYLE_BTN_GHOST}">${skipText}</button>`}
+            ${hideNext ? '' : `<button type="button" data-act="next" class="pkw-primary" style="${STYLE_BTN_PRIMARY}">${nextText}</button>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function wireFooter(card, { onNext } = {}) {
+      card.querySelector('[data-act=back]')?.addEventListener('click', back);
+      card.querySelector('[data-act=skip]')?.addEventListener('click', next);
+      card.querySelector('[data-act=next]')?.addEventListener('click', async () => {
+        if (onNext) { const ok = await onNext(); if (ok === false) return; }
+        await flushSave(); next();
+      });
+    }
+
+    // ── Render current step ────────────────────────────────
     function renderStep() {
       const step = STEPS[stepIdx];
       const stage = document.getElementById('wiz-stage');
       stage.innerHTML = '';
-      const card = document.createElement('div');
-      card.className = 'wiz-card';
+      const card = document.createElement('section');
+      card.className = 'pkw-fadein';
+      card.setAttribute('style', STYLE_CARD);
       stage.appendChild(card);
 
-      if (step.key === 'identity')    renderIdentity(card);
-      else if (step.key === 'brand')  renderBrand(card);
-      else if (step.key === 'story')  renderStory(card);
-      else if (step.key === 'numbers') renderNumbers(card);
-      else if (step.key === 'press')  renderPress(card);
+      if (step.key === 'logo-gate')      renderLogoGate(card);
+      else if (step.key === 'identity')  renderIdentity(card);
+      else if (step.key === 'logo-gen')  renderLogoGen(card);
+      else if (step.key === 'bio-short') renderBioShort(card);
+      else if (step.key === 'bio-long')  renderBioLong(card);
+      else if (step.key === 'numbers')   renderNumbers(card);
+      else if (step.key === 'press')     renderPress(card);
+      else if (step.key === 'awards')    renderAwards(card);
+      else if (step.key === 'links')     renderLinks(card);
+      else if (step.key === 'brand')     renderBrand(card);
+    }
 
-      // Footer
-      const footer = document.createElement('div');
-      footer.className = 'wiz-footer';
-      footer.innerHTML = `
-        <button type="button" class="wiz-btn wiz-btn--link" data-act="back" ${stepIdx === 0 ? 'disabled style="visibility:hidden"' : ''}>← Back</button>
-        <div class="wiz-actions">
-          <button type="button" class="wiz-btn wiz-btn--ghost" data-act="skip">Skip</button>
-          <button type="button" class="wiz-btn wiz-btn--primary" data-act="next">${stepIdx === STEPS.length - 2 ? 'Review →' : 'Continue →'}</button>
+    // ── Step: logo gate ────────────────────────────────────
+    function renderLogoGate(card) {
+      const hasLogo = !!STATE.assets?.logo;
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Do you already have a logo?</h2>
+        <p style="${STYLE_HELPER}">Either upload yours or we’ll generate one with AI based on your name + style. You can change it later.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;" id="lg-tiles">
+          <button type="button" class="pkw-tile ${hasLogo ? 'is-active' : ''}" data-choice="yes" style="text-align:left;padding:22px 22px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
+            <div style="font-size:24px;margin-bottom:8px;">\u{1F4E4}</div>
+            <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;">Yes, I have one</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:4px;line-height:1.45;">Upload PNG / SVG / JPG. We’ll extract your palette automatically.</div>
+          </button>
+          <button type="button" class="pkw-tile" data-choice="no" style="text-align:left;padding:22px 22px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
+            <div style="font-size:24px;margin-bottom:8px;">✨</div>
+            <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;">No, generate with AI</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:4px;line-height:1.45;">We’ll create a clean vector mark from your name + tagline.</div>
+          </button>
         </div>
+
+        <div id="lg-upload-wrap" style="margin-top:18px;${hasLogo ? '' : 'display:none;'}"></div>
+
+        ${footerHTML({ hideSkip: true, nextText: hasLogo ? 'Continue →' : 'Pick one to continue' })}
       `;
-      card.appendChild(footer);
-      footer.querySelector('[data-act=back]')?.addEventListener('click', back);
-      footer.querySelector('[data-act=skip]')?.addEventListener('click', next);
-      footer.querySelector('[data-act=next]')?.addEventListener('click', async () => { await flushSave(); next(); });
-    }
 
-    // ── Identity step ─────────────────────────────────
-    function renderIdentity(card) {
-      const KIT_TYPES = [
-        { v: 'musician', l: 'Musician / DJ', s: 'Songs, sets, releases' },
-        { v: 'agency', l: 'Agency / Studio', s: 'Creative services' },
-        { v: 'photographer', l: 'Photographer', s: 'Visual portfolio' },
-        { v: 'founder', l: 'Founder', s: 'Startup or company' },
-        { v: 'model', l: 'Model / Talent', s: 'Editorial portfolio' },
-        { v: 'other', l: 'Something else', s: 'Custom kit' },
-      ];
-      card.insertAdjacentHTML('beforeend', `
-        <div class="wiz-eyebrow">Identity · Step 1 of ${STEPS.length - 1}</div>
-        <h2 class="wiz-question">Who is this press kit for?</h2>
-        <p class="wiz-helper">Your name or brand sits at the top of every page. The tagline is the first thing journalists read.</p>
-        <div class="wiz-body">
-          <div>
-            <label class="wiz-input-label">Name on the kit</label>
-            <input type="text" id="f-name" class="wiz-input" value="${escapeAttr(STATE.name)}" maxlength="80" placeholder="e.g. Mattman Music" />
-          </div>
-          <div>
-            <label class="wiz-input-label">Tagline (one short line)</label>
-            <input type="text" id="f-tagline" class="wiz-input" value="${escapeAttr(STATE.tagline ?? '')}" maxlength="120" placeholder="e.g. House music from Cluj" />
-          </div>
-          <div>
-            <label class="wiz-input-label">What kind of kit is this?</label>
-            <div class="wiz-choices" id="f-kit-type">
-              ${KIT_TYPES.map(t => `
-                <button type="button" class="wiz-choice ${STATE.kit_type === t.v ? 'is-selected' : ''}" data-v="${t.v}">
-                  ${t.l}<span class="wiz-choice-sub">${t.s}</span>
-                </button>`).join('')}
-            </div>
-          </div>
-        </div>
-      `);
-      card.querySelector('#f-name').addEventListener('input', e => queueSave({ name: e.target.value }));
-      card.querySelector('#f-tagline').addEventListener('input', e => queueSave({ tagline: e.target.value }));
-      card.querySelectorAll('#f-kit-type .wiz-choice').forEach(b => {
+      function showUpload() {
+        const wrap = card.querySelector('#lg-upload-wrap');
+        wrap.style.display = 'block';
+        renderUploadBox(wrap);
+      }
+      function hideUpload() {
+        const wrap = card.querySelector('#lg-upload-wrap');
+        wrap.style.display = 'none';
+      }
+
+      card.querySelectorAll('#lg-tiles .pkw-tile').forEach(b => {
         b.addEventListener('click', () => {
-          card.querySelectorAll('#f-kit-type .wiz-choice').forEach(x => x.classList.remove('is-selected'));
-          b.classList.add('is-selected');
-          queueSave({ kit_type: b.dataset.v });
+          card.querySelectorAll('#lg-tiles .pkw-tile').forEach(x => x.classList.remove('is-active'));
+          b.classList.add('is-active');
+          const next = card.querySelector('[data-act=next]');
+          next.textContent = 'Continue →';
+          if (b.dataset.choice === 'yes') {
+            needsLogoGen = false;
+            showUpload();
+          } else {
+            needsLogoGen = true;
+            hideUpload();
+          }
         });
       });
+
+      if (hasLogo) showUpload();
+
+      wireFooter(card, { onNext: async () => {
+        const choice = card.querySelector('#lg-tiles .pkw-tile.is-active')?.dataset.choice;
+        if (!choice) return false;
+        rebuildSteps('logo-gate');
+        return true;
+      }});
     }
 
-    // ── Brand step (logo + palette + fonts) ────────────
-    function renderBrand(card) {
-      card.insertAdjacentHTML('beforeend', `
-        <div class="wiz-eyebrow">Brand · Step 2 of ${STEPS.length - 1}</div>
-        <h2 class="wiz-question">How should it look?</h2>
-        <p class="wiz-helper">Logo, palette, and fonts. Skip anything you're not sure about — we have sensible defaults.</p>
-        <div class="wiz-body">
-          <div>
-            <label class="wiz-input-label">Logo</label>
-            <div id="f-logo-wrap"></div>
-          </div>
-          <div>
-            <label class="wiz-input-label">Palette</label>
-            <div class="wiz-palette-grid" id="f-palette">
-              ${['primary','secondary','accent','text','bg'].map(k => `
-                <div class="wiz-pal-col">
-                  <input type="color" data-pal="${k}" value="${STATE.palette?.[k] || '#000000'}" />
-                  <label>${k}</label>
-                </div>`).join('')}
-            </div>
-            <div class="wiz-preset-row">
-              ${PALETTE_PRESETS.map((p, i) => `
-                <button type="button" class="wiz-preset" data-preset="${i}" title="${p.name}">
-                  ${['primary','accent','bg'].map(k => `<span class="wiz-preset-sw" style="background:${p[k]};"></span>`).join('')}
-                </button>`).join('')}
-            </div>
-          </div>
-          <div>
-            <label class="wiz-input-label">Fonts</label>
-            <div class="wiz-font-row">
-              <div class="wiz-font-group">
-                <span style="font-size:11px;color:rgba(255,255,255,0.5);">Heading</span>
-                ${fontCombo('heading', STATE.fonts.heading)}
-              </div>
-              <div class="wiz-font-group">
-                <span style="font-size:11px;color:rgba(255,255,255,0.5);">Body</span>
-                ${fontCombo('body', STATE.fonts.body)}
-              </div>
-            </div>
-            <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:8px;">All Google Fonts available — search by name. Each option previews in its own family.</p>
-          </div>
-        </div>
-      `);
-      renderLogoBox(card.querySelector('#f-logo-wrap'));
-      // Palette
-      card.querySelectorAll('#f-palette input[type=color]').forEach(el => {
-        el.addEventListener('input', () => {
-          const next = { ...STATE.palette };
-          next[el.dataset.pal] = el.value;
-          next.extracted_from_logo = false;
-          queueSave({ palette: next });
-        });
-      });
-      card.querySelectorAll('.wiz-preset').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const p = PALETTE_PRESETS[+btn.dataset.preset];
-          const next = { primary: p.primary, secondary: p.secondary, accent: p.accent, text: p.text, bg: p.bg };
-          card.querySelectorAll('#f-palette input[type=color]').forEach(el => { el.value = next[el.dataset.pal]; });
-          queueSave({ palette: next });
-        });
-      });
-      wireFontCombos(card);
-    }
-
-    // ── Logo box (upload / AI gen / downloads) ─────────
-    function renderLogoBox(box) {
+    function renderUploadBox(box) {
       const logo = STATE.assets?.logo;
       const svg = STATE.assets?.logo_svg;
       if (logo) {
-        const filename = (logo.split('/').pop() || 'logo').slice(0, 28);
+        const filename = (logo.split('/').pop() || 'logo').slice(0, 32);
         box.innerHTML = `
-          <div class="wiz-uploaded">
-            <img src="${logo}" alt="" />
-            <div class="wiz-uploaded-info">
-              <strong>${escapeHtml(filename)}</strong>
-              <span>${svg ? 'SVG vector ready' : 'PNG · vectorizing…'}</span>
-              <div class="wiz-uploaded-actions" style="margin-top:6px;">
-                <a class="wiz-pill" href="${logo}" download>↓ PNG</a>
-                ${svg ? `<a class="wiz-pill" href="${svg}" download>↓ SVG</a>` : ''}
-                <button type="button" class="wiz-pill" id="logo-replace">Replace</button>
-                <button type="button" class="wiz-pill wiz-pill--ai" id="logo-ai">Generate new with AI</button>
-              </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;">
+            <img src="${logo}" alt="" style="width:64px;height:64px;object-fit:contain;background:#fafafa;border-radius:10px;padding:6px;" />
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+              <strong style="font-size:13.5px;color:#fff;font-weight:600;">${escapeHtml(filename)}</strong>
+              <span style="font-size:11.5px;color:rgba(255,255,255,0.45);">${svg ? 'SVG vector ready' : 'PNG · vectorizing…'}</span>
             </div>
+            <button type="button" id="lg-replace" style="height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Replace</button>
           </div>
         `;
-        box.querySelector('#logo-replace').addEventListener('click', () => openUploadDialog(box));
-        box.querySelector('#logo-ai').addEventListener('click', () => openGenModal());
-        // If SVG missing on a raster logo, kick off vectorization
+        box.querySelector('#lg-replace').addEventListener('click', () => openUploadDialog(box));
         if (!svg && !logo.toLowerCase().endsWith('.svg')) {
           fetch(`/api/kits/${kitId}/vectorize-logo`, { method: 'POST' })
-            .then(r => r.json())
-            .then(d => {
-              if (d.svgUrl) {
-                STATE.assets.logo_svg = d.svgUrl;
-                renderLogoBox(box);
-              }
-            })
-            .catch(() => { /* silent — user can retry by replacing */ });
+            .then(r => r.json()).then(d => {
+              if (d.svgUrl) { STATE.assets.logo_svg = d.svgUrl; renderUploadBox(box); }
+            }).catch(() => {});
         }
       } else {
         box.innerHTML = `
-          <div class="wiz-upload" id="logo-drop">
-            <input type="file" accept="image/*" id="logo-input" />
-            <div class="wiz-upload-title">Upload logo</div>
-            <div class="wiz-upload-sub">PNG, SVG or JPG. We'll extract your palette + make an SVG vector.</div>
+          <div id="lg-drop" style="position:relative;padding:36px 24px;text-align:center;background:rgba(255,255,255,0.025);border:1px dashed rgba(255,255,255,0.2);border-radius:14px;cursor:pointer;transition:all .15s;">
+            <input type="file" accept="image/*" id="lg-input" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+            <div style="font-size:24px;margin-bottom:6px;">↑</div>
+            <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;">Drag a logo or click to upload</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.5);">PNG, SVG, or JPG. We’ll extract your palette automatically.</div>
           </div>
-          <button type="button" class="wiz-pill wiz-pill--ai" style="margin-top:10px;" id="logo-ai">✦ Don't have a logo? Generate one with AI</button>
         `;
-        box.querySelector('#logo-input').addEventListener('change', e => handleLogoUpload(e.target.files[0], box));
-        box.querySelector('#logo-ai').addEventListener('click', () => openGenModal());
+        box.querySelector('#lg-input').addEventListener('change', e => handleLogoUpload(e.target.files[0], box));
       }
     }
     function openUploadDialog(box) {
@@ -567,29 +386,444 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
         const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
         STATE.assets = { ...(STATE.assets || {}), logo: blob.url, logo_svg: undefined };
-        // PATCH directly so the server re-extracts the palette and pushes back next render
         await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });
-        // Refresh state
-        renderLogoBox(box);
+        renderUploadBox(box);
         markSaved();
       } catch (e) {
-        console.error(e); saveState.textContent='Upload failed';
+        console.error(e); saveState.textContent = 'Upload failed';
       }
     }
 
-    // ── Font combobox helpers ─────────────────────────
+    // ── Step: identity (name + tagline) ────────────────────
+    function renderIdentity(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">What’s the name + tagline?</h2>
+        <p style="${STYLE_HELPER}">The name sits at the top of every page. The tagline is the first thing journalists read — keep it short, sharp, quotable.</p>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div>
+            <label style="${STYLE_LABEL}">Name on the kit</label>
+            <input id="f-name" type="text" maxlength="80" class="pkw-input" value="${escapeAttr(STATE.name)}" placeholder="e.g. Mattman Music" style="${STYLE_INPUT}" />
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Tagline (one line)</label>
+            <input id="f-tagline" type="text" maxlength="120" class="pkw-input" value="${escapeAttr(STATE.tagline ?? '')}" placeholder="e.g. House music from Cluj" style="${STYLE_INPUT}" />
+          </div>
+        </div>
+
+        ${footerHTML()}
+      `;
+      card.querySelector('#f-name').addEventListener('input', e => queueSave({ name: e.target.value }));
+      card.querySelector('#f-tagline').addEventListener('input', e => queueSave({ tagline: e.target.value }));
+      wireFooter(card);
+    }
+
+    // ── Step: logo gen (AI) ────────────────────────────────
+    function renderLogoGen(card) {
+      const logo = STATE.assets?.logo;
+      const svg = STATE.assets?.logo_svg;
+      const refs = STATE.assets?.logo_refs || [];
+
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Let’s generate your logo.</h2>
+        <p style="${STYLE_HELPER}">We’ll use your name + tagline. Add a description and (optionally) up to 3 reference photos for style guidance.</p>
+
+        <div id="lg-result" style="${logo ? '' : 'display:none;'}margin-bottom:18px;"></div>
+
+        <div id="lg-controls" style="display:flex;flex-direction:column;gap:16px;">
+          <div>
+            <label style="${STYLE_LABEL}">Describe your logo (optional)</label>
+            <textarea id="lg-desc" maxlength="400" class="pkw-textarea" placeholder="e.g. Minimal monogram, geometric, single weight. Or leave blank and we’ll riff off your name." style="${STYLE_TEXTAREA};min-height:96px;"></textarea>
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Style keywords (optional)</label>
+            <input id="lg-style" type="text" maxlength="80" class="pkw-input" placeholder="minimal · bold · geometric · organic" style="${STYLE_INPUT}" />
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Reference photos (0–3, optional)</label>
+            <div id="lg-refs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;"></div>
+            <button type="button" id="lg-add-ref" class="pkw-add" style="${STYLE_ADD}">+ Add reference photo</button>
+            <input type="file" accept="image/*" id="lg-ref-input" style="display:none;" />
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <label style="font-size:12px;color:rgba(255,255,255,0.6);display:inline-flex;align-items:center;gap:8px;">
+              <span>Color override</span>
+              <input id="lg-color" type="color" value="${STATE.palette?.primary || '#f97316'}" style="width:38px;height:32px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
+            </label>
+            <span style="font-size:11px;color:rgba(255,255,255,0.35);flex:1;">Leave to use your palette · violet AI for the curious.</span>
+          </div>
+
+          <button type="button" id="lg-go" class="pkw-primary" style="${STYLE_BTN_PRIMARY};height:52px;width:100%;margin-top:4px;background:linear-gradient(135deg,#f97316 0%, #a78bfa 140%);">
+            ✨ Generate logo
+          </button>
+
+          <div id="lg-progress" style="display:none;font-size:12.5px;color:rgba(255,255,255,0.65);">
+            <div data-pstep="1" style="padding:6px 0;color:#f97316;">1. Generating logo with AI…</div>
+            <div data-pstep="2" style="padding:6px 0;color:rgba(255,255,255,0.35);">2. Removing background…</div>
+            <div data-pstep="3" style="padding:6px 0;color:rgba(255,255,255,0.35);">3. Vectorizing to SVG…</div>
+          </div>
+          <p id="lg-error" style="display:none;font-size:12.5px;color:#ff8a8a;margin:0;"></p>
+        </div>
+
+        ${footerHTML({ hideSkip: false, skipText: 'Skip for now', nextText: 'Continue →' })}
+      `;
+
+      function renderRefs() {
+        const wrap = card.querySelector('#lg-refs');
+        const list = STATE.assets?.logo_refs || [];
+        if (list.length === 0) { wrap.innerHTML = ''; return; }
+        wrap.innerHTML = list.map((u, i) => `
+          <div style="position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);">
+            <img src="${u}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+            <button type="button" data-rm-ref="${i}" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,0.7);color:#fff;cursor:pointer;font-size:13px;font-family:inherit;">×</button>
+          </div>
+        `).join('');
+        wrap.querySelectorAll('[data-rm-ref]').forEach(b => b.addEventListener('click', () => {
+          const idx = +b.dataset.rmRef;
+          STATE.assets.logo_refs = (STATE.assets.logo_refs || []).filter((_, j) => j !== idx);
+          queueSave({ assets: { ...STATE.assets } });
+          renderRefs();
+        }));
+      }
+
+      function renderResult() {
+        const wrap = card.querySelector('#lg-result');
+        const url = STATE.assets?.logo;
+        if (!url) { wrap.style.display = 'none'; return; }
+        wrap.style.display = 'block';
+        wrap.innerHTML = `
+          <div style="background:#fafafa;border-radius:16px;padding:28px;display:flex;align-items:center;justify-content:center;min-height:200px;border:1px solid rgba(255,255,255,0.08);">
+            <img src="${url}" alt="" style="max-width:240px;max-height:160px;object-fit:contain;" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:11.5px;color:rgba(255,255,255,0.55);font-weight:600;letter-spacing:0.04em;">${STATE.assets?.logo_svg ? 'SVG ready ·' : 'Vectorizing… ·'}</span>
+            <button type="button" id="lg-try-again" style="height:36px;padding:0 16px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Try again with more guidance</button>
+          </div>
+        `;
+        wrap.querySelector('#lg-try-again').addEventListener('click', () => {
+          card.querySelector('#lg-controls').scrollIntoView({ behavior:'smooth', block:'start' });
+          card.querySelector('#lg-desc').focus();
+        });
+      }
+
+      renderRefs();
+      renderResult();
+
+      card.querySelector('#lg-add-ref').addEventListener('click', () => {
+        const list = STATE.assets?.logo_refs || [];
+        if (list.length >= 3) return;
+        card.querySelector('#lg-ref-input').click();
+      });
+      card.querySelector('#lg-ref-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        markDirty();
+        try {
+          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+          STATE.assets = { ...(STATE.assets || {}), logo_refs: [...(STATE.assets?.logo_refs || []), blob.url] };
+          queueSave({ assets: STATE.assets });
+          renderRefs();
+        } catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+      });
+
+      function setPStep(n, status) {
+        card.querySelectorAll('#lg-progress [data-pstep]').forEach(el => {
+          const s = +el.dataset.pstep;
+          if (s < n) { el.style.color = '#6ee7a3'; }
+          else if (s === n) { el.style.color = status === 'done' ? '#6ee7a3' : '#f97316'; }
+          else { el.style.color = 'rgba(255,255,255,0.35)'; }
+        });
+      }
+
+      card.querySelector('#lg-go').addEventListener('click', async () => {
+        const desc = card.querySelector('#lg-desc').value.trim();
+        const style = card.querySelector('#lg-style').value.trim();
+        const colorEl = card.querySelector('#lg-color');
+        const primaryColor = colorEl.value && colorEl.value !== '#000000' ? colorEl.value : undefined;
+        const goBtn = card.querySelector('#lg-go');
+        const err = card.querySelector('#lg-error');
+        const prog = card.querySelector('#lg-progress');
+
+        // Build description: prepend name + tagline if user left it blank/short.
+        const baseDesc = desc.length >= 4
+          ? desc
+          : `Logo for ${STATE.name}${STATE.tagline ? ' — ' + STATE.tagline : ''}`;
+
+        err.style.display = 'none';
+        prog.style.display = 'block';
+        goBtn.disabled = true;
+        const oldLabel = goBtn.textContent;
+        goBtn.textContent = 'Generating…';
+
+        setPStep(1, 'active');
+        const t2 = setTimeout(() => setPStep(2, 'active'), 8000);
+        const t3 = setTimeout(() => setPStep(3, 'active'), 18000);
+
+        try {
+          const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ description: baseDesc, style: style || undefined, primaryColor }),
+          });
+          const data = await r.json();
+          clearTimeout(t2); clearTimeout(t3);
+          if (!r.ok) {
+            err.textContent = data.error || 'Generation failed.';
+            err.style.display = 'block'; prog.style.display = 'none';
+            goBtn.disabled = false; goBtn.textContent = oldLabel;
+            return;
+          }
+          setPStep(3, 'done');
+          // Pull fresh state for assets
+          STATE.assets = { ...(STATE.assets || {}), logo: data.pngUrl || data.logo, logo_svg: data.svgUrl || data.logo_svg };
+          renderResult();
+          goBtn.disabled = false; goBtn.textContent = '✨ Generate another';
+          setTimeout(() => { prog.style.display = 'none'; }, 800);
+        } catch (e) {
+          clearTimeout(t2); clearTimeout(t3);
+          err.textContent = 'Network error.';
+          err.style.display = 'block'; prog.style.display = 'none';
+          goBtn.disabled = false; goBtn.textContent = oldLabel;
+        }
+      });
+
+      wireFooter(card);
+    }
+
+    // ── Step: bio short ────────────────────────────────────
+    function renderBioShort(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">The one-line story.</h2>
+        <p style="${STYLE_HELPER}">Two sentences that journalists will literally copy-paste. 280 characters max — think headline, not paragraph.</p>
+
+        <textarea id="f-bio-short" class="pkw-textarea" maxlength="280" placeholder="A line that captures the whole thing." style="${STYLE_TEXTAREA};min-height:120px;">${escapeHtml(STATE.bio_short ?? '')}</textarea>
+        <div style="display:flex;justify-content:flex-end;font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:6px;font-variant-numeric:tabular-nums;" id="f-bio-count">${(STATE.bio_short ?? '').length} / 280</div>
+
+        ${footerHTML()}
+      `;
+      const ta = card.querySelector('#f-bio-short');
+      const ct = card.querySelector('#f-bio-count');
+      ta.addEventListener('input', e => { queueSave({ bio_short: e.target.value }); ct.textContent = `${e.target.value.length} / 280`; });
+      wireFooter(card);
+    }
+
+    // ── Step: bio long ─────────────────────────────────────
+    function renderBioLong(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">The longer version.</h2>
+        <p style="${STYLE_HELPER}">The full story: what you do, who you’ve worked with, why it matters. Optional — skip if you don’t want one.</p>
+
+        <textarea id="f-bio-long" class="pkw-textarea" maxlength="3000" placeholder="The full story." style="${STYLE_TEXTAREA};min-height:200px;">${escapeHtml(STATE.bio_long ?? '')}</textarea>
+
+        ${footerHTML()}
+      `;
+      card.querySelector('#f-bio-long').addEventListener('input', e => queueSave({ bio_long: e.target.value }));
+      wireFooter(card);
+    }
+
+    // ── Step: numbers (stats) ──────────────────────────────
+    function renderNumbers(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">What numbers matter?</h2>
+        <p style="${STYLE_HELPER}">Stats sit on the inside spread in big tabular numbers. Three or four is usually plenty.</p>
+
+        <div id="f-stats" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-stat" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add stat</button>
+
+        ${footerHTML({ skipText: 'No stats' })}
+      `;
+      bindRows(card, 'f-stats', 'stats', 'grid-template-columns:1fr 1.4fr 40px;',
+        (s) => `
+          <input type="text" placeholder="1.2M" data-k="value" value="${escapeAttr(s.value ?? '')}" class="pkw-input" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="monthly listeners" data-k="label" value="${escapeAttr(s.label ?? '')}" class="pkw-input" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.stats, 'add-stat', () => ({ value: '', label: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: press mentions ───────────────────────────────
+    function renderPress(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Where have you been featured?</h2>
+        <p style="${STYLE_HELPER}">Outlet name and year (and optionally a quote). Recent or prestigious first — we’ll lay them out as a clean list.</p>
+
+        <div id="f-press" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-press" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add press mention</button>
+
+        ${footerHTML({ skipText: 'No press yet' })}
+      `;
+      bindRows(card, 'f-press', 'press', 'grid-template-columns:1.5fr 80px 40px;',
+        (p) => `
+          <input type="text" placeholder="Outlet (Mixmag)" data-k="name" value="${escapeAttr(p.name ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="Year" data-k="year" value="${escapeAttr(p.year ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.press, 'add-press', () => ({ name: '', year: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: awards ───────────────────────────────────────
+    function renderAwards(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Any awards or recognition?</h2>
+        <p style="${STYLE_HELPER}">Name + year + (optional) issuer. Keep it short — only the ones that move the needle.</p>
+
+        <div id="f-awards" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-award" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add award</button>
+
+        ${footerHTML({ skipText: 'No awards' })}
+      `;
+      bindRows(card, 'f-awards', 'awards', 'grid-template-columns:1.4fr 80px 1fr 40px;',
+        (a) => `
+          <input type="text" placeholder="Award name" data-k="name" value="${escapeAttr(a.name ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="Year" data-k="year" value="${escapeAttr(a.year ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="Issuer (opt)" data-k="issuer" value="${escapeAttr(a.issuer ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.awards, 'add-award', () => ({ name: '', year: '', issuer: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: links (contact + social) ─────────────────────
+    function renderLinks(card) {
+      const PLATFORMS = ['spotify','soundcloud','youtube','apple_music','bandcamp','instagram','tiktok','website','booking','other'];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Contact + social links.</h2>
+        <p style="${STYLE_HELPER}">Where journalists send emails, what they listen to first, where they find you. This becomes the back cover.</p>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div>
+            <label style="${STYLE_LABEL}">Booking email</label>
+            <input id="f-email" type="email" class="pkw-input" value="${escapeAttr(STATE.contact_email ?? '')}" placeholder="booking@you.com" style="${STYLE_INPUT}" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="${STYLE_LABEL}">Phone</label>
+              <input id="f-phone" type="tel" class="pkw-input" value="${escapeAttr(STATE.contact_phone ?? '')}" placeholder="(optional)" style="${STYLE_INPUT}" />
+            </div>
+            <div>
+              <label style="${STYLE_LABEL}">Other (telegram, etc.)</label>
+              <input id="f-other" type="text" class="pkw-input" value="${escapeAttr(STATE.contact_other ?? '')}" placeholder="(optional)" style="${STYLE_INPUT}" />
+            </div>
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Social + streaming links</label>
+            <div id="f-links" style="display:flex;flex-direction:column;gap:10px;"></div>
+            <button type="button" id="add-link" class="pkw-add" style="${STYLE_ADD};margin-top:10px;">+ Add link</button>
+          </div>
+        </div>
+
+        ${footerHTML()}
+      `;
+      card.querySelector('#f-email').addEventListener('input', e => queueSave({ contact_email: e.target.value }));
+      card.querySelector('#f-phone').addEventListener('input', e => queueSave({ contact_phone: e.target.value }));
+      card.querySelector('#f-other').addEventListener('input', e => queueSave({ contact_other: e.target.value }));
+      const SELECT_STYLE = 'height:42px;padding:0 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13px;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1l4 4 4-4\' stroke=\'%23ffffff80\' fill=\'none\' stroke-width=\'1.5\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:28px;';
+      bindRows(card, 'f-links', 'links', 'grid-template-columns:150px 1fr 40px;',
+        (l) => `
+          <select data-k="platform" style="${SELECT_STYLE}">${PLATFORMS.map(p => `<option ${l.platform === p ? 'selected' : ''} value="${p}">${p}</option>`).join('')}</select>
+          <input type="url" placeholder="https://…" data-k="url" value="${escapeAttr(l.url ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.links, 'add-link', () => ({ platform: 'spotify', url: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: brand (palette + fonts) ──────────────────────
+    function renderBrand(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Palette & fonts.</h2>
+        <p style="${STYLE_HELPER}">We pulled these from your logo (where possible). Tweak any swatch — click to pick a color. Fonts search across all Google Fonts.</p>
+
+        <div style="display:flex;flex-direction:column;gap:22px;">
+          <div>
+            <label style="${STYLE_LABEL}">Palette</label>
+            <div id="f-palette" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
+              ${['primary','secondary','accent','text','bg'].map(k => `
+                <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                  <input type="color" data-pal="${k}" value="${STATE.palette?.[k] || '#000000'}" style="width:100%;height:54px;border-radius:12px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;padding:0;" />
+                  <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.55);">${k}</label>
+                </div>
+              `).join('')}
+            </div>
+            <div id="f-presets" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;"></div>
+          </div>
+
+          <div>
+            <label style="${STYLE_LABEL}">Fonts</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <span style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">Heading</span>
+                ${fontCombo('heading', STATE.fonts.heading)}
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <span style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">Body</span>
+                ${fontCombo('body', STATE.fonts.body)}
+              </div>
+            </div>
+            <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:10px;">Search across all Google Fonts. Each option previews in its own family.</p>
+          </div>
+        </div>
+
+        ${footerHTML({ nextText: 'Review →' })}
+      `;
+
+      // palette
+      card.querySelectorAll('#f-palette input[type=color]').forEach(el => {
+        el.addEventListener('input', () => {
+          const next = { ...STATE.palette };
+          next[el.dataset.pal] = el.value;
+          next.extracted_from_logo = false;
+          queueSave({ palette: next });
+        });
+      });
+
+      // presets
+      const presetsWrap = card.querySelector('#f-presets');
+      presetsWrap.innerHTML = PALETTE_PRESETS.map((p, i) => `
+        <button type="button" data-preset="${i}" title="${p.name}" style="display:inline-flex;gap:2px;align-items:center;padding:6px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);cursor:pointer;">
+          ${['primary','accent','bg'].map(k => `<span style="width:22px;height:22px;border-radius:5px;background:${p[k]};"></span>`).join('')}
+        </button>
+      `).join('');
+      presetsWrap.querySelectorAll('[data-preset]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = PALETTE_PRESETS[+btn.dataset.preset];
+          const next = { primary: p.primary, secondary: p.secondary, accent: p.accent, text: p.text, bg: p.bg };
+          card.querySelectorAll('#f-palette input[type=color]').forEach(el => { el.value = next[el.dataset.pal]; });
+          queueSave({ palette: next });
+        });
+      });
+
+      wireFontCombos(card);
+      wireFooter(card);
+    }
+
+    // ── Font combobox ──────────────────────────────────────
     function fontCombo(target, current) {
       return `
-        <div class="wiz-font-combo" data-font="${target}">
-          <input type="text" class="wiz-font-input" value="${escapeAttr(current)}" style="font-family:'${current}',sans-serif;" placeholder="Search Google Fonts…" />
-          <div class="wiz-font-list"></div>
+        <div class="pkw-font-combo" data-font="${target}" style="position:relative;">
+          <input type="text" class="pkw-input pkw-font-input" value="${escapeAttr(current)}" style="${STYLE_INPUT};font-family:'${current}',sans-serif;" placeholder="Search Google Fonts…" />
+          <div class="pkw-font-list" style="position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:280px;overflow-y:auto;background:#15151a;border:1px solid rgba(255,255,255,0.14);border-radius:12px;z-index:60;display:none;box-shadow:0 18px 48px rgba(0,0,0,0.45);"></div>
         </div>
       `;
     }
     function wireFontCombos(card) {
-      card.querySelectorAll('.wiz-font-combo').forEach(box => {
+      card.querySelectorAll('.pkw-font-combo').forEach(box => {
         const inp = box.querySelector('input');
-        const list = box.querySelector('.wiz-font-list');
+        const list = box.querySelector('.pkw-font-list');
         const target = box.dataset.font;
         let active = -1;
 
@@ -598,32 +832,32 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           const matches = FONTS.filter(f => !q || f.family.toLowerCase().includes(q)).slice(0, 60);
           active = -1;
           list.innerHTML = matches.map((f, i) => `
-            <div class="wiz-font-opt" data-fam="${escapeAttr(f.family)}" data-idx="${i}" style="font-family:'${f.family}',sans-serif;">
+            <div class="pkw-font-opt" data-fam="${escapeAttr(f.family)}" data-idx="${i}" style="padding:10px 14px;font-size:15px;color:rgba(255,255,255,0.85);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:'${f.family}',sans-serif;">
               <span>${escapeHtml(f.family)}</span>
-              <span class="wiz-font-opt-tag">${f.category}</span>
+              <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);font-family:'Inter',sans-serif;">${f.category}</span>
             </div>
           `).join('') || '<div style="padding:14px;color:rgba(255,255,255,0.4);font-size:12px;">No match.</div>';
-          list.querySelectorAll('.wiz-font-opt').forEach(o => o.addEventListener('click', () => pick(o.dataset.fam)));
+          list.querySelectorAll('.pkw-font-opt').forEach(o => o.addEventListener('click', () => pick(o.dataset.fam)));
         }
         function pick(fam) {
           inp.value = fam;
           inp.style.fontFamily = `'${fam}', sans-serif`;
-          list.classList.remove('open');
+          list.style.display = 'none';
           loadGoogleFont(fam);
           const next = { ...STATE.fonts, [target]: fam, auto: false };
           queueSave({ fonts: next });
         }
 
-        inp.addEventListener('focus', () => { render(inp.value); list.classList.add('open'); });
-        inp.addEventListener('input', () => { render(inp.value); list.classList.add('open'); });
+        inp.addEventListener('focus', () => { render(inp.value); list.style.display = 'block'; });
+        inp.addEventListener('input', () => { render(inp.value); list.style.display = 'block'; });
         inp.addEventListener('keydown', (e) => {
-          const opts = list.querySelectorAll('.wiz-font-opt');
+          const opts = list.querySelectorAll('.pkw-font-opt');
           if (e.key === 'ArrowDown') { active = Math.min(active + 1, opts.length - 1); opts.forEach((o,i)=>o.classList.toggle('is-active', i===active)); opts[active]?.scrollIntoView({block:'nearest'}); e.preventDefault(); }
           else if (e.key === 'ArrowUp') { active = Math.max(active - 1, 0); opts.forEach((o,i)=>o.classList.toggle('is-active', i===active)); opts[active]?.scrollIntoView({block:'nearest'}); e.preventDefault(); }
           else if (e.key === 'Enter' && active >= 0) { pick(opts[active].dataset.fam); e.preventDefault(); }
-          else if (e.key === 'Escape') { list.classList.remove('open'); }
+          else if (e.key === 'Escape') { list.style.display = 'none'; }
         });
-        document.addEventListener('click', (e) => { if (!box.contains(e.target)) list.classList.remove('open'); });
+        document.addEventListener('click', (e) => { if (!box.contains(e.target)) list.style.display = 'none'; });
       });
     }
     function loadGoogleFont(family) {
@@ -635,177 +869,12 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       document.head.appendChild(link);
     }
 
-    // ── Story step ────────────────────────────────────
-    function renderStory(card) {
-      card.insertAdjacentHTML('beforeend', `
-        <div class="wiz-eyebrow">Story · Step 3 of ${STEPS.length - 1}</div>
-        <h2 class="wiz-question">Tell your story.</h2>
-        <p class="wiz-helper">A one-liner for the cover, then the full version that fills the inside spread. Write it like a journalist would quote it.</p>
-        <div class="wiz-body">
-          <div>
-            <label class="wiz-input-label">Short bio (one or two sentences)</label>
-            <textarea id="f-bio-short" class="wiz-textarea" maxlength="280" style="min-height:84px;" placeholder="A line that captures the whole thing.">${escapeHtml(STATE.bio_short ?? '')}</textarea>
-          </div>
-          <div>
-            <label class="wiz-input-label">Long bio (paragraphs allowed)</label>
-            <textarea id="f-bio-long" class="wiz-textarea" maxlength="3000" placeholder="The full story — what you do, who you've worked with, why this matters.">${escapeHtml(STATE.bio_long ?? '')}</textarea>
-          </div>
-          <div>
-            <label class="wiz-input-label">Portrait or hero photo (optional)</label>
-            <div id="f-portrait-wrap"></div>
-          </div>
-        </div>
-      `);
-      card.querySelector('#f-bio-short').addEventListener('input', e => queueSave({ bio_short: e.target.value }));
-      card.querySelector('#f-bio-long').addEventListener('input', e => queueSave({ bio_long: e.target.value }));
-      renderPortrait(card.querySelector('#f-portrait-wrap'));
-    }
-    function renderPortrait(box) {
-      const url = STATE.assets?.portrait;
-      if (url) {
-        box.innerHTML = `<div class="wiz-uploaded"><img src="${url}" style="object-fit:cover;border-radius:10px;background:none;" /><div class="wiz-uploaded-info"><strong>Portrait</strong><span>Used on the cover</span></div><button type="button" class="wiz-pill" id="port-rm">Remove</button></div>`;
-        box.querySelector('#port-rm').addEventListener('click', () => {
-          STATE.assets.portrait = undefined;
-          queueSave({ assets: { ...STATE.assets } });
-          renderPortrait(box);
-        });
-      } else {
-        box.innerHTML = `<div class="wiz-upload"><input type="file" accept="image/*" /><div class="wiz-upload-title">Upload portrait</div><div class="wiz-upload-sub">A single hero shot for the cover.</div></div>`;
-        box.querySelector('input').addEventListener('change', async e => {
-          const f = e.target.files[0]; if (!f) return;
-          markDirty();
-          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
-          const blob = await upload(f.name, f, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
-          STATE.assets = { ...(STATE.assets || {}), portrait: blob.url };
-          queueSave({ assets: STATE.assets });
-          renderPortrait(box);
-        });
-      }
-    }
-
-    // ── Numbers step (stats + awards) ─────────────────
-    function renderNumbers(card) {
-      card.insertAdjacentHTML('beforeend', `
-        <div class="wiz-eyebrow">Numbers · Step 4 of ${STEPS.length - 1}</div>
-        <h2 class="wiz-question">What numbers matter?</h2>
-        <p class="wiz-helper">Stats sit on the inside spread in big tabular numbers. Awards get their own list. Keep them short.</p>
-        <div class="wiz-body">
-          <div>
-            <label class="wiz-input-label">Stats</label>
-            <div class="wiz-rows" id="f-stats"></div>
-            <button type="button" class="wiz-add" id="add-stat" style="margin-top:8px;">+ Add stat</button>
-          </div>
-          <div>
-            <label class="wiz-input-label">Awards & recognition</label>
-            <div class="wiz-rows" id="f-awards"></div>
-            <button type="button" class="wiz-add" id="add-award" style="margin-top:8px;">+ Add award</button>
-          </div>
-        </div>
-      `);
-      bindRows(card, 'f-stats', 'stats', 'wiz-row--stat',
-        (s, i) => `<input type="text" placeholder="1.2M" data-k="value" value="${escapeAttr(s.value ?? '')}" />
-                   <input type="text" placeholder="monthly listeners" data-k="label" value="${escapeAttr(s.label ?? '')}" />
-                   <button type="button" class="wiz-rm" data-rm>×</button>`,
-        STATE.stats, 'add-stat', () => ({ value: '', label: '' })
-      );
-      bindRows(card, 'f-awards', 'awards', 'wiz-row--award',
-        (a) => `<input type="text" placeholder="Award name" data-k="name" value="${escapeAttr(a.name ?? '')}" />
-                <input type="text" placeholder="Year" data-k="year" value="${escapeAttr(a.year ?? '')}" />
-                <button type="button" class="wiz-rm" data-rm>×</button>`,
-        STATE.awards, 'add-award', () => ({ name: '', year: '' })
-      );
-    }
-
-    // ── Press & links step ────────────────────────────
-    function renderPress(card) {
-      const PLATFORMS = ['spotify','soundcloud','youtube','apple_music','bandcamp','instagram','tiktok','website','booking','other'];
-      card.insertAdjacentHTML('beforeend', `
-        <div class="wiz-eyebrow">Press & contact · Step 5 of ${STEPS.length - 1}</div>
-        <h2 class="wiz-question">Press, links & contact.</h2>
-        <p class="wiz-helper">Where journalists should send emails, what to listen to first, where you've been featured. The contact spread is the back cover.</p>
-        <div class="wiz-body">
-          <div>
-            <label class="wiz-input-label">Press mentions</label>
-            <div class="wiz-rows" id="f-press"></div>
-            <button type="button" class="wiz-add" id="add-press" style="margin-top:8px;">+ Add press mention</button>
-          </div>
-          <div>
-            <label class="wiz-input-label">Links (Spotify, IG, website…)</label>
-            <div class="wiz-rows" id="f-links"></div>
-            <button type="button" class="wiz-add" id="add-link" style="margin-top:8px;">+ Add link</button>
-          </div>
-          <div>
-            <label class="wiz-input-label">Booking email</label>
-            <input type="email" id="f-email" class="wiz-input" value="${escapeAttr(STATE.contact_email ?? '')}" placeholder="booking@you.com" />
-          </div>
-          <div class="wiz-font-row">
-            <div>
-              <label class="wiz-input-label">Phone (optional)</label>
-              <input type="tel" id="f-phone" class="wiz-input" value="${escapeAttr(STATE.contact_phone ?? '')}" />
-            </div>
-            <div>
-              <label class="wiz-input-label">Other (Telegram, etc.)</label>
-              <input type="text" id="f-other" class="wiz-input" value="${escapeAttr(STATE.contact_other ?? '')}" />
-            </div>
-          </div>
-          <div>
-            <label class="wiz-input-label">Photos for the gallery spread</label>
-            <div id="f-photos"></div>
-            <input type="file" id="photos-input" accept="image/*" multiple style="display:none;" />
-            <button type="button" class="wiz-add" id="add-photos" style="margin-top:8px;">+ Add photos</button>
-          </div>
-        </div>
-      `);
-      bindRows(card, 'f-press', 'press', 'wiz-row--press',
-        (p) => `<input type="text" placeholder="Outlet (Mixmag)" data-k="name" value="${escapeAttr(p.name ?? '')}" />
-                <input type="text" placeholder="Year" data-k="year" value="${escapeAttr(p.year ?? '')}" />
-                <button type="button" class="wiz-rm" data-rm>×</button>`,
-        STATE.press, 'add-press', () => ({ name: '', year: '' })
-      );
-      bindRows(card, 'f-links', 'links', 'wiz-row--link',
-        (l) => `<select data-k="platform">${PLATFORMS.map(p => `<option ${l.platform===p?'selected':''} value="${p}">${p}</option>`).join('')}</select>
-                <input type="url" placeholder="https://…" data-k="url" value="${escapeAttr(l.url ?? '')}" />
-                <button type="button" class="wiz-rm" data-rm>×</button>`,
-        STATE.links, 'add-link', () => ({ platform: 'spotify', url: '' })
-      );
-      card.querySelector('#f-email').addEventListener('input', e => queueSave({ contact_email: e.target.value }));
-      card.querySelector('#f-phone').addEventListener('input', e => queueSave({ contact_phone: e.target.value }));
-      card.querySelector('#f-other').addEventListener('input', e => queueSave({ contact_other: e.target.value }));
-      renderPhotos(card.querySelector('#f-photos'));
-      card.querySelector('#add-photos').addEventListener('click', () => card.querySelector('#photos-input').click());
-      card.querySelector('#photos-input').addEventListener('change', async e => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
-        markDirty();
-        const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
-        for (const f of files) {
-          try {
-            const blob = await upload(f.name, f, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
-            STATE.assets = { ...(STATE.assets || {}), photos: [...(STATE.assets?.photos || []), blob.url] };
-          } catch (err) { console.error(err); }
-        }
-        queueSave({ assets: STATE.assets });
-        renderPhotos(card.querySelector('#f-photos'));
-      });
-    }
-    function renderPhotos(box) {
-      const photos = STATE.assets?.photos || [];
-      if (photos.length === 0) { box.innerHTML = '<p style="font-size:11.5px;color:rgba(255,255,255,0.4);">No photos yet.</p>'; return; }
-      box.innerHTML = `<div class="wiz-photo-grid">${photos.map((p,i) => `<div class="wiz-photo-item"><img src="${p}" alt=""><button type="button" class="wiz-photo-rm" data-i="${i}">×</button></div>`).join('')}</div>`;
-      box.querySelectorAll('.wiz-photo-rm').forEach(b => b.addEventListener('click', () => {
-        const idx = +b.dataset.i;
-        STATE.assets.photos = STATE.assets.photos.filter((_, j) => j !== idx);
-        queueSave({ assets: { ...STATE.assets } });
-        renderPhotos(box);
-      }));
-    }
-
-    // ── Repeater helper ───────────────────────────────
-    function bindRows(card, listId, stateKey, rowClass, tmpl, initialList, addBtnId, blank) {
+    // ── Repeater helper ────────────────────────────────────
+    function bindRows(card, listId, stateKey, gridCols, tmpl, initialList, addBtnId, blank) {
       const wrap = card.querySelector('#' + listId);
       function refresh() {
         const out = [];
-        wrap.querySelectorAll('.wiz-row').forEach(row => {
+        wrap.querySelectorAll('[data-row]').forEach(row => {
           const obj = {};
           row.querySelectorAll('[data-k]').forEach(el => { obj[el.dataset.k] = el.value; });
           if (Object.values(obj).some(v => v)) out.push(obj);
@@ -815,7 +884,8 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       }
       function add(data) {
         const row = document.createElement('div');
-        row.className = 'wiz-row ' + rowClass;
+        row.setAttribute('data-row', '');
+        row.style.cssText = `display:grid;gap:8px;align-items:center;${gridCols}`;
         row.innerHTML = tmpl(data);
         wrap.appendChild(row);
         row.querySelectorAll('input, select').forEach(el => { el.addEventListener('input', refresh); el.addEventListener('change', refresh); });
@@ -825,69 +895,79 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       card.querySelector('#' + addBtnId).addEventListener('click', () => add(blank()));
     }
 
-    // ── Review screen ─────────────────────────────────
+    // ── Review screen ──────────────────────────────────────
     function renderReview() {
       const recap = document.getElementById('review-recap');
-      const KIT_LABEL = { musician:'Musician', agency:'Agency', photographer:'Photographer', founder:'Founder', model:'Talent', other:'Press kit' };
       const heading = STATE.fonts?.heading ?? 'Inter';
       const body = STATE.fonts?.body ?? 'Inter';
-      const status = STATE.status;
-      const published = status === 'published';
-      recap.innerHTML = `
-        <div class="recap-section">
-          <div class="recap-section-h">
-            <h3 class="recap-h">Identity</h3>
-            <button type="button" class="recap-edit" data-go="0">Edit</button>
+      const published = STATE.status === 'published';
+
+      const idxOf = (key) => STEPS.findIndex(s => s.key === key);
+      const SECTIONS = [
+        { title: 'Identity', step: idxOf('identity'), rows: [
+          ['Name', STATE.name || '—'],
+          ['Tagline', STATE.tagline || '—'],
+        ]},
+        { title: 'Brand', step: idxOf('brand'), rows: [
+          ['Logo', `${STATE.assets?.logo ? 'Yes' : '—'}${STATE.assets?.logo_svg ? ' · SVG ready' : ''}`],
+          ['Palette', `<span style="display:inline-flex;gap:4px;justify-content:flex-end;">${['primary','accent','bg'].map(k => `<span style="width:14px;height:14px;border-radius:3px;background:${STATE.palette?.[k] ?? '#000'};border:1px solid rgba(255,255,255,0.12);"></span>`).join('')}</span>`],
+          ['Fonts', `<span style="font-family:'${heading}', sans-serif;">${escapeHtml(heading)} <span style="opacity:.55;font-family:'${body}',sans-serif;">/ ${escapeHtml(body)}</span></span>`],
+        ]},
+        { title: 'Story', step: idxOf('bio-short'), rows: [
+          ['Short bio', STATE.bio_short ? escapeHtml(STATE.bio_short.slice(0, 70)) + (STATE.bio_short.length > 70 ? '…' : '') : '—'],
+          ['Long bio', STATE.bio_long ? `${STATE.bio_long.split(/\s+/).length} words` : '—'],
+        ]},
+        { title: 'Numbers', step: idxOf('numbers'), rows: [
+          ['Stats', String((STATE.stats || []).length)],
+        ]},
+        { title: 'Press', step: idxOf('press'), rows: [
+          ['Mentions', String((STATE.press || []).length)],
+        ]},
+        { title: 'Awards', step: idxOf('awards'), rows: [
+          ['Awards', String((STATE.awards || []).length)],
+        ]},
+        { title: 'Links', step: idxOf('links'), rows: [
+          ['Email', escapeHtml(STATE.contact_email ?? '—')],
+          ['Links', String((STATE.links || []).length)],
+        ]},
+      ];
+
+      recap.innerHTML = SECTIONS.map(sec => `
+        <div style="margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.55);margin:0;">${sec.title}</h3>
+            <button type="button" class="pkw-recap-edit" data-go="${sec.step}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;background:none;border:0;font-family:inherit;padding:0;">Edit →</button>
           </div>
-          <div class="recap-row"><span class="recap-label">Name</span><span class="recap-val">${escapeHtml(STATE.name)}</span></div>
-          ${STATE.tagline ? `<div class="recap-row"><span class="recap-label">Tagline</span><span class="recap-val">${escapeHtml(STATE.tagline)}</span></div>` : ''}
-          <div class="recap-row"><span class="recap-label">Type</span><span class="recap-val">${KIT_LABEL[STATE.kit_type] ?? STATE.kit_type}</span></div>
+          ${sec.rows.map(([l, v]) => `
+            <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;">
+              <span style="color:rgba(255,255,255,0.55);font-weight:500;">${l}</span>
+              <span style="color:#fff;text-align:right;max-width:60%;word-break:break-word;">${v}</span>
+            </div>
+          `).join('')}
         </div>
-        <div class="recap-section">
-          <div class="recap-section-h">
-            <h3 class="recap-h">Brand</h3>
-            <button type="button" class="recap-edit" data-go="1">Edit</button>
-          </div>
-          <div class="recap-row"><span class="recap-label">Logo</span><span class="recap-val">${STATE.assets?.logo ? 'Yes' : '—'}${STATE.assets?.logo_svg ? ' · SVG ready' : ''}</span></div>
-          <div class="recap-row"><span class="recap-label">Palette</span><span class="recap-val" style="display:inline-flex;gap:4px;justify-content:flex-end;">${['primary','accent','bg'].map(k => `<span style="width:14px;height:14px;border-radius:3px;background:${STATE.palette?.[k] ?? '#000'};border:1px solid rgba(255,255,255,0.12);"></span>`).join('')}</span></div>
-          <div class="recap-row"><span class="recap-label">Fonts</span><span class="recap-val" style="font-family:'${heading}', sans-serif;">${escapeHtml(heading)} <span style="opacity:.55;font-family:'${body}',sans-serif;">/ ${escapeHtml(body)}</span></span></div>
-        </div>
-        <div class="recap-section">
-          <div class="recap-section-h">
-            <h3 class="recap-h">Story</h3>
-            <button type="button" class="recap-edit" data-go="2">Edit</button>
-          </div>
-          <div class="recap-row"><span class="recap-label">Short bio</span><span class="recap-val">${STATE.bio_short ? escapeHtml(STATE.bio_short.slice(0, 90)) + (STATE.bio_short.length > 90 ? '…' : '') : '—'}</span></div>
-          <div class="recap-row"><span class="recap-label">Long bio</span><span class="recap-val">${STATE.bio_long ? `${STATE.bio_long.split(/\\s+/).length} words` : '—'}</span></div>
-          <div class="recap-row"><span class="recap-label">Portrait</span><span class="recap-val">${STATE.assets?.portrait ? 'Yes' : '—'}</span></div>
-        </div>
-        <div class="recap-section">
-          <div class="recap-section-h">
-            <h3 class="recap-h">Numbers</h3>
-            <button type="button" class="recap-edit" data-go="3">Edit</button>
-          </div>
-          <div class="recap-row"><span class="recap-label">Stats</span><span class="recap-val">${(STATE.stats||[]).length}</span></div>
-          <div class="recap-row"><span class="recap-label">Awards</span><span class="recap-val">${(STATE.awards||[]).length}</span></div>
-        </div>
-        <div class="recap-section">
-          <div class="recap-section-h">
-            <h3 class="recap-h">Press & contact</h3>
-            <button type="button" class="recap-edit" data-go="4">Edit</button>
-          </div>
-          <div class="recap-row"><span class="recap-label">Press</span><span class="recap-val">${(STATE.press||[]).length}</span></div>
-          <div class="recap-row"><span class="recap-label">Links</span><span class="recap-val">${(STATE.links||[]).length}</span></div>
-          <div class="recap-row"><span class="recap-label">Photos</span><span class="recap-val">${(STATE.assets?.photos||[]).length}</span></div>
-          <div class="recap-row"><span class="recap-label">Email</span><span class="recap-val">${escapeHtml(STATE.contact_email ?? '—')}</span></div>
-        </div>
-        <div class="recap-section" style="display:flex;flex-direction:column;gap:10px;">
+      `).join('') + `
+        <div style="margin-top:22px;display:flex;flex-direction:column;gap:10px;">
           ${published
-            ? `<a href="/kit/${STATE.slug}" target="_blank" class="wiz-btn wiz-btn--ghost" style="text-decoration:none;justify-content:center;">View live kit ↗</a>
-               <a href="/kit/${STATE.slug}?print=1" target="_blank" class="wiz-btn wiz-btn--primary" style="text-decoration:none;justify-content:center;">Download PDF</a>`
-            : `<button type="button" id="publish-btn" class="wiz-btn wiz-btn--publish" style="justify-content:center;font-size:14.5px;padding:14px 22px;">Publish for €15 →</button>
-               <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:0;">You'll be charged once. Shareable link + PDF unlock immediately after.</p>`
+            ? `<a href="/kit/${STATE.slug}" target="_blank" style="height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.02em;">View live kit ↗</a>
+               <a href="/kit/${STATE.slug}?print=1" target="_blank" style="height:52px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:#f97316;color:#0a0a0a;border-radius:999px;font-family:inherit;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.04em;">Download PDF ↓</a>`
+            : `<button type="button" id="publish-btn" class="pkw-primary" style="height:54px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Publish for €15 →</button>
+               <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:0;line-height:1.5;">You’ll be charged once. Shareable link + PDF unlock immediately after.</p>`
           }
         </div>
       `;
+
+      // Header for the recap
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
+      head.innerHTML = `
+        <div>
+          <span style="${STYLE_EYEBROW}"><span style="${STYLE_EYEBROW_DOT}"></span>Review</span>
+          <h2 style="font-family:'Inter',sans-serif;font-size:24px;font-weight:300;letter-spacing:-0.025em;color:#fff;margin:14px 0 4px;">What you’ve answered</h2>
+          <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0;line-height:1.5;">Tap any section to edit. The preview on the right updates live.</p>
+        </div>
+      `;
+      recap.prepend(head);
+
       recap.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
       const pubBtn = recap.querySelector('#publish-btn');
       if (pubBtn) pubBtn.addEventListener('click', publishFlow);
@@ -906,7 +986,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       btn.disabled = false; btn.textContent = 'Publish for €15 →';
     }
 
-    // ── Palette presets ───────────────────────────────
+    // ── Palette presets ────────────────────────────────────
     const PALETTE_PRESETS = [
       { name:'Mono',     primary:'#0a0a0a', secondary:'#262626', accent:'#f97316', text:'#0a0a0a', bg:'#fafafa' },
       { name:'Editorial',primary:'#1d1d1f', secondary:'#5a5a5e', accent:'#c97064', text:'#1d1d1f', bg:'#f5efe5' },
@@ -916,74 +996,34 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       { name:'Aurora',   primary:'#1d2bd1', secondary:'#3b3bc7', accent:'#c97064', text:'#0a0a0a', bg:'#f0eef8' },
     ];
 
-    // ── Logo gen modal ────────────────────────────────
-    function openGenModal() {
-      const m = document.getElementById('gen-modal');
-      m.classList.add('open');
-      document.getElementById('gen-error').classList.remove('show');
-      document.getElementById('gen-progress').classList.remove('show');
-    }
-
-    document.getElementById('gen-cancel').addEventListener('click', () => document.getElementById('gen-modal').classList.remove('open'));
-    document.getElementById('gen-modal').addEventListener('click', e => { if (e.target.id === 'gen-modal') e.target.classList.remove('open'); });
-    document.getElementById('gen-go').addEventListener('click', async () => {
-      const description = document.getElementById('gen-desc').value.trim();
-      const style = document.getElementById('gen-style').value.trim();
-      const colorEl = document.getElementById('gen-color');
-      const primaryColor = colorEl.value && colorEl.value !== '#000000' ? colorEl.value : undefined;
-      const err = document.getElementById('gen-error');
-      const prog = document.getElementById('gen-progress');
-      if (description.length < 4) {
-        err.textContent = 'Describe the brand in at least 4 characters.';
-        err.classList.add('show'); return;
-      }
-      err.classList.remove('show');
-      prog.classList.add('show');
-      document.getElementById('gen-go').disabled = true;
-      document.getElementById('gen-cancel').disabled = true;
-      setStep(1, 'active');
-      setTimeout(() => setStep(2, 'active'), 8000);
-      setTimeout(() => setStep(3, 'active'), 18000);
-      try {
-        const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
-          method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ description, style: style || undefined, primaryColor }),
-        });
-        const data = await r.json();
-        if (!r.ok) {
-          err.textContent = data.error || 'Generation failed.';
-          err.classList.add('show'); prog.classList.remove('show');
-          document.getElementById('gen-go').disabled = false;
-          document.getElementById('gen-cancel').disabled = false;
-          return;
-        }
-        setStep(3, 'done');
-        setTimeout(() => window.location.reload(), 500);
-      } catch (e) {
-        err.textContent = 'Network error.';
-        err.classList.add('show'); prog.classList.remove('show');
-        document.getElementById('gen-go').disabled = false;
-        document.getElementById('gen-cancel').disabled = false;
-      }
-    });
-    function setStep(n, status) {
-      document.querySelectorAll('#gen-progress .step').forEach(el => {
-        const s = +el.dataset.step;
-        el.classList.remove('active','done','pending');
-        if (s < n) el.classList.add('done');
-        else if (s === n) el.classList.add(status === 'done' ? 'done' : 'active');
-        else el.classList.add('pending');
-      });
-    }
-
-    // ── Utils ─────────────────────────────────────────
+    // ── Utils ──────────────────────────────────────────────
     function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function escapeAttr(s) { return escapeHtml(s); }
 
-    // ── Boot ──────────────────────────────────────────
-    renderChips();
-    renderStep();
+    // ── Boot ───────────────────────────────────────────────
+    function initialStepFromHash() {
+      const m = (window.location.hash || '').match(/step=([\w-]+)/);
+      if (!m) return 0;
+      const idx = STEPS.findIndex(s => s.key === m[1]);
+      return idx >= 0 ? idx : 0;
+    }
 
+    // If user already has a logo on load, skip needsLogoGen.
+    if (STATE.assets?.logo) needsLogoGen = false;
+    STEPS = buildSteps();
+    stepIdx = initialStepFromHash();
+    renderProgress();
+    if (STEPS[stepIdx].key === 'review') {
+      document.getElementById('wiz-stage').hidden = true;
+      document.getElementById('review-stage').hidden = false;
+      renderReview(); reloadPreview();
+    } else {
+      renderStep();
+    }
     window.addEventListener('beforeunload', () => { flushSave(); });
+    window.addEventListener('hashchange', () => {
+      const idx = initialStepFromHash();
+      if (idx !== stepIdx) goTo(idx, { skipSave: true });
+    });
   </script>
 </Dashboard>
