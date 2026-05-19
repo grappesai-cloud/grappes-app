@@ -24,6 +24,21 @@ export interface Fonts {
 
 export type KitMode = "press_kit" | "brand_book";
 
+// ── DENY-style press kit role chip ────────────────────────────────────────
+// Drives copy in the rebuilt wizard + section labels in the PDF (Discography
+// vs Portfolio, etc.). 'other' allows a free-text role string stored on the
+// kit alongside this enum value.
+export type KitRole =
+  | "dj" | "producer" | "musician" | "photographer"
+  | "founder" | "model" | "athlete" | "brand" | "other";
+
+export interface BookingAgent {
+  name: string;
+  email?: string;
+  phone?: string;
+  role?: string; // e.g. "Worldwide", "Romania", "Management"
+}
+
 export interface PressKit {
   id: string;
   user_id: string;
@@ -44,13 +59,38 @@ export interface PressKit {
   stats: { value: string; label: string }[];
   assets: {
     logo?: string;
+    logo_svg?: string;
+    logo_refs?: string[];
     portrait?: string;
     photos?: string[];
     videos?: string[];
     press_logos?: string[];
+    // DENY-style additions
+    cover_portrait?: string;     // dominant cover photo
+    spread_portraits?: string[]; // left-half portraits cycled through spreads
+    signature?: string;          // transparent PNG of user signature (optional)
   };
-  press: { name: string; url?: string; year?: string; quote?: string }[];
+  press: { name: string; url?: string; year?: string; quote?: string; role?: string; title?: string }[];
   awards: { name: string; year?: string; issuer?: string }[];
+
+  // ── DENY-style structured fields (PR 2) ───────────────────────────────
+  role: KitRole | string;
+  overview_intro?: string;                                            // short intro paragraph on Overview page
+  key_highlights: string[];                                           // bullet list on Overview page
+  shared_stage: string | null;                                        // comma-separated names
+  career: {
+    festivals?: string[];
+    international?: string[];
+    charts?: string[];
+  };
+  big_stats: { label: string; value: string }[];                      // headline numbers on Statistics page
+  booking: {
+    agents?: BookingAgent[];
+    management?: BookingAgent;
+    press_link?: string;
+    instagram?: string;
+  };
+
   template_version: number;
   stripe_session_id: string | null;
   published_at: string | null;
@@ -122,6 +162,68 @@ export function googleFontsUrl(fonts: Fonts): string {
     families.push(`family=${body}:wght@300;400;500;600`);
   }
   return `https://fonts.googleapis.com/css2?${families.join("&")}&display=swap`;
+}
+
+// ── DENY-style accent derivation ───────────────────────────────────────────
+// Picks ONE bold accent color used by the press-kit PDF (section titles,
+// scribble overlays, key callouts). Rules:
+//   1. Prefer palette.accent if its luminance is 0.15-0.65 AND saturation > 0.35
+//   2. Else try palette.primary against the same gate
+//   3. Else fall back to a curated pool, hashed by kit name for stability
+const ACCENT_FALLBACK_POOL = [
+  "#A3E635", // DENY lime
+  "#22D3EE",
+  "#F97316",
+  "#FB7185",
+  "#FBBF24",
+  "#A78BFA",
+  "#34D399",
+];
+
+function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
+  const m = hex.replace("#", "");
+  if (m.length !== 6) return null;
+  const r = parseInt(m.substring(0, 2), 16) / 255;
+  const g = parseInt(m.substring(2, 4), 16) / 255;
+  const b = parseInt(m.substring(4, 6), 16) / 255;
+  if ([r, g, b].some(n => Number.isNaN(n))) return null;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h, s, l };
+}
+
+function isBoldAccent(hex: string | undefined | null): boolean {
+  if (!hex) return false;
+  const hsl = hexToHsl(hex);
+  if (!hsl) return false;
+  return hsl.l >= 0.15 && hsl.l <= 0.65 && hsl.s > 0.35;
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+export function accentForKit(kit: Pick<PressKit, "palette" | "name">): string {
+  const p = kit.palette ?? ({} as Partial<Palette>);
+  if (isBoldAccent(p.accent))  return p.accent!;
+  if (isBoldAccent(p.primary)) return p.primary!;
+  const key = (kit.name || "kit").toLowerCase();
+  return ACCENT_FALLBACK_POOL[hashString(key) % ACCENT_FALLBACK_POOL.length];
 }
 
 // ── Helper: compute a readable foreground color for a given background ─────
