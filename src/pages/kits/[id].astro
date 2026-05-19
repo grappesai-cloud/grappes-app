@@ -781,7 +781,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             <div id="f-apps" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
               ${ALL.map(([id, label]) => `
                 <button type="button" data-app="${id}" class="bbw-tile ${sel.has(id) ? 'is-active' : ''}" style="text-align:left;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:14px;color:#fff;font-family:inherit;cursor:pointer;display:flex;gap:12px;align-items:center;">
-                  <img src="/mockups/${id}.svg" alt="" style="width:56px;height:56px;object-fit:contain;background:#fafafa;border-radius:8px;padding:4px;flex-shrink:0;" />
+                  <img src="/mockups/${id}.jpg" alt="" loading="lazy" style="width:56px;height:56px;object-fit:cover;background:#fafafa;border-radius:8px;flex-shrink:0;" />
                   <div style="flex:1;">
                     <div style="font-size:14px;font-weight:600;">${label}</div>
                     <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">${sel.has(id) ? 'Selected' : 'Tap to add'}</div>
