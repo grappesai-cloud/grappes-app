@@ -43,6 +43,14 @@ function pickAccent(): { name: string; hex: string } {
   return ACCENT_PALETTE[Math.floor(Math.random() * ACCENT_PALETTE.length)];
 }
 
+/** Convert "#RRGGBB" or "RRGGBB" to [r,g,b] integer triplet, or null if invalid. */
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const v = parseInt(m[1], 16);
+  return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+}
+
 const BASE_RULES = [
   "flat vector style, single or two-tone solid color silhouette",
   "soft off-white #FAFAFA background — no harsh pure white",
@@ -214,6 +222,25 @@ async function generateSvgFromRecraft(input: GenerateLogoInput): Promise<{ svg: 
     body.style_id = styleId;
   } else {
     body.model = "recraftv4_vector";
+  }
+
+  // Color constraint: when the user explicitly forced a color (primaryColor)
+  // or has a kit palette set, pass them via Recraft's `controls.colors` so the
+  // output is HARD-constrained to those hues — putting a hex in the prompt
+  // text was being ignored (Recraft treats color tokens as weak signal).
+  const constraintColors: number[][] = [];
+  if (input.primaryColor) {
+    const rgb = hexToRgb(input.primaryColor);
+    if (rgb) constraintColors.push(rgb);
+  }
+  if (constraintColors.length === 0 && input.paletteColors) {
+    for (const c of input.paletteColors.slice(0, 3)) {
+      const rgb = hexToRgb(c);
+      if (rgb) constraintColors.push(rgb);
+    }
+  }
+  if (constraintColors.length > 0) {
+    body.controls = { colors: constraintColors.map((rgb) => ({ rgb })) };
   }
 
   const res = await fetch(`${RECRAFT_BASE}/images/generations`, {
