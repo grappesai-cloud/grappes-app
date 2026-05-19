@@ -204,4 +204,26 @@ const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
     .tile-grid :global(.pt-card:nth-child(5)) { animation-delay: 0.42s; }
 
   </style>
+
+  <!-- Defensive click handler: ensure tiles navigate even if the anchor's
+       default action gets swallowed by something upstream. -->
+  <script is:inline>
+    document.addEventListener('click', function(e){
+      var t = e.target;
+      var card = t && t.closest ? t.closest('a.pt-card[data-tile-href]') : null;
+      if (!card) return;
+      // If browser already handled the navigation, don't fire twice.
+      // We only kick in when default got prevented somehow.
+      if (e.defaultPrevented) return;
+      var href = card.getAttribute('data-tile-href');
+      if (!href) return;
+      // Let middle-click / cmd+click open in new tab natively.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+      // Small timeout so native nav (if any) takes precedence.
+      setTimeout(function(){
+        if (window.location.pathname + window.location.search === href) return;
+        window.location.href = href;
+      }, 50);
+    });
+  </script>
 </Dashboard>
