@@ -52,22 +52,20 @@ const FRAG = /* glsl */ `
   uniform vec3  uRegionDebugColors[${REGION_SLOTS}];
   uniform int   uRegionCount;
   uniform float uDebug;
-  // fMRI heat palette: dark blue -> blue -> teal -> green -> yellow -> orange -> red
+  // Muted base (slate / cool grey) that only ignites violet -> amber -> rose
+  // where there's actual measured activity. Avoids the "Smurf blue plastic"
+  // look the old fMRI palette gave when the whole brain sat at low activation.
   vec3 palette(float t) {
     t = clamp(t, 0.0, 1.0);
-    vec3 cBlueDark  = vec3(0.04, 0.06, 0.22);
-    vec3 cBlue      = vec3(0.10, 0.32, 0.78);
-    vec3 cTeal      = vec3(0.10, 0.65, 0.70);
-    vec3 cGreen     = vec3(0.30, 0.82, 0.40);
-    vec3 cYellow    = vec3(0.96, 0.90, 0.18);
-    vec3 cOrange    = vec3(0.97, 0.55, 0.12);
-    vec3 cRed       = vec3(0.94, 0.18, 0.16);
-    if (t < 0.15)      return mix(cBlueDark, cBlue,  t / 0.15);
-    else if (t < 0.35) return mix(cBlue,     cTeal,  (t - 0.15) / 0.20);
-    else if (t < 0.55) return mix(cTeal,     cGreen, (t - 0.35) / 0.20);
-    else if (t < 0.72) return mix(cGreen,    cYellow,(t - 0.55) / 0.17);
-    else if (t < 0.88) return mix(cYellow,   cOrange,(t - 0.72) / 0.16);
-    return mix(cOrange, cRed, (t - 0.88) / 0.12);
+    vec3 cIdle      = vec3(0.085, 0.085, 0.115); // graphite, almost black
+    vec3 cLow       = vec3(0.18, 0.17, 0.24);    // cool charcoal violet
+    vec3 cMid       = vec3(0.55, 0.43, 0.96);    // violet (brand accent)
+    vec3 cHi        = vec3(0.99, 0.65, 0.22);    // warm amber
+    vec3 cPeak      = vec3(0.99, 0.30, 0.40);    // rose peak
+    if (t < 0.20)      return mix(cIdle, cLow, t / 0.20);
+    else if (t < 0.50) return mix(cLow,  cMid, (t - 0.20) / 0.30);
+    else if (t < 0.80) return mix(cMid,  cHi,  (t - 0.50) / 0.30);
+    return mix(cHi, cPeak, (t - 0.80) / 0.20);
   }
   void main() {
     float fresnel = pow(1.0 - max(dot(vNormal, vViewDir), 0.0), 2.4);
@@ -306,7 +304,7 @@ export default function BrainHeatmap({
     : undefined;
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_50%_50%,rgba(244,63,94,0.10),rgba(0,0,0,0.85))] ring-1 ring-zinc-900 ${className ?? "h-full min-h-[420px] w-full"}`}
+      className={`relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[radial-gradient(circle_at_50%_45%,rgba(167,139,250,0.10),rgba(8,8,12,0.92))] backdrop-blur-xl ${className ?? "h-full min-h-[420px] w-full"}`}
     >
       <Canvas
         camera={{ position: [0, 0.1, 3.4], fov: 38 }}
@@ -316,10 +314,10 @@ export default function BrainHeatmap({
           alpha: true,
         }}
       >
-        <color attach="background" args={["#040406"]} />
-        <ambientLight intensity={0.3} />
-        <pointLight position={[3, 4, 5]} intensity={0.95} color="#ffe0c2" />
-        <pointLight position={[-3, -2, -3]} intensity={0.55} color="#5e9fff" />
+        <color attach="background" args={["#08080c"]} />
+        <ambientLight intensity={0.35} />
+        <pointLight position={[3, 4, 5]} intensity={0.85} color="#ffe0c2" />
+        <pointLight position={[-3, -2, -3]} intensity={0.45} color="#a78bfa" />
         <Suspense fallback={<Fallback />}>
           <BrainMesh
             hemi={hemi}
