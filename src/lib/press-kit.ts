@@ -134,22 +134,114 @@ export const DEFAULT_PALETTE: Palette = {
   bg:        "#fafafa",
 };
 
+// ── Color theory helpers ────────────────────────────────────────────────────
+function hexToHslTuple(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  const v = m ? parseInt(m[1], 16) : 0;
+  const r = ((v >> 16) & 0xff) / 255, g = ((v >> 8) & 0xff) / 255, b = (v & 0xff) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h * 360, s, l];
+}
+function hslToHex(h: number, s: number, l: number): string {
+  h = ((h % 360) + 360) % 360 / 360;
+  s = Math.max(0, Math.min(1, s));
+  l = Math.max(0, Math.min(1, l));
+  let r: number, g: number, b: number;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  const toHex = (x: number) => Math.round(x * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 // ── Server-side palette extraction from a logo URL ─────────────────────────
-// Uses node-vibrant. Returns null if extraction fails (corrupt image, etc.) —
-// caller falls back to DEFAULT_PALETTE or the previous palette.
+// Returns ONLY colors actually present in the logo (no hardcoded fallbacks).
+// Caller pairs this with fillPalette() to complete the 5-slot palette using
+// color theory based on whatever was extracted.
 export async function extractPaletteFromLogo(logoUrl: string): Promise<Palette | null> {
   try {
     const palette = await Vibrant.from(logoUrl).getPalette();
-    const primary   = palette.Vibrant?.hex   ?? palette.DarkVibrant?.hex   ?? "#0a0a0a";
-    const secondary = palette.Muted?.hex     ?? palette.DarkMuted?.hex     ?? "#262626";
-    const accent    = palette.LightVibrant?.hex ?? palette.LightMuted?.hex ?? "#22d3ee";
-    const text      = palette.DarkMuted?.hex  ?? palette.DarkVibrant?.hex  ?? "#0a0a0a";
-    const bg        = palette.LightMuted?.hex ?? "#fafafa";
-    return { primary, secondary, accent, text, bg, extracted_from_logo: true };
+    const primary   = palette.Vibrant?.hex   ?? palette.DarkVibrant?.hex ?? null;
+    const secondary = palette.Muted?.hex     ?? palette.DarkMuted?.hex   ?? null;
+    const accent    = palette.LightVibrant?.hex ?? null;
+    const text      = palette.DarkMuted?.hex  ?? palette.DarkVibrant?.hex ?? null;
+    const bg        = palette.LightMuted?.hex ?? null;
+
+    // If nothing usable came out, bail.
+    if (!primary && !secondary && !accent && !text && !bg) return null;
+
+    // Build a partial palette of ONLY real extracted colors, then fill the
+    // rest using color theory derived from the dominant hue.
+    const partial: Partial<Palette> = {};
+    if (primary) partial.primary = primary;
+    if (secondary) partial.secondary = secondary;
+    if (accent) partial.accent = accent;
+    if (text) partial.text = text;
+    if (bg) partial.bg = bg;
+
+    return { ...fillPalette(partial), extracted_from_logo: true };
   } catch (err) {
     console.error("[press-kit] palette extraction failed:", err);
     return null;
   }
+}
+
+// ── Color-theory completion ────────────────────────────────────────────────
+// Given a partial palette (typically 1-3 colors extracted from a logo), fill
+// the remaining slots using HSL rotations so the final 5 colors are
+// technically coherent (no random cyan when the logo is red).
+//
+// Rules:
+//   - primary: required. If missing, fall back to the first non-empty slot or
+//     a sensible neutral (#0a0a0a).
+//   - secondary: same hue as primary, less saturated + slightly lighter.
+//   - accent: complementary hue (180° from primary), bumped saturation.
+//   - bg: very light tint of primary (L=0.97, S=0.04) — almost white but
+//     hinted toward the brand.
+//   - text: very dark shade of primary (L=0.10, S=0.30) — almost black with
+//     a hint of the brand hue. Avoids absolute #000.
+export function fillPalette(partial: Partial<Palette>): Palette {
+  const primary = partial.primary || partial.secondary || partial.accent || partial.text || "#0a0a0a";
+  const [h, s] = hexToHslTuple(primary);
+
+  const secondary = partial.secondary || hslToHex(h, Math.max(0.18, s * 0.55), 0.32);
+  const accent    = partial.accent    || hslToHex(h + 180, Math.max(0.55, s), 0.55);
+  const bg        = partial.bg        || hslToHex(h, 0.04, 0.97);
+  const text      = partial.text      || hslToHex(h, 0.30, 0.10);
+
+  return {
+    primary,
+    secondary,
+    accent,
+    bg,
+    text,
+    extracted_from_logo: partial.primary != null,
+  };
 }
 
 // ── Short shareable slug (10 chars base36) used in /kit/[slug] public URL ──
