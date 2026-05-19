@@ -1,6 +1,6 @@
 // ── Brand Book mockup templates ──────────────────────────────────────────────
 // Catalog of "blank product" base illustrations + the rectangular region where
-// the user's logo gets composited. Each template lives in /public/mockups/<id>.svg.
+// the user's logo gets composited. Each template lives in /public/mockups/<id>.jpg.
 //
 // PR 3 ships flat-illustration SVG bases (approach B in the spec). The Recraft-
 // generated photographic version (approach A) is wired through
@@ -43,7 +43,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   business_card: {
     id: "business_card",
     label: "Business Card",
-    base_url: "/mockups/business_card.svg",
+    base_url: "/mockups/business_card.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 202, y: 382, w: 260, h: 260 },
     blend: "over",
@@ -51,7 +51,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   billboard: {
     id: "billboard",
     label: "Billboard",
-    base_url: "/mockups/billboard.svg",
+    base_url: "/mockups/billboard.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 160, y: 210, w: 704, h: 380 },
     blend: "over",
@@ -59,7 +59,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   tote_bag: {
     id: "tote_bag",
     label: "Tote Bag",
-    base_url: "/mockups/tote_bag.svg",
+    base_url: "/mockups/tote_bag.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 290, y: 380, w: 444, h: 444 },
     blend: "over",
@@ -67,7 +67,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   t_shirt: {
     id: "t_shirt",
     label: "T-Shirt",
-    base_url: "/mockups/t_shirt.svg",
+    base_url: "/mockups/t_shirt.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 396, y: 500, w: 232, h: 232 },
     blend: "over",
@@ -75,7 +75,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   phone_case: {
     id: "phone_case",
     label: "Phone Case",
-    base_url: "/mockups/phone_case.svg",
+    base_url: "/mockups/phone_case.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 372, y: 260, w: 280, h: 280 },
     blend: "over",
@@ -84,7 +84,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   coffee_cup: {
     id: "coffee_cup",
     label: "Coffee Cup",
-    base_url: "/mockups/coffee_cup.svg",
+    base_url: "/mockups/coffee_cup.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 372, y: 430, w: 280, h: 280 },
     blend: "over",
@@ -92,7 +92,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   signage: {
     id: "signage",
     label: "Signage",
-    base_url: "/mockups/signage.svg",
+    base_url: "/mockups/signage.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 170, y: 430, w: 684, h: 180 },
     blend: "over",
@@ -100,7 +100,7 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
   vehicle: {
     id: "vehicle",
     label: "Delivery Vehicle",
-    base_url: "/mockups/vehicle.svg",
+    base_url: "/mockups/vehicle.jpg",
     width: 1024, height: 1024,
     logo_region: { x: 280, y: 520, w: 560, h: 220 },
     blend: "over",
