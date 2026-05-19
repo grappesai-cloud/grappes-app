@@ -256,7 +256,7 @@
       card.querySelector('#lg-ref-input').addEventListener('change', async (e) => {
         const file = e.target.files?.[0]; if (!file) return;
         try {
-          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const { upload } = await import('/vendor/vercel-blob-client.js');
           const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/logo/sign-upload` });
           LG.refs = [...LG.refs, blob.url];
           renderRefs();
