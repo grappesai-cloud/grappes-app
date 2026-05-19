@@ -1,0 +1,667 @@
+---
+// ── Brand Book template (PR 3) ─────────────────────────────────────────────
+// Portrait A4 multi-spread brand book modeled on Santai Coffee / So Matcha /
+// Cherry Chewy / Chill brand guidelines. Heavy color blocks, big specimen
+// typography, labelled palette circles, logo system grids, mockup applications.
+//
+// Each spread is one .page (210mm × 297mm). The PDF print path uses
+// `?print=1` from /kit/[slug]; the editor iframe also renders this same
+// component directly via /kit/preview/[id].
+
+import type { PressKit } from '../lib/press-kit';
+import { accentForKit, readableForeground, googleFontsUrl } from '../lib/press-kit';
+import { MOCKUPS, isMockupId, type MockupId } from '../lib/mockups';
+
+interface Props {
+  kit: PressKit;
+  printMode?: boolean;
+}
+
+const { kit: k, printMode = false } = Astro.props;
+const accent = accentForKit(k);
+const YEAR = new Date(k.created_at ?? Date.now()).getFullYear() || new Date().getFullYear();
+
+// ── Palette ──────────────────────────────────────────────────────────────
+type NamedColor = { hex: string; label?: string; role?: string };
+const DEFAULT_ROLES = ['Primary', 'Secondary', 'Accent', 'Background', 'Text'];
+const rawPalette: NamedColor[] = Array.isArray(k.palette_named) && k.palette_named.length
+  ? k.palette_named
+  : (() => {
+      // Synthesize from kit.palette if user never filled labels.
+      const p = k.palette || ({} as any);
+      const seq: NamedColor[] = [];
+      if (p.primary)   seq.push({ hex: p.primary,   label: 'Primary',    role: 'primary' });
+      if (p.secondary) seq.push({ hex: p.secondary, label: 'Secondary',  role: 'secondary' });
+      if (p.accent)    seq.push({ hex: p.accent,    label: 'Accent',     role: 'accent' });
+      if (p.bg)        seq.push({ hex: p.bg,        label: 'Background', role: 'background' });
+      if (p.text)      seq.push({ hex: p.text,      label: 'Text',       role: 'text' });
+      return seq.slice(0, 5);
+    })();
+const palette: NamedColor[] = rawPalette.slice(0, 5).map((c, i) => ({
+  hex: c.hex || '#0a0a0a',
+  label: c.label || DEFAULT_ROLES[i] || 'Color',
+  role: c.role || DEFAULT_ROLES[i]?.toLowerCase() || 'color',
+}));
+
+// Cover background — prefer named "primary", else first palette, else accent.
+const coverBg = (palette.find(p => p.role === 'primary')?.hex)
+  || palette[0]?.hex
+  || accent;
+const coverFg = readableForeground(coverBg);
+
+// Logo system swatches: use secondary + primary if present, else fallbacks.
+const secondaryColor = palette.find(p => p.role === 'secondary')?.hex || palette[1]?.hex || '#f3eee4';
+const primaryColor   = palette.find(p => p.role === 'primary')?.hex   || palette[0]?.hex || '#0a0a0a';
+const accentColor    = palette.find(p => p.role === 'accent')?.hex    || accent;
+
+// ── Typography (Google Fonts via the kit.fonts object) ───────────────────
+const fontsCss = googleFontsUrl(k.fonts);
+const headingFamily = `'${k.fonts?.heading || 'Inter'}', sans-serif`;
+const bodyFamily    = `'${k.fonts?.body    || 'Inter'}', sans-serif`;
+
+// ── Content ──────────────────────────────────────────────────────────────
+const mascotUrl = k.assets?.mascot;
+const logoUrl   = k.assets?.logo;
+const tagline   = k.tagline ?? '';
+const voicePara = (k.voice_paragraph ?? '').trim();
+const voiceKwds = (k.voice_keywords ?? '').split(',').map(s => s.trim()).filter(Boolean);
+const dontsList = Array.isArray(k.donts) ? k.donts.filter(Boolean) : [];
+
+const validApps: MockupId[] = (Array.isArray(k.applications) ? k.applications : [])
+  .filter((s): s is MockupId => typeof s === 'string' && isMockupId(s));
+
+const monogram = (k.name || 'BK').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'BK';
+
+// Pages
+const showMascot = !!mascotUrl;
+const showVoice  = voicePara.length > 0 || voiceKwds.length > 0;
+const showApps   = validApps.length > 0;
+const showDonts  = dontsList.length > 0;
+
+// Mockup endpoint URL builder (per-kit, owner-only render).
+function mockupSrc(id: MockupId): string {
+  return `/api/kits/${k.id}/mockup/${id}`;
+}
+
+// Pages ordering for the small footer page-number line.
+const pages: { key: string; title: string; show: boolean }[] = [
+  { key: 'cover',       title: 'COVER',         show: true },
+  { key: 'logo-system', title: 'LOGO SYSTEM',   show: true },
+  { key: 'mascot',      title: 'MASCOT',        show: showMascot },
+  { key: 'palette',     title: 'COLOR PALETTE', show: true },
+  { key: 'typography',  title: 'TYPOGRAPHY',    show: true },
+  { key: 'voice',       title: 'BRAND VOICE',   show: showVoice },
+  { key: 'applications',title: 'APPLICATIONS',  show: showApps },
+  { key: 'donts',       title: "DON'TS",        show: showDonts },
+  { key: 'credits',     title: 'CREDITS',       show: true },
+].filter(p => p.show);
+const pageNum = (key: string) => String(pages.findIndex(p => p.key === key) + 1).padStart(2, '0');
+const totalPages = pages.length;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{k.name} — brand book</title>
+{tagline && <meta name="description" content={tagline} />}
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href={fontsCss} />
+<style is:inline define:vars={{
+  accentColor, coverBg, coverFg, primaryColor, secondaryColor,
+}}>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #1a1a1d;
+    color: #0a0a0a;
+    font-family: var(--bb-body);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  img { display: block; max-width: 100%; }
+
+  /* ── Portrait A4 page (210 × 297mm) ──────────────────────────────── */
+  .bb { margin: 0 auto; background: #1a1a1d; }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    position: relative;
+    overflow: hidden;
+    background: #ffffff;
+    color: #0a0a0a;
+    page-break-after: always;
+    break-after: page;
+    margin: 0 auto;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+
+  /* Footer */
+  .bb-footer {
+    position: absolute;
+    left: 16mm; right: 16mm; bottom: 10mm;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(0,0,0,0.5); font-weight: 600;
+    font-feature-settings: "tnum","lnum";
+  }
+  .bb-footer .num { color: #0a0a0a; }
+  .bb-footer .sec { color: var(--accentColor); font-weight: 800; }
+
+  /* Page header */
+  .page-head {
+    position: absolute; top: 16mm; left: 16mm; right: 16mm;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(0,0,0,0.45); font-weight: 600;
+  }
+  .page-title {
+    font-family: var(--bb-heading);
+    font-size: 48px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #0a0a0a;
+    font-weight: 700;
+  }
+
+  /* ── Cover page ───────────────────────────────────────────────── */
+  .cover {
+    background: var(--coverBg);
+    color: var(--coverFg);
+    padding: 22mm 18mm;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .cover-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    font-weight: 600;
+  }
+  .cover-logo-wrap {
+    display: flex; justify-content: center; align-items: center;
+    margin: 18mm 0 14mm;
+    min-height: 60mm;
+  }
+  .cover-logo-wrap img { max-width: 130mm; max-height: 60mm; object-fit: contain; }
+  .cover-brand-name {
+    font-family: var(--bb-heading);
+    font-size: clamp(60px, 12vw, 130px);
+    letter-spacing: -0.04em;
+    line-height: 0.92;
+    font-weight: 700;
+    color: var(--coverFg);
+    margin-bottom: 8mm;
+    text-transform: none;
+  }
+  .cover-tagline {
+    font-family: var(--bb-body);
+    font-size: 16px;
+    line-height: 1.5;
+    max-width: 140mm;
+    opacity: 0.85;
+  }
+  .cover-bottom {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  /* ── Logo system page ────────────────────────────────────────── */
+  .logo-grid {
+    position: absolute; left: 16mm; right: 16mm; top: 38mm; bottom: 22mm;
+    display: grid; grid-template-rows: 1fr 1fr auto;
+    gap: 8mm;
+  }
+  .logo-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 4mm;
+  }
+  .logo-cell {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    padding: 8mm;
+    position: relative;
+  }
+  .logo-cell img { max-width: 80%; max-height: 80%; object-fit: contain; }
+  .logo-cell .submark-mono {
+    font-family: var(--bb-heading);
+    width: 36mm; height: 36mm; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24mm; font-weight: 700; letter-spacing: -0.04em;
+  }
+  .logo-captions {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(0,0,0,0.55); font-weight: 600; text-align: center;
+  }
+
+  /* ── Mascot page ─────────────────────────────────────────────── */
+  .mascot-page {
+    background: var(--secondaryColor);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 30mm 20mm;
+  }
+  .mascot-page img { max-width: 130mm; max-height: 180mm; object-fit: contain; }
+  .mascot-caption {
+    margin-top: 12mm;
+    font-family: var(--bb-body);
+    font-size: 14px; color: rgba(0,0,0,0.7); text-align: center;
+    max-width: 140mm; line-height: 1.55;
+  }
+
+  /* ── Color palette page ──────────────────────────────────────── */
+  .palette-stack {
+    position: absolute; left: 16mm; right: 16mm; top: 42mm; bottom: 22mm;
+    display: flex; flex-direction: column; gap: 6mm;
+  }
+  .palette-row {
+    display: grid;
+    grid-template-columns: 60mm 1fr;
+    gap: 8mm;
+    align-items: center;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    padding-bottom: 6mm;
+  }
+  .palette-row:last-child { border-bottom: 0; }
+  .swatch {
+    width: 60mm; height: 38mm; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .palette-info { display: flex; flex-direction: column; gap: 6px; }
+  .palette-hex {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px; color: #0a0a0a; font-feature-settings: "tnum","lnum";
+    letter-spacing: 0.04em;
+  }
+  .palette-label {
+    font-family: var(--bb-heading);
+    font-size: 26px; line-height: 1.05; letter-spacing: -0.02em; font-weight: 700;
+  }
+  .palette-role {
+    align-self: flex-start;
+    display: inline-block;
+    font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    background: rgba(0,0,0,0.06);
+    padding: 4px 9px; border-radius: 999px;
+    font-weight: 700; color: rgba(0,0,0,0.6);
+  }
+
+  /* ── Typography page ─────────────────────────────────────────── */
+  .typo-stack {
+    position: absolute; left: 16mm; right: 16mm; top: 42mm; bottom: 22mm;
+    display: flex; flex-direction: column; gap: 8mm;
+  }
+  .typo-block {
+    border-top: 1px solid rgba(0,0,0,0.1);
+    padding-top: 6mm;
+    display: flex; flex-direction: column; gap: 4mm;
+  }
+  .typo-aa {
+    font-size: 220px; line-height: 0.85; letter-spacing: -0.05em;
+    color: #0a0a0a; font-weight: 700;
+  }
+  .typo-alphabet {
+    font-size: 16px; line-height: 1.5; letter-spacing: 0.04em;
+    color: rgba(0,0,0,0.7); word-break: break-all;
+  }
+  .typo-meta {
+    font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(0,0,0,0.55); font-weight: 700;
+    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 3mm;
+  }
+
+  /* ── Voice page ──────────────────────────────────────────────── */
+  .voice-page { padding: 42mm 18mm 22mm; }
+  .voice-quote {
+    font-family: var(--bb-body);
+    font-size: 32px; line-height: 1.35; letter-spacing: -0.01em;
+    color: #0a0a0a;
+    max-width: 180mm;
+    margin-bottom: 14mm;
+  }
+  .voice-quote::before { content: '“'; font-family: var(--bb-heading); font-size: 64px; color: var(--accentColor); line-height: 0; margin-right: 0.05em; vertical-align: -0.18em; }
+  .voice-kwds { display: flex; flex-wrap: wrap; gap: 8px; }
+  .voice-pill {
+    font-size: 12px; letter-spacing: 0.06em;
+    background: var(--accentColor);
+    color: #fff;
+    padding: 6px 14px; border-radius: 999px;
+    font-weight: 700; text-transform: uppercase;
+  }
+
+  /* ── Applications page ───────────────────────────────────────── */
+  .apps-page { padding: 42mm 14mm 22mm; }
+  .apps-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8mm 6mm;
+  }
+  .apps-cell {
+    display: flex; flex-direction: column; gap: 4mm;
+  }
+  .apps-img-wrap {
+    aspect-ratio: 1 / 1;
+    border-radius: 4px; overflow: hidden;
+    background: #f3f0ea;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+  .apps-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .apps-label {
+    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: rgba(0,0,0,0.6); font-weight: 700; text-align: center;
+  }
+
+  /* ── Don'ts page ─────────────────────────────────────────────── */
+  .donts-page { padding: 42mm 18mm 22mm; }
+  .donts-title { color: #c0392b; }
+  .donts-list { display: flex; flex-direction: column; gap: 5mm; margin-top: 8mm; }
+  .donts-row {
+    display: flex; align-items: flex-start; gap: 10mm;
+    font-size: 16px; line-height: 1.45;
+    padding-bottom: 5mm;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .donts-x {
+    flex-shrink: 0;
+    width: 12mm; height: 12mm; border-radius: 50%;
+    background: #c0392b; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+  }
+
+  /* ── Credits page ────────────────────────────────────────────── */
+  .credits-page {
+    background: var(--coverBg);
+    color: var(--coverFg);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    padding: 30mm 20mm; text-align: center;
+  }
+  .credits-mono {
+    width: 30mm; height: 30mm; border-radius: 50%;
+    border: 2px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--bb-heading); font-weight: 700; font-size: 14mm;
+    margin-bottom: 12mm;
+  }
+
+  /* ── Variables for fonts ─────────────────────────────────────── */
+  body {
+    --bb-heading: ${''};
+  }
+
+  /* Print rules */
+  @page { size: A4 portrait; margin: 0; }
+  @media print {
+    html, body, .bb { background: #fff; }
+    .page { box-shadow: none !important; margin: 0 !important; }
+  }
+
+  /* Screen presentation (when not printing) */
+  @media screen {
+    .bb { padding: 24px 0; }
+    .page { box-shadow: 0 24px 60px -20px rgba(0,0,0,0.45); margin-bottom: 18px; }
+  }
+</style>
+
+<!-- Inline font-family vars (Astro can't interpolate strings inside is:inline + define:vars) -->
+<style is:inline set:html={`
+  body { --bb-heading: ${headingFamily}; --bb-body: ${bodyFamily}; }
+`}></style>
+
+</head>
+<body>
+<div class="bb">
+
+  {/* ───────── Page 1 — Cover ───────── */}
+  <section class="page cover">
+    <div class="cover-top">
+      <span>BRAND GUIDELINES</span>
+      <span>{YEAR}</span>
+    </div>
+    {logoUrl && (
+      <div class="cover-logo-wrap"><img src={logoUrl} alt={`${k.name} logo`} /></div>
+    )}
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
+      <h1 class="cover-brand-name">{k.name}</h1>
+      {tagline && <p class="cover-tagline">{tagline}</p>}
+    </div>
+    <div class="cover-bottom">
+      <span>{k.industry || 'Brand'}</span>
+      <span>Vol. 01</span>
+    </div>
+  </section>
+
+  {/* ───────── Page 2 — Logo system ───────── */}
+  <section class="page">
+    <div class="page-head"><span>{pageNum('logo-system')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
+      <h2 class="page-title">LOGO SYSTEM</h2>
+    </div>
+    <div class="logo-grid">
+      {/* Row 1 — light backgrounds (secondary color tinted) */}
+      <div class="logo-row">
+        <div class="logo-cell" style={`background:${secondaryColor};`}>
+          {logoUrl ? <img src={logoUrl} alt="Logotype" /> : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+        </div>
+        <div class="logo-cell" style={`background:${secondaryColor};`}>
+          {logoUrl ? <img src={logoUrl} alt="Brandmark" style="max-width:50%;max-height:50%;" /> : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+        </div>
+        <div class="logo-cell" style={`background:${secondaryColor};`}>
+          <div class="submark-mono" style={`color:${primaryColor};background:transparent;border:2px solid ${primaryColor};`}>{monogram}</div>
+        </div>
+      </div>
+      {/* Row 2 — primary color backgrounds (inverse) */}
+      <div class="logo-row">
+        <div class="logo-cell" style={`background:${primaryColor};`}>
+          {logoUrl ? <img src={logoUrl} alt="Logotype on color" style="filter:brightness(0) invert(1);" /> : <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};`}>{monogram}</div>}
+        </div>
+        <div class="logo-cell" style={`background:${primaryColor};`}>
+          {logoUrl ? <img src={logoUrl} alt="Brandmark on color" style="filter:brightness(0) invert(1);max-width:50%;max-height:50%;" /> : <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};`}>{monogram}</div>}
+        </div>
+        <div class="logo-cell" style={`background:${primaryColor};`}>
+          <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};background:transparent;`}>{monogram}</div>
+        </div>
+      </div>
+      {/* Captions */}
+      <div class="logo-captions">
+        <span>Logotype · primary</span>
+        <span>Brandmark · icon-only</span>
+        <span>Submark · favicon</span>
+      </div>
+    </div>
+    <div class="bb-footer">
+      <span class="sec">LOGO SYSTEM</span>
+      <span><span class="num">{pageNum('logo-system')}</span> / {String(totalPages).padStart(2,'0')}</span>
+    </div>
+  </section>
+
+  {/* ───────── Page 3 — Mascot (optional) ───────── */}
+  {showMascot && (
+    <section class="page mascot-page">
+      <div class="page-head"><span>{pageNum('mascot')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+      <img src={mascotUrl} alt={`${k.name} mascot`} />
+      <p class="mascot-caption">Our mascot shows up on packaging, social, and signage. Use generously — it's the soul of the brand.</p>
+      <div class="bb-footer">
+        <span class="sec">MASCOT</span>
+        <span><span class="num">{pageNum('mascot')}</span> / {String(totalPages).padStart(2,'0')}</span>
+      </div>
+    </section>
+  )}
+
+  {/* ───────── Page 4 — Color palette ───────── */}
+  <section class="page">
+    <div class="page-head"><span>{pageNum('palette')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
+      <h2 class="page-title">COLOR PALETTE</h2>
+    </div>
+    <div class="palette-stack">
+      {palette.map((c) => (
+        <div class="palette-row">
+          <div class="swatch" style={`background:${c.hex};`}></div>
+          <div class="palette-info">
+            <span class="palette-role">{c.role}</span>
+            <span class="palette-label">{c.label}</span>
+            <span class="palette-hex">{c.hex.toUpperCase()}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="bb-footer">
+      <span class="sec">COLOR PALETTE</span>
+      <span><span class="num">{pageNum('palette')}</span> / {String(totalPages).padStart(2,'0')}</span>
+    </div>
+  </section>
+
+  {/* ───────── Page 5 — Typography ───────── */}
+  <section class="page">
+    <div class="page-head"><span>{pageNum('typography')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
+      <h2 class="page-title">TYPOGRAPHY</h2>
+    </div>
+    <div class="typo-stack">
+      <div class="typo-block" style={`font-family:${headingFamily};`}>
+        <div class="typo-aa" style={`font-family:${headingFamily};`}>Aa</div>
+        <div class="typo-alphabet" style={`font-family:${headingFamily};`}>
+          ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+        </div>
+        <div class="typo-meta">{k.fonts?.heading || 'Inter'} · Heading</div>
+      </div>
+      <div class="typo-block" style={`font-family:${bodyFamily};`}>
+        <div class="typo-aa" style={`font-family:${bodyFamily};font-size:160px;`}>Aa</div>
+        <div class="typo-alphabet" style={`font-family:${bodyFamily};`}>
+          ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+        </div>
+        <div class="typo-meta">{k.fonts?.body || 'Inter'} · Body</div>
+      </div>
+    </div>
+    <div class="bb-footer">
+      <span class="sec">TYPOGRAPHY</span>
+      <span><span class="num">{pageNum('typography')}</span> / {String(totalPages).padStart(2,'0')}</span>
+    </div>
+  </section>
+
+  {/* ───────── Page 6 — Voice (optional) ───────── */}
+  {showVoice && (
+    <section class="page voice-page">
+      <div class="page-head"><span>{pageNum('voice')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+      <div style="position:absolute;top:30mm;left:18mm;right:18mm;">
+        <h2 class="page-title">BRAND VOICE</h2>
+      </div>
+      <div style="margin-top:24mm;">
+        {voicePara && <p class="voice-quote">{voicePara}</p>}
+        {voiceKwds.length > 0 && (
+          <div class="voice-kwds">
+            {voiceKwds.map((kw) => <span class="voice-pill">{kw}</span>)}
+          </div>
+        )}
+      </div>
+      <div class="bb-footer">
+        <span class="sec">BRAND VOICE</span>
+        <span><span class="num">{pageNum('voice')}</span> / {String(totalPages).padStart(2,'0')}</span>
+      </div>
+    </section>
+  )}
+
+  {/* ───────── Page 7 — Applications (optional, 2x3 grid; overflow→next page) ───────── */}
+  {showApps && (() => {
+    const firstChunk = validApps.slice(0, 6);
+    const secondChunk = validApps.slice(6, 8);
+    return (
+      <>
+        <section class="page apps-page">
+          <div class="page-head"><span>{pageNum('applications')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+          <div style="position:absolute;top:30mm;left:14mm;right:14mm;">
+            <h2 class="page-title">APPLICATIONS</h2>
+          </div>
+          <div style="margin-top:24mm;">
+            <div class="apps-grid">
+              {firstChunk.map((id) => {
+                const t = MOCKUPS[id];
+                return (
+                  <div class="apps-cell">
+                    <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
+                    <div class="apps-label">{t.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div class="bb-footer">
+            <span class="sec">APPLICATIONS</span>
+            <span><span class="num">{pageNum('applications')}</span> / {String(totalPages).padStart(2,'0')}</span>
+          </div>
+        </section>
+        {secondChunk.length > 0 && (
+          <section class="page apps-page">
+            <div class="page-head"><span>{pageNum('applications')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+            <div style="position:absolute;top:30mm;left:14mm;right:14mm;">
+              <h2 class="page-title">APPLICATIONS — CONT.</h2>
+            </div>
+            <div style="margin-top:24mm;">
+              <div class="apps-grid">
+                {secondChunk.map((id) => {
+                  const t = MOCKUPS[id];
+                  return (
+                    <div class="apps-cell">
+                      <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
+                      <div class="apps-label">{t.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div class="bb-footer">
+              <span class="sec">APPLICATIONS</span>
+              <span><span class="num">{pageNum('applications')}</span> / {String(totalPages).padStart(2,'0')}</span>
+            </div>
+          </section>
+        )}
+      </>
+    );
+  })()}
+
+  {/* ───────── Page 8 — Don'ts (optional) ───────── */}
+  {showDonts && (
+    <section class="page donts-page">
+      <div class="page-head"><span>{pageNum('donts')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+      <div style="position:absolute;top:30mm;left:18mm;right:18mm;">
+        <h2 class="page-title donts-title">DON'TS</h2>
+      </div>
+      <div class="donts-list" style="margin-top:24mm;">
+        {dontsList.map((d) => (
+          <div class="donts-row">
+            <div class="donts-x">×</div>
+            <div>{d}</div>
+          </div>
+        ))}
+      </div>
+      <div class="bb-footer">
+        <span class="sec">DON'TS</span>
+        <span><span class="num">{pageNum('donts')}</span> / {String(totalPages).padStart(2,'0')}</span>
+      </div>
+    </section>
+  )}
+
+  {/* ───────── Final page — Credits ───────── */}
+  <section class="page credits-page">
+    <div class="credits-mono">{monogram}</div>
+    <p style="font-family:var(--bb-body);font-size:14px;letter-spacing:0.04em;opacity:0.85;margin-bottom:6mm;">
+      Brand book prepared with
+    </p>
+    <p style="font-family:var(--bb-heading);font-size:36px;letter-spacing:-0.02em;font-weight:700;">
+      Grappes
+    </p>
+    <p style="font-family:var(--bb-body);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;opacity:0.7;margin-top:8mm;">
+      {YEAR} · Vol. 01
+    </p>
+  </section>
+
+</div>
+
+{printMode && (
+  <script is:inline>
+    window.addEventListener('load', () => setTimeout(() => window.print(), 400));
+  </script>
+)}
+</body>
+</html>

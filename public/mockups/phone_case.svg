@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <filter id="sh" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="20" stdDeviation="22" flood-color="#000" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="#e2dccf"/>
+  <g filter="url(#sh)">
+    <rect x="340" y="120" width="344" height="784" rx="58" fill="#15161a"/>
+    <rect x="364" y="200" width="200" height="40" rx="6" fill="#2a2c33"/>
+    <circle cx="608" cy="220" r="12" fill="#2a2c33"/>
+    <rect x="372" y="260" width="280" height="280" fill="none" stroke="#3c3f47" stroke-width="2" stroke-dasharray="8 8"/>
+  </g>
+  <text x="512" y="970" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#8a8270" letter-spacing="5">PHONE CASE</text>
+</svg>

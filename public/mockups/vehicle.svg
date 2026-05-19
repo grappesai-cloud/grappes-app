@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <filter id="sh" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.26"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="#cfcfc6"/>
+  <rect y="760" width="1024" height="264" fill="#48463f"/>
+  <g filter="url(#sh)">
+    <path d="M 120 470
+             L 240 320
+             L 700 320
+             L 760 380
+             L 900 400
+             L 900 760
+             L 120 760
+             Z" fill="#f4f1e8"/>
+    <path d="M 120 470 L 240 320 L 700 320 L 760 380 L 900 400 L 900 760 L 120 760 Z"
+          fill="none" stroke="#1a1a1a" stroke-width="3"/>
+    <rect x="260" y="360" width="180" height="120" fill="#bcd5e0" stroke="#1a1a1a" stroke-width="3"/>
+    <rect x="460" y="360" width="220" height="120" fill="#bcd5e0" stroke="#1a1a1a" stroke-width="3"/>
+    <rect x="280" y="520" width="560" height="220" fill="none" stroke="#9c9787" stroke-width="2" stroke-dasharray="8 8"/>
+    <circle cx="260" cy="760" r="64" fill="#1f1e1c"/>
+    <circle cx="260" cy="760" r="28" fill="#7d7a72"/>
+    <circle cx="760" cy="760" r="64" fill="#1f1e1c"/>
+    <circle cx="760" cy="760" r="28" fill="#7d7a72"/>
+  </g>
+  <text x="512" y="970" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#f0ede4" letter-spacing="5">DELIVERY VEHICLE</text>
+</svg>
