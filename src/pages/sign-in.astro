@@ -4,8 +4,11 @@ import { callAuthApi, redirectWithCookies } from '../lib/auth-server';
 if (Astro.locals.user) return Astro.redirect('/dashboard');
 
 // Conditionally show social-login buttons based on which providers have envs.
-const googleEnabled = !!(import.meta.env.GOOGLE_CLIENT_ID && import.meta.env.GOOGLE_CLIENT_SECRET);
-const appleEnabled = !!(import.meta.env.APPLE_CLIENT_ID && import.meta.env.APPLE_CLIENT_SECRET);
+// Use e() helper because import.meta.env doesn't expose non-PUBLIC vars at
+// runtime on Vercel SSR — it has to read process.env dynamically.
+import { e } from '../lib/env';
+const googleEnabled = !!(e('GOOGLE_CLIENT_ID') && e('GOOGLE_CLIENT_SECRET'));
+const appleEnabled  = !!(e('APPLE_CLIENT_ID')  && e('APPLE_CLIENT_SECRET'));
 
 let error = '';
 
