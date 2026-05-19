@@ -15,11 +15,18 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: "Too many requests." }, 429);
   }
 
-  let body: { name?: string; kit_type?: KitType } = {};
+  let body: { name?: string; kit_type?: KitType; kit_type_other?: string } = {};
   try { body = await request.json(); } catch { /* allow empty body */ }
 
   const name = (body.name ?? "").trim() || "Untitled press kit";
   const kit_type = (body.kit_type ?? "other") as KitType;
+  // When the user picks "Other" we capture the free-text label and seed it as
+  // an initial tagline so step 2 already shows something meaningful. The user
+  // can edit or clear it on the next screen.
+  const taglineSeed =
+    kit_type === "other" && body.kit_type_other
+      ? body.kit_type_other.trim().slice(0, 60)
+      : null;
 
   const client = createAdminClient();
   const { data, error } = await client
@@ -28,6 +35,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
       user_id: user.id,
       name,
       kit_type,
+      tagline: taglineSeed,
       palette: DEFAULT_PALETTE,
       fonts: defaultFontsFor(kit_type),
     })

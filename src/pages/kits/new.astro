@@ -37,14 +37,16 @@ import Dashboard from '../../layouts/Dashboard.astro';
             { v: 'model', label: 'Model / Talent' },
             { v: 'other', label: 'Other' },
           ].map((opt, i) => (
-            <label style="display:block;cursor:pointer;">
-              <input type="radio" name="kit_type" value={opt.v} checked={i === 0} style="position:absolute;opacity:0;pointer-events:none;" />
-              <span class="kt-card" style="display:block;padding:11px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);text-align:center;transition:all 0.15s;">
-                {opt.label}
-              </span>
-            </label>
+            <button type="button" class="kt-card" data-value={opt.v} aria-pressed={i === 0 ? 'true' : 'false'} style="padding:12px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,0.8);text-align:center;cursor:pointer;transition:all 0.15s;">
+              {opt.label}
+            </button>
           ))}
         </div>
+        <input type="hidden" id="kit-type-value" value="musician" />
+        <label id="kit-type-other-wrap" style="display:none;flex-direction:column;gap:6px;margin-top:12px;">
+          <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);">Tell us what kind</span>
+          <input id="kit-type-other" type="text" maxlength="60" placeholder="e.g. Writer, Producer, Restaurant, Athlete…" style="height:44px;padding:0 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:11px;color:#fff;font-family:inherit;font-size:14px;outline:none;" />
+        </label>
       </fieldset>
 
       <button type="submit" id="create-btn" style="margin-top:6px;height:48px;background:#f97316;color:#0a0a0a;border:none;border-radius:11px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;">
@@ -56,42 +58,75 @@ import Dashboard from '../../layouts/Dashboard.astro';
   </div>
 
   <style>
-    input[name="kit_type"]:checked + .kt-card {
+    .kt-card:hover { border-color: rgba(255,255,255,0.22); color: #fff; }
+    .kt-card[aria-pressed="true"] {
       background: rgba(249,115,22,0.12);
       border-color: #f97316;
       color: #fff;
+      box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
     }
     input[type="text"]:focus { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,0.18); }
   </style>
 
   <script is:inline>
-    document.getElementById('new-kit-form').addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const btn = document.getElementById('create-btn');
-      const err = document.getElementById('new-kit-error');
-      const name = document.getElementById('kit-name').value.trim();
-      const kit_type = document.querySelector('input[name="kit_type"]:checked')?.value || 'other';
-      if (!name) return;
-      btn.disabled = true;
-      btn.textContent = 'Creating…';
-      err.style.display = 'none';
-      try {
-        const r = await fetch('/api/kits', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, kit_type }) });
-        const data = await r.json();
-        if (!r.ok) {
-          err.textContent = data.error || 'Could not create.';
+    (function () {
+      const grid = document.getElementById('kit-type-grid');
+      const hidden = document.getElementById('kit-type-value');
+      const otherWrap = document.getElementById('kit-type-other-wrap');
+      const otherInput = document.getElementById('kit-type-other');
+
+      grid.addEventListener('click', (e) => {
+        const btn = e.target.closest('.kt-card');
+        if (!btn) return;
+        grid.querySelectorAll('.kt-card').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+        btn.setAttribute('aria-pressed', 'true');
+        const v = btn.dataset.value;
+        hidden.value = v;
+        if (v === 'other') {
+          otherWrap.style.display = 'flex';
+          setTimeout(() => otherInput.focus(), 50);
+        } else {
+          otherWrap.style.display = 'none';
+        }
+      });
+
+      document.getElementById('new-kit-form').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const btn = document.getElementById('create-btn');
+        const err = document.getElementById('new-kit-error');
+        const name = document.getElementById('kit-name').value.trim();
+        let kit_type = hidden.value || 'musician';
+        const kit_type_other = otherInput.value.trim();
+        if (!name) return;
+        if (kit_type === 'other' && !kit_type_other) {
+          err.textContent = 'Tell us what kind of kit (or pick one above).';
+          err.style.display = 'block';
+          otherInput.focus();
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Creating…';
+        err.style.display = 'none';
+        try {
+          const body = { name, kit_type };
+          if (kit_type === 'other') body.kit_type_other = kit_type_other;
+          const r = await fetch('/api/kits', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+          const data = await r.json();
+          if (!r.ok) {
+            err.textContent = data.error || 'Could not create.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Continue →';
+            return;
+          }
+          window.location.href = `/kits/${data.id}`;
+        } catch {
+          err.textContent = 'Network error.';
           err.style.display = 'block';
           btn.disabled = false;
           btn.textContent = 'Continue →';
-          return;
         }
-        window.location.href = `/kits/${data.id}`;
-      } catch {
-        err.textContent = 'Network error.';
-        err.style.display = 'block';
-        btn.disabled = false;
-        btn.textContent = 'Continue →';
-      }
-    });
+      });
+    })();
   </script>
 </Dashboard>
