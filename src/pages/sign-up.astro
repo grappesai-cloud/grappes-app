@@ -61,8 +61,11 @@ if (Astro.request.method === 'POST') {
 }
 
 // Conditionally show social-login buttons based on which providers have envs.
-const googleEnabled = !!(import.meta.env.GOOGLE_CLIENT_ID && import.meta.env.GOOGLE_CLIENT_SECRET);
-const appleEnabled = !!(import.meta.env.APPLE_CLIENT_ID && import.meta.env.APPLE_CLIENT_SECRET);
+// e() falls back to process.env at runtime on Vercel SSR — import.meta.env
+// doesn't expose non-PUBLIC vars there.
+import { e } from '../lib/env';
+const googleEnabled = !!(e('GOOGLE_CLIENT_ID') && e('GOOGLE_CLIENT_SECRET'));
+const appleEnabled  = !!(e('APPLE_CLIENT_ID')  && e('APPLE_CLIENT_SECRET'));
 ---
 
 <html lang="en">
