@@ -89,7 +89,15 @@ export interface GeneratedLogo {
 }
 
 export interface GenerateLogoInput {
-  kitId: string;
+  /**
+   * Path prefix under which the SVG + PNG land in Vercel Blob. Press Kit Lab
+   * passes `kits/<kit-id>`. Logo Lab (standalone) passes `logos/<user-id>`.
+   * The previous `kitId` field still works (back-compat) but new callers
+   * should pass `assetPrefix` directly.
+   */
+  assetPrefix?: string;
+  /** @deprecated — pass `assetPrefix` instead. Kept for the existing press-kit endpoint. */
+  kitId?: string;
   description: string;
   primaryColor?: string;
   paletteColors?: string[];
@@ -393,12 +401,13 @@ export async function generateLogo(input: GenerateLogoInput): Promise<GeneratedL
   const pngBytes = await svgToPng(svgBytes);
 
   const ts = Date.now();
-  const pngBlob = await put(`kits/${input.kitId}/logo-${ts}.png`, pngBytes, {
+  const prefix = input.assetPrefix ?? (input.kitId ? `kits/${input.kitId}` : `logos/misc`);
+  const pngBlob = await put(`${prefix}/logo-${ts}.png`, pngBytes, {
     access: "public",
     contentType: "image/png",
     token,
   });
-  const svgBlob = await put(`kits/${input.kitId}/logo-${ts}.svg`, svg, {
+  const svgBlob = await put(`${prefix}/logo-${ts}.svg`, svg, {
     access: "public",
     contentType: "image/svg+xml",
     token,

@@ -22,12 +22,15 @@ export interface Fonts {
   auto?: boolean;
 }
 
+export type KitMode = "press_kit" | "brand_book";
+
 export interface PressKit {
   id: string;
   user_id: string;
   status: "draft" | "published";
   slug: string | null;
   kit_type: KitType;
+  mode: KitMode;
   name: string;
   tagline: string | null;
   bio_short: string | null;
