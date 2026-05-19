@@ -232,6 +232,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     const STYLE_BTN_GHOST = 'height:44px;padding:0 18px;background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:all .15s;';
     const STYLE_BTN_LINK  = 'height:44px;padding:0 14px;background:transparent;color:rgba(255,255,255,0.5);border:0;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;';
     const STYLE_ADD = 'width:100%;padding:13px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.2);border-radius:12px;color:rgba(255,255,255,0.7);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;';
+    const STYLE_CHIP = 'padding:9px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:999px;color:rgba(255,255,255,0.78);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;';
 
     function eyebrowHTML() {
       const step = STEPS[stepIdx];
@@ -438,12 +439,28 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
         <div id="lg-controls" style="display:flex;flex-direction:column;gap:16px;">
           <div>
-            <label style="${STYLE_LABEL}">Describe your logo (optional)</label>
-            <textarea id="lg-desc" maxlength="400" class="pkw-textarea" placeholder="e.g. Minimal monogram, geometric, single weight. Or leave blank and we’ll riff off your name." style="${STYLE_TEXTAREA};min-height:96px;"></textarea>
+            <label style="${STYLE_LABEL}">Logo type</label>
+            <div id="lg-type" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              <button type="button" class="pkw-chip is-active" data-type="icon" style="${STYLE_CHIP}">Icon only</button>
+              <button type="button" class="pkw-chip" data-type="wordmark" style="${STYLE_CHIP}">Wordmark (text)</button>
+              <button type="button" class="pkw-chip" data-type="combination" style="${STYLE_CHIP}">Icon + text</button>
+            </div>
+            <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:8px 0 0;line-height:1.5;">Wordmark / Icon + text will render your brand name (<b style="color:rgba(255,255,255,0.7);font-weight:600;">${STATE.name || 'your brand'}</b>) as actual readable text.</p>
           </div>
           <div>
-            <label style="${STYLE_LABEL}">Style keywords (optional)</label>
-            <input id="lg-style" type="text" maxlength="80" class="pkw-input" placeholder="minimal · bold · geometric · organic" style="${STYLE_INPUT}" />
+            <label style="${STYLE_LABEL}">Vibe</label>
+            <div id="lg-mood" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              ${['Minimal','Bold','Editorial','Geometric','Organic','Playful','Hand-drawn','Brutalist'].map(m => `<button type="button" class="pkw-chip" data-mood="${m.toLowerCase()}" style="${STYLE_CHIP}">${m}</button>`).join('')}
+            </div>
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Describe what should appear in the logo</label>
+            <textarea id="lg-desc" maxlength="500" class="pkw-textarea" placeholder="e.g. an abstract snowflake fused with the letter A; sharp, geometric, single weight." style="${STYLE_TEXTAREA};min-height:96px;"></textarea>
+            <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:6px 0 0;line-height:1.5;">Be specific. The AI takes this literally — name the elements, motifs, or concepts you want included.</p>
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Extra style keywords (optional)</label>
+            <input id="lg-style" type="text" maxlength="120" class="pkw-input" placeholder="e.g. monogram, single line, swiss, art deco" style="${STYLE_INPUT}" />
           </div>
           <div>
             <label style="${STYLE_LABEL}">Reference photos (0–3, optional)</label>
@@ -551,12 +568,29 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         colorRow.style.display = forceColorCb.checked ? 'flex' : 'none';
       });
 
+      // Wire type + mood chips (single-select for type, single-select for mood).
+      const typeGroup = card.querySelector('#lg-type');
+      typeGroup.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-type]'); if (!b) return;
+        typeGroup.querySelectorAll('[data-type]').forEach(x => x.classList.remove('is-active'));
+        b.classList.add('is-active');
+      });
+      const moodGroup = card.querySelector('#lg-mood');
+      moodGroup.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-mood]'); if (!b) return;
+        const wasActive = b.classList.contains('is-active');
+        moodGroup.querySelectorAll('[data-mood]').forEach(x => x.classList.remove('is-active'));
+        if (!wasActive) b.classList.add('is-active');
+      });
+
       card.querySelector('#lg-go').addEventListener('click', async () => {
         const desc = card.querySelector('#lg-desc').value.trim();
         const style = card.querySelector('#lg-style').value.trim();
         const colorEl = card.querySelector('#lg-color');
         const primaryColor = forceColorCb.checked ? colorEl.value : undefined;
         const referenceImages = (STATE.assets?.logo_refs || []).slice(0, 3);
+        const logoType = typeGroup.querySelector('.is-active')?.dataset.type || 'icon';
+        const mood = moodGroup.querySelector('.is-active')?.dataset.mood;
         const goBtn = card.querySelector('#lg-go');
         const err = card.querySelector('#lg-error');
         const prog = card.querySelector('#lg-progress');
@@ -579,7 +613,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         try {
           const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ description: baseDesc, style: style || undefined, primaryColor, referenceImages }),
+            body: JSON.stringify({ description: baseDesc, style: style || undefined, primaryColor, referenceImages, logoType, mood }),
           });
           const data = await r.json();
           clearTimeout(t2); clearTimeout(t3);

@@ -23,16 +23,25 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     return json({ error: "Slow down, 3 logos per minute max." }, 429);
   }
 
-  let body: { description?: string; primaryColor?: string; style?: string; referenceImages?: string[] } = {};
+  let body: {
+    description?: string;
+    primaryColor?: string;
+    style?: string;
+    referenceImages?: string[];
+    logoType?: "icon" | "wordmark" | "combination";
+    mood?: string;
+  } = {};
   try { body = await request.json(); } catch {}
   const description = (body.description ?? "").trim();
+  // Description used to be required (>=4 chars). With logoType the brand name
+  // alone is enough for wordmark/combination, and references can stand in for
+  // icon-only. We re-check after we know the kit + flags.
   const referenceImages = Array.isArray(body.referenceImages)
     ? body.referenceImages.filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u)).slice(0, 3)
     : [];
-  if (description.length < 4) {
-    return json({ error: "Describe the brand in a sentence (at least 4 characters)." }, 400);
-  }
-
+  const logoType: "icon" | "wordmark" | "combination" =
+    body.logoType === "wordmark" || body.logoType === "combination" ? body.logoType : "icon";
+  const mood = (body.mood ?? "").trim() || undefined;
   const client = createAdminClient();
   const { data: kit } = await client
     .from("press_kits")
@@ -40,6 +49,13 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     .eq("id", params.id)
     .maybeSingle();
   if (!kit || kit.user_id !== user.id) return json({ error: "Not found" }, 404);
+
+  // After we know the kit, validate that we have enough signal to generate.
+  // Icon-only needs SOMETHING to draw (description or refs); wordmark/combo
+  // can run on the brand name alone.
+  if (logoType === "icon" && description.length < 4 && referenceImages.length === 0) {
+    return json({ error: "Describe the icon or add a reference photo (at least one)." }, 400);
+  }
 
   // Pull palette colors so the generator stays on brand. Skip when palette is
   // still the default (untouched by user, no logo extraction yet).
@@ -63,6 +79,9 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     paletteColors: paletteColors.length > 0 ? paletteColors : undefined,
     style: body.style,
     referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
+    brandName: (kit.name ?? "").trim() || undefined,
+    logoType,
+    mood,
   };
 
   try {

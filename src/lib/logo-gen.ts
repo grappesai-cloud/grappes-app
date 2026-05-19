@@ -40,16 +40,35 @@ function pickAccent(): { name: string; hex: string } {
   return ACCENT_PALETTE[Math.floor(Math.random() * ACCENT_PALETTE.length)];
 }
 
-const SYSTEM_PROMPT_RULES = [
-  "flat vector logo mark, single or two-tone solid color silhouette, perfectly centered",
+const BASE_RULES = [
+  "flat vector style, single or two-tone solid color silhouette",
   "soft off-white #FAFAFA background — no harsh pure white",
   "NO gradients, NO drop shadows, NO inner shadows, NO outer glow, NO bevels, NO 3D",
   "NO photorealism, NO photographs, NO textures, NO noise",
-  "NO text, NO letters, NO numbers anywhere in the image",
-  "thick clean shapes, geometric or organic, recognizable at 16px favicon scale",
+  "thick clean shapes, recognizable at 32px favicon scale",
   "high contrast against the background — large solid shapes that vectorize cleanly to SVG",
-  "negative space allowed inside the mark",
-].join("; ");
+  "negative space allowed",
+];
+const ICON_ONLY_RULES = [
+  ...BASE_RULES,
+  "NO text, NO letters, NO numbers, NO wordmark — icon mark only",
+];
+const WORDMARK_RULES = [
+  ...BASE_RULES,
+  "wordmark / lettermark — the brand name is the logo, set in a strong custom-style letterform",
+  "letters must be SHARP and READABLE, not decorative noise",
+];
+const COMBO_RULES = [
+  ...BASE_RULES,
+  "combination mark — an icon + the brand name set together with strong hierarchy",
+  "the icon and the wordmark should feel like one mark, not two unrelated shapes",
+];
+type LogoType = "icon" | "wordmark" | "combination";
+function rulesFor(t: LogoType): string {
+  if (t === "wordmark") return WORDMARK_RULES.join("; ");
+  if (t === "combination") return COMBO_RULES.join("; ");
+  return ICON_ONLY_RULES.join("; ");
+}
 
 export interface GeneratedLogo {
   pngUrl: string;
@@ -78,6 +97,12 @@ export interface GenerateLogoInput {
    * rather than ignoring them entirely.
    */
   referenceImages?: string[];
+  /** Brand name (the actual text to render when wordmark / combination). */
+  brandName?: string;
+  /** Logo type — drives whether text is allowed in the output. */
+  logoType?: "icon" | "wordmark" | "combination";
+  /** Optional mood / vibe chip: "minimal", "bold", "editorial", etc. */
+  mood?: string;
 }
 
 /**
@@ -103,17 +128,33 @@ async function generateRawLogo(input: GenerateLogoInput): Promise<Buffer> {
   const styleHint = input.style ? `Style: ${input.style}.` : "";
 
   const refs = (input.referenceImages ?? []).slice(0, 3);
+  const logoType: LogoType = input.logoType ?? "icon";
+  const brand = input.brandName?.trim();
+  const moodHint = input.mood ? `Mood: ${input.mood}.` : "";
+
   const refsHint =
     refs.length > 0
-      ? `Use the attached reference image${refs.length > 1 ? "s" : ""} as STYLE GUIDANCE ONLY — match their visual language (silhouette weight, geometric vs organic, negative-space treatment, overall vibe) but do NOT copy their actual shapes or letters. Output an original mark for "${input.description}".`
+      ? `Use the attached reference image${refs.length > 1 ? "s" : ""} as STYLE GUIDANCE ONLY — match their visual language (silhouette weight, geometric vs organic, negative-space treatment, overall vibe) but do NOT copy their actual shapes or letters.`
       : "";
 
-  const prompt = `Design a flat vector LOGO MARK (no text, no wordmark) for: "${input.description}".
+  const typeIntro = (() => {
+    if (logoType === "wordmark") {
+      return `Design a WORDMARK logo for the brand "${brand ?? input.description}". The brand name "${brand ?? ""}" must appear as readable text in a strong, custom-feeling letterform. ${input.description ? `Additional brief: ${input.description}.` : ""}`;
+    }
+    if (logoType === "combination") {
+      return `Design a COMBINATION mark for the brand "${brand ?? input.description}" — an icon paired with the readable brand name "${brand ?? ""}". The icon and the wordmark should sit together as one mark. ${input.description ? `Concept: ${input.description}.` : ""}`;
+    }
+    return `Design an ICON-ONLY logo mark (no text) for: "${input.description}"${brand ? ` (brand: "${brand}")` : ""}.`;
+  })();
+
+  const prompt = `${typeIntro}
 ${refsHint}
 ${colorHint}
 ${styleHint}
-STRICT VISUAL RULES: ${SYSTEM_PROMPT_RULES}.
-The result will be vectorized to SVG, so it must be a clean silhouette with strong contrast against the off-white background.`;
+${moodHint}
+STRICT VISUAL RULES: ${rulesFor(logoType)}.
+The result will be vectorized to SVG, so it must be a clean silhouette with strong contrast against the off-white background.
+Take the user's description literally — if they asked for a specific element, motif, or concept, it MUST appear in the output. Do not substitute it with something generic.`;
 
   // When references are supplied, route through gpt-image-1's edit endpoint so
   // the model actually conditions on them. Without this the URLs were captured
