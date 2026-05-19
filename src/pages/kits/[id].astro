@@ -443,6 +443,19 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           }
           const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary', accent: 'Accent', background: 'Background', text: 'Text' };
 
+          // Detect stale-default palette: when the kit's palette is exactly
+          // the DEFAULT_PALETTE from before the SVG-aware extractor shipped
+          // (primary #0a0a0a + accent #22d3ee + bg #fafafa), it's almost
+          // certainly NOT what the logo actually contains. Auto-trigger a
+          // re-extraction on entry so the user doesn't have to click the
+          // button manually.
+          function isStaleDefault() {
+            const p = STATE.palette || {};
+            return (p.primary || '').toLowerCase() === '#0a0a0a'
+                && (p.accent  || '').toLowerCase() === '#22d3ee'
+                && (p.bg      || '').toLowerCase() === '#fafafa';
+          }
+
           // Seed once: if palette_named is empty, build it from kit.palette but
           // only push slots whose hex matches a non-default value. Whatever's
           // missing gets auto-derived via color theory below.
@@ -471,11 +484,37 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             queueSave({ palette_named: STATE.palette_named });
           }
 
+          async function runExtractFromLogo(btn) {
+            if (!STATE.assets || !STATE.assets.logo) {
+              alert('Upload a logo first (Brand step).');
+              return;
+            }
+            const oldText = btn ? btn.textContent : null;
+            if (btn) { btn.disabled = true; btn.textContent = 'Extracting…'; }
+            try {
+              const r = await fetch(`/api/kits/${kitId}/extract-palette`, { method: 'POST' });
+              const data = await r.json();
+              if (!r.ok) throw new Error(data.error || 'Extraction failed');
+              STATE.palette = data.palette;
+              STATE.palette_named = data.palette_named;
+              renderPalette(card);
+            } catch (e) {
+              alert(e.message || 'Could not extract palette.');
+              if (btn) { btn.disabled = false; btn.textContent = oldText; }
+            }
+          }
+          // Auto re-extract on stale defaults — fire once per session.
+          if (isStaleDefault() && !window.__BB_AUTO_EXTRACTED__) {
+            window.__BB_AUTO_EXTRACTED__ = true;
+            runExtractFromLogo(null);
+          }
+
           card.innerHTML = `
             ${eyebrowHTML()}
             <h2 style="${STYLE_TITLE}">Lock in your color palette.</h2>
             <p style="${STYLE_HELPER}">3–5 colors with names. Auto-filled from your logo + completed with color theory where the logo was too monochrome. Adjust freely.</p>
             <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+              <button type="button" id="bb-pal-extract" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:38px;font-size:11.5px;border-color:rgba(167,139,250,0.4);color:#c4b5fd;">↻ Re-extract from logo</button>
               <button type="button" id="bb-pal-rederive" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:38px;font-size:11.5px;">Re-derive from primary</button>
               ${STATE.palette_named.length < 5 ? `<button type="button" id="bb-add-color" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:38px;font-size:11.5px;">+ Add color (${STATE.palette_named.length}/5)</button>` : ''}
             </div>
@@ -571,6 +610,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             queueSave({ palette_named: STATE.palette_named });
             renderPalette(card);
           });
+          card.querySelector('#bb-pal-extract')?.addEventListener('click', (e) => runExtractFromLogo(e.currentTarget));
           card.querySelector('#bb-pal-rederive')?.addEventListener('click', () => {
             const primary = (STATE.palette_named.find(c => c.role === 'primary') || STATE.palette_named[0]).hex;
             STATE.palette_named = STATE.palette_named.map(c => {
