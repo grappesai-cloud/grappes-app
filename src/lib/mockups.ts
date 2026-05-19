@@ -45,39 +45,48 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
     label: "Business Card",
     base_url: "/mockups/business_card.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 202, y: 382, w: 260, h: 260 },
+    // White card sits angled, roughly x=200..760, y=240..820. Center logo.
+    logo_region: { x: 320, y: 420, w: 360, h: 220 },
     blend: "over",
+    logo_tint: "auto",
   },
   billboard: {
     id: "billboard",
     label: "Billboard",
     base_url: "/mockups/billboard.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 160, y: 210, w: 704, h: 380 },
+    // Blank white panel angled, centered region.
+    logo_region: { x: 260, y: 160, w: 620, h: 320 },
     blend: "over",
+    logo_tint: "auto",
   },
   tote_bag: {
     id: "tote_bag",
     label: "Tote Bag",
     base_url: "/mockups/tote_bag.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 290, y: 380, w: 444, h: 444 },
+    // Canvas bag front sits in right half of frame, x=420..960, y=380..880.
+    logo_region: { x: 500, y: 500, w: 360, h: 320 },
     blend: "over",
+    logo_tint: "auto",
   },
   t_shirt: {
     id: "t_shirt",
     label: "T-Shirt",
     base_url: "/mockups/t_shirt.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 396, y: 500, w: 232, h: 232 },
+    // Heather grey tee, chest area slightly above center.
+    logo_region: { x: 380, y: 260, w: 280, h: 240 },
     blend: "over",
+    logo_tint: "auto",
   },
   phone_case: {
     id: "phone_case",
     label: "Phone Case",
     base_url: "/mockups/phone_case.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 372, y: 260, w: 280, h: 280 },
+    // Black matte case angled, body lower-half centered.
+    logo_region: { x: 380, y: 380, w: 260, h: 260 },
     blend: "over",
     logo_tint: "white",
   },
@@ -86,24 +95,30 @@ export const MOCKUPS: Record<MockupId, MockupTemplate> = {
     label: "Coffee Cup",
     base_url: "/mockups/coffee_cup.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 372, y: 430, w: 280, h: 280 },
+    // Brown kraft sleeve band, x=240..560, y=420..680.
+    logo_region: { x: 280, y: 470, w: 240, h: 180 },
     blend: "over",
+    logo_tint: "white",
   },
   signage: {
     id: "signage",
     label: "Signage",
     base_url: "/mockups/signage.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 170, y: 430, w: 684, h: 180 },
+    // Portrait white storefront panel x=140..400, y=160..620.
+    logo_region: { x: 170, y: 280, w: 240, h: 260 },
     blend: "over",
+    logo_tint: "auto",
   },
   vehicle: {
     id: "vehicle",
     label: "Delivery Vehicle",
     base_url: "/mockups/vehicle.jpg",
     width: 1024, height: 1024,
-    logo_region: { x: 280, y: 520, w: 560, h: 220 },
+    // White van side panel, between cab and rear, above dark skirt.
+    logo_region: { x: 340, y: 360, w: 340, h: 160 },
     blend: "over",
+    logo_tint: "auto",
   },
 };
 
