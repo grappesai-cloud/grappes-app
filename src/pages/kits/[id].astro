@@ -140,6 +140,14 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     palette: k.palette, fonts: k.fonts,
     assets: k.assets ?? {}, stats: k.stats ?? [], links: k.links ?? [],
     press: k.press ?? [], awards: k.awards ?? [],
+    // DENY-style fields
+    role: (k as any).role ?? 'other',
+    overview_intro: (k as any).overview_intro ?? '',
+    key_highlights: (k as any).key_highlights ?? [],
+    shared_stage: (k as any).shared_stage ?? '',
+    career: (k as any).career ?? {},
+    big_stats: (k as any).big_stats ?? [],
+    booking: (k as any).booking ?? {},
     status: k.status, slug: k.slug,
   })} />
   <script id="font-bootstrap" type="application/json" set:html={JSON.stringify(GOOGLE_FONTS)} />
@@ -193,28 +201,25 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     let needsLogoGen = false;
 
     function buildSteps() {
-      const logoGenSteps = needsLogoGen ? [
-        { key: 'logo-type',  chapter: 'Brand', title: 'What kind of logo do you want?' },
-        { key: 'logo-vibe',  chapter: 'Brand', title: 'What should it feel like?' },
-        { key: 'logo-desc',  chapter: 'Brand', title: 'What should appear in it?' },
-        { key: 'logo-refs',  chapter: 'Brand', title: 'Any visual references?' },
-        { key: 'logo-color', chapter: 'Brand', title: 'A specific color in mind?' },
-        { key: 'logo-go',    chapter: 'Brand', title: 'Ready — let’s generate it.' },
-      ] : [];
-      const base = [
-        { key: 'logo-gate',     chapter: 'Brand',    title: 'Do you already have a logo?' },
-        { key: 'identity',      chapter: 'Identity', title: 'What’s the name + tagline?' },
-        ...logoGenSteps,
-        { key: 'bio-short',     chapter: 'Story',    title: 'The one-line story.' },
-        { key: 'bio-long',      chapter: 'Story',    title: 'The longer version.' },
-        { key: 'numbers',       chapter: 'Numbers',  title: 'What numbers matter?' },
-        { key: 'press',         chapter: 'Press',    title: 'Where have you been featured?' },
-        { key: 'awards',        chapter: 'Awards',   title: 'Any awards or recognition?' },
-        { key: 'links',         chapter: 'Links',    title: 'Contact + social links.' },
-        { key: 'brand',         chapter: 'Brand',    title: 'Palette & fonts.' },
-        { key: 'review',        chapter: 'Review',   title: 'Review & publish' },
+      // DENY-2026-style press-kit flow. Order matches the spec.
+      return [
+        { key: 'identity',              chapter: 'Identity',  title: 'Who is this kit for?' },
+        { key: 'signature',             chapter: 'Identity',  title: 'A signature for the cover.' },
+        { key: 'cover-portrait',        chapter: 'Cover',     title: 'The cover portrait.' },
+        { key: 'spread-portraits',      chapter: 'Cover',     title: 'A few more portraits.' },
+        { key: 'overview-intro',        chapter: 'Overview',  title: 'A short intro.' },
+        { key: 'overview-stats',        chapter: 'Overview',  title: 'Inline stats.' },
+        { key: 'key-highlights',        chapter: 'Overview',  title: 'Key highlights.' },
+        { key: 'biography',             chapter: 'Biography', title: 'The longer biography.' },
+        { key: 'shared-stage',          chapter: 'Biography', title: 'Shared the stage with…' },
+        { key: 'career-festivals',      chapter: 'Career',    title: 'Festivals played.' },
+        { key: 'career-international',  chapter: 'Career',    title: 'International reach.' },
+        { key: 'career-charts',         chapter: 'Career',    title: 'Charts & radio.' },
+        { key: 'discography-releases',  chapter: 'Portfolio', title: 'Releases / portfolio.' },
+        { key: 'statistics',            chapter: 'Numbers',   title: 'Headline statistics.' },
+        { key: 'contact-booking',       chapter: 'Contact',   title: 'Booking & contact.' },
+        { key: 'review',                chapter: 'Review',    title: 'Review & publish' },
       ];
-      return base;
     }
     let STEPS = buildSteps();
     let stepIdx = 0;
@@ -349,21 +354,25 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       card.setAttribute('style', STYLE_CARD);
       stage.appendChild(card);
 
-      if (step.key === 'logo-gate')      renderLogoGate(card);
-      else if (step.key === 'identity')  renderIdentity(card);
-      else if (step.key === 'logo-type') renderLogoType(card);
-      else if (step.key === 'logo-vibe') renderLogoVibe(card);
-      else if (step.key === 'logo-desc') renderLogoDesc(card);
-      else if (step.key === 'logo-refs') renderLogoRefs(card);
-      else if (step.key === 'logo-color') renderLogoColor(card);
-      else if (step.key === 'logo-go')   renderLogoGo(card);
-      else if (step.key === 'bio-short') renderBioShort(card);
-      else if (step.key === 'bio-long')  renderBioLong(card);
-      else if (step.key === 'numbers')   renderNumbers(card);
-      else if (step.key === 'press')     renderPress(card);
-      else if (step.key === 'awards')    renderAwards(card);
-      else if (step.key === 'links')     renderLinks(card);
-      else if (step.key === 'brand')     renderBrand(card);
+      const map = {
+        'identity':             renderIdentity,
+        'signature':            renderSignature,
+        'cover-portrait':       renderCoverPortrait,
+        'spread-portraits':     renderSpreadPortraits,
+        'overview-intro':       renderOverviewIntro,
+        'overview-stats':       renderOverviewStats,
+        'key-highlights':       renderKeyHighlights,
+        'biography':            renderBiography,
+        'shared-stage':         renderSharedStage,
+        'career-festivals':     renderCareerFestivals,
+        'career-international': renderCareerInternational,
+        'career-charts':        renderCareerCharts,
+        'discography-releases': renderPortfolio,
+        'statistics':           renderStatistics,
+        'contact-booking':      renderContactBooking,
+      };
+      const fn = map[step.key];
+      if (fn) fn(card);
     }
 
     // ── Step: logo gate ────────────────────────────────────
@@ -483,29 +492,450 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       }
     }
 
-    // ── Step: identity (name + tagline) ────────────────────
+    // ── Step: identity (name + tagline + role) ─────────────
     function renderIdentity(card) {
+      const ROLES = [
+        ['dj','DJ'], ['producer','Producer'], ['musician','Musician'],
+        ['photographer','Photographer'], ['founder','Founder'],
+        ['model','Model'], ['athlete','Athlete'], ['brand','Brand'], ['other','Other'],
+      ];
+      const currentRole = STATE.role || 'other';
       card.innerHTML = `
         ${eyebrowHTML()}
-        <h2 style="${STYLE_TITLE}">What’s the name + tagline?</h2>
-        <p style="${STYLE_HELPER}">The name sits at the top of every page. The tagline is the first thing journalists read — keep it short, sharp, quotable.</p>
+        <h2 style="${STYLE_TITLE}">Who is this kit for?</h2>
+        <p style="${STYLE_HELPER}">Name + tagline + what you do. We use the role to tune section labels in the kit (Discography vs Portfolio, etc.).</p>
 
         <div style="display:flex;flex-direction:column;gap:18px;">
           <div>
             <label style="${STYLE_LABEL}">Name on the kit</label>
-            <input id="f-name" type="text" maxlength="80" class="pkw-input" value="${escapeAttr(STATE.name)}" placeholder="e.g. Mattman Music" style="${STYLE_INPUT}" />
+            <input id="f-name" type="text" maxlength="80" class="pkw-input" value="${escapeAttr(STATE.name)}" placeholder="e.g. DENY" style="${STYLE_INPUT}" />
           </div>
           <div>
             <label style="${STYLE_LABEL}">Tagline (one line)</label>
-            <input id="f-tagline" type="text" maxlength="120" class="pkw-input" value="${escapeAttr(STATE.tagline ?? '')}" placeholder="e.g. House music from Cluj" style="${STYLE_INPUT}" />
+            <input id="f-tagline" type="text" maxlength="120" class="pkw-input" value="${escapeAttr(STATE.tagline ?? '')}" placeholder="e.g. Bucharest-based DJ &amp; producer" style="${STYLE_INPUT}" />
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Role</label>
+            <div id="f-roles" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+              ${ROLES.map(([v,l]) => selectablePill({ value: v, label: l, selected: currentRole === v })).join('')}
+            </div>
+            <input id="f-role-other" type="text" maxlength="40" class="pkw-input" value="${escapeAttr(currentRole === 'other' ? (STATE.role_label ?? '') : '')}" placeholder="If other, type your role" style="${STYLE_INPUT};margin-top:10px;display:${currentRole === 'other' ? 'block' : 'none'};" />
           </div>
         </div>
 
-        ${footerHTML()}
+        ${footerHTML({ hideSkip: true })}
       `;
       card.querySelector('#f-name').addEventListener('input', e => queueSave({ name: e.target.value }));
       card.querySelector('#f-tagline').addEventListener('input', e => queueSave({ tagline: e.target.value }));
+      card.querySelector('#f-roles').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-pill]'); if (!b) return;
+        STATE.role = b.dataset.pill;
+        queueSave({ role: STATE.role });
+        const otherInput = card.querySelector('#f-role-other');
+        otherInput.style.display = STATE.role === 'other' ? 'block' : 'none';
+        renderIdentity(card);
+      });
+      card.querySelector('#f-role-other')?.addEventListener('input', e => {
+        STATE.role_label = e.target.value;
+        // Stored on `role` as the free-text label when selected role is 'other'
+        if (e.target.value.trim()) queueSave({ role: e.target.value.trim().toLowerCase() });
+      });
       wireFooter(card);
+    }
+
+    // ── Reusable: single-file upload tile with thumb preview ───
+    function singleUploadTile({ url, label, hint }) {
+      if (url) {
+        return `
+          <div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;">
+            <div style="width:96px;height:120px;border-radius:10px;background:#0f0f12;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;">
+              <img src="${url}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;" />
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;">
+              <strong style="font-size:13.5px;color:#fff;font-weight:600;">${label}</strong>
+              <span style="font-size:11.5px;color:rgba(255,255,255,0.45);">${hint}</span>
+            </div>
+            <button type="button" data-replace style="height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Replace</button>
+          </div>
+        `;
+      }
+      return `
+        <div data-drop style="position:relative;padding:36px 24px;text-align:center;background:rgba(255,255,255,0.025);border:1px dashed rgba(255,255,255,0.2);border-radius:14px;cursor:pointer;transition:all .15s;">
+          <input type="file" accept="image/*" data-input style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+          <div style="font-size:24px;margin-bottom:6px;">↑</div>
+          <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;">${label}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);">${hint}</div>
+        </div>
+      `;
+    }
+
+    async function uploadOne(file) {
+      const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+      return blob.url;
+    }
+
+    function wireSingleUpload(card, onUploaded) {
+      const input = card.querySelector('[data-input]');
+      const replace = card.querySelector('[data-replace]');
+      if (input) input.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        markDirty();
+        try { const url = await uploadOne(file); onUploaded(url); markSaved(); }
+        catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+      });
+      if (replace) replace.addEventListener('click', () => {
+        const f = document.createElement('input');
+        f.type = 'file'; f.accept = 'image/*';
+        f.onchange = async () => {
+          const file = f.files?.[0]; if (!file) return;
+          markDirty();
+          try { const url = await uploadOne(file); onUploaded(url); markSaved(); }
+          catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+        };
+        f.click();
+      });
+    }
+
+    // ── Step: signature (optional PNG + Caveat preview) ────
+    function renderSignature(card) {
+      const sig = STATE.assets?.signature;
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">A signature for the cover.</h2>
+        <p style="${STYLE_HELPER}">Optional. Upload a transparent PNG of your handwritten signature, or skip and we'll render your name in a script font on the cover.</p>
+
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          ${singleUploadTile({ url: sig, label: sig ? 'signature.png' : 'Drag a signature PNG or click', hint: sig ? 'Will appear on cover + contact page' : 'Transparent PNG, max ~500px wide' })}
+          <div style="padding:14px 18px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;text-align:center;">
+            <div style="font-size:10.5px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:6px;font-weight:700;">Fallback preview</div>
+            <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" />
+            <div style="font-family:'Caveat',cursive;font-size:34px;color:#fff;">${escapeHtml(STATE.name || 'Your name')}</div>
+          </div>
+        </div>
+
+        ${footerHTML({ skipText: 'Skip — use script font' })}
+      `;
+      wireSingleUpload(card, (url) => {
+        STATE.assets = { ...(STATE.assets || {}), signature: url };
+        queueSave({ assets: STATE.assets });
+        renderSignature(card);
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: cover portrait (required) ────────────────────
+    function renderCoverPortrait(card) {
+      const url = STATE.assets?.cover_portrait;
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">The cover portrait.</h2>
+        <p style="${STYLE_HELPER}">A single high-res shot that dominates page 1 and watermarks the contact page. Editorial framing works best — high contrast, strong eye-line.</p>
+
+        ${singleUploadTile({ url, label: url ? 'cover.jpg' : 'Drag your cover portrait or click', hint: url ? 'Used on cover + contact page' : 'JPG / PNG, at least 1600px on the long edge' })}
+
+        ${footerHTML({ hideSkip: true })}
+      `;
+      wireSingleUpload(card, (u) => {
+        STATE.assets = { ...(STATE.assets || {}), cover_portrait: u };
+        queueSave({ assets: STATE.assets });
+        renderCoverPortrait(card);
+      });
+      wireFooter(card, { onNext: async () => {
+        if (!STATE.assets?.cover_portrait) { alert('Upload a cover portrait first.'); return false; }
+        return true;
+      }});
+    }
+
+    // ── Step: spread portraits (up to 5, optional) ─────────
+    function renderSpreadPortraits(card) {
+      const list = STATE.assets?.spread_portraits || [];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">A few more portraits.</h2>
+        <p style="${STYLE_HELPER}">Up to 5. These fill the left side of each content spread (Overview, Biography, Career, Portfolio, Statistics). Upload less and we'll cycle through what you give us.</p>
+
+        <div id="sp-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;"></div>
+        ${list.length < 5 ? `<button type="button" id="sp-add" class="pkw-add" style="${STYLE_ADD}">+ Add portrait (${list.length}/5)</button>` : `<p style="font-size:12px;color:rgba(255,255,255,0.45);text-align:center;">5 / 5 — remove one to add another.</p>`}
+        <input type="file" accept="image/*" id="sp-input" style="display:none;" />
+
+        ${footerHTML({ skipText: 'Skip — reuse cover' })}
+      `;
+      function renderGrid() {
+        const grid = card.querySelector('#sp-grid');
+        const cur = STATE.assets?.spread_portraits || [];
+        if (cur.length === 0) { grid.innerHTML = '<div style="grid-column:1/-1;font-size:12px;color:rgba(255,255,255,0.4);text-align:center;padding:14px;">No portraits yet — we'll reuse your cover.</div>'; return; }
+        grid.innerHTML = cur.map((u, i) => `
+          <div style="position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);">
+            <img src="${u}" alt="" style="width:100%;height:100%;object-fit:contain;background:#0f0f12;" />
+            <button type="button" data-rm="${i}" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,0.75);color:#fff;cursor:pointer;font-size:13px;font-family:inherit;">×</button>
+            <div style="position:absolute;bottom:6px;left:6px;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:4px;">${i + 1}</div>
+          </div>
+        `).join('');
+        grid.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+          const idx = +b.dataset.rm;
+          STATE.assets.spread_portraits = (STATE.assets.spread_portraits || []).filter((_, j) => j !== idx);
+          queueSave({ assets: { ...STATE.assets } });
+          renderSpreadPortraits(card);
+        }));
+      }
+      renderGrid();
+      card.querySelector('#sp-add')?.addEventListener('click', () => card.querySelector('#sp-input').click());
+      card.querySelector('#sp-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        markDirty();
+        try {
+          const url = await uploadOne(file);
+          STATE.assets = { ...(STATE.assets || {}), spread_portraits: [...(STATE.assets?.spread_portraits || []), url].slice(0, 5) };
+          queueSave({ assets: STATE.assets });
+          renderSpreadPortraits(card);
+        } catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: overview intro paragraph ─────────────────────
+    function renderOverviewIntro(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">A short intro.</h2>
+        <p style="${STYLE_HELPER}">Two sentences at the top of the Overview page. Think "DENY is a Bucharest-based DJ and producer shaping…" — 200 characters max.</p>
+        <textarea id="f-intro" class="pkw-textarea" maxlength="220" placeholder="e.g. DENY is a Bucharest-based DJ &amp; producer shaping the Romanian electronic scene." style="${STYLE_TEXTAREA};min-height:120px;">${escapeHtml(STATE.overview_intro ?? '')}</textarea>
+        <div style="display:flex;justify-content:flex-end;font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:6px;font-variant-numeric:tabular-nums;" id="f-intro-count">${(STATE.overview_intro ?? '').length} / 220</div>
+        ${footerHTML()}
+      `;
+      const ta = card.querySelector('#f-intro');
+      const ct = card.querySelector('#f-intro-count');
+      ta.addEventListener('input', e => { queueSave({ overview_intro: e.target.value }); ct.textContent = `${e.target.value.length} / 220`; });
+      wireFooter(card);
+    }
+
+    // ── Step: overview inline stats (label + value) ────────
+    function renderOverviewStats(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Inline stats.</h2>
+        <p style="${STYLE_HELPER}">Small label-value pairs printed underneath the Overview intro. e.g. "Social Media Followers — 97.7K", "Total Streams — 3.42M".</p>
+        <div id="f-stats" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-stat" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add stat</button>
+        ${footerHTML({ skipText: 'No inline stats' })}
+      `;
+      bindRows(card, 'f-stats', 'stats', 'grid-template-columns:1.4fr 1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="Social Media Followers" data-k="label" value="${escapeAttr(s.label ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="97.7K" data-k="value" value="${escapeAttr(s.value ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.stats, 'add-stat', () => ({ label: '', value: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: key highlights (bullet list) ─────────────────
+    function renderKeyHighlights(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Key highlights.</h2>
+        <p style="${STYLE_HELPER}">5-8 punchy bullets. Optionally prefix with a lead like "#1 — Charted track in Portugal" — we'll style the part before the dash as an accent label.</p>
+        <div id="f-hi" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-hi" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add highlight</button>
+        ${footerHTML({ skipText: 'Skip highlights' })}
+      `;
+      // Wrap as objects for the repeater
+      const initial = (STATE.key_highlights || []).map(t => ({ text: t }));
+      bindRows(card, 'f-hi', '__hi_rows', 'grid-template-columns:1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="#1 — Charted track in Portugal" data-k="text" value="${escapeAttr(s.text ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        initial, 'add-hi', () => ({ text: '' })
+      );
+      // Mirror into the proper field on every save flush
+      const origQueue = queueSave;
+      const observer = setInterval(() => {
+        if (Array.isArray(STATE.__hi_rows)) {
+          const list = STATE.__hi_rows.map(r => (r.text || '').trim()).filter(Boolean);
+          if (JSON.stringify(list) !== JSON.stringify(STATE.key_highlights)) {
+            STATE.key_highlights = list;
+            origQueue({ key_highlights: list });
+          }
+        }
+      }, 700);
+      // Clean up when the user navigates away
+      card.addEventListener('DOMNodeRemoved', () => clearInterval(observer));
+      wireFooter(card, { onNext: async () => {
+        const list = (STATE.__hi_rows || []).map(r => (r.text || '').trim()).filter(Boolean);
+        STATE.key_highlights = list;
+        await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key_highlights: list }) });
+        clearInterval(observer);
+        return true;
+      }});
+    }
+
+    // ── Step: biography (long bio) ─────────────────────────
+    function renderBiography(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">The longer biography.</h2>
+        <p style="${STYLE_HELPER}">Two or three paragraphs of the full story — context, sound, what makes you you. Up to 3000 characters.</p>
+        <textarea id="f-bio" class="pkw-textarea" maxlength="3000" placeholder="The full story." style="${STYLE_TEXTAREA};min-height:240px;">${escapeHtml(STATE.bio_long ?? '')}</textarea>
+        ${footerHTML({ skipText: 'Skip biography' })}
+      `;
+      card.querySelector('#f-bio').addEventListener('input', e => queueSave({ bio_long: e.target.value }));
+      wireFooter(card);
+    }
+
+    // ── Step: shared stage ─────────────────────────────────
+    function renderSharedStage(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Shared the stage with…</h2>
+        <p style="${STYLE_HELPER}">Comma-separated names. We print them at the bottom of the Biography page in italic.</p>
+        <input id="f-shared" type="text" maxlength="600" class="pkw-input" value="${escapeAttr(STATE.shared_stage ?? '')}" placeholder="e.g. Solomun, Tale Of Us, Adriatique" style="${STYLE_INPUT};height:60px;" />
+        ${footerHTML({ skipText: 'Skip' })}
+      `;
+      card.querySelector('#f-shared').addEventListener('input', e => queueSave({ shared_stage: e.target.value }));
+      wireFooter(card);
+    }
+
+    // ── Generic single-column list editor (career rows) ────
+    function renderCareerList(card, careerKey, titleText, helperText, placeholder) {
+      const initial = ((STATE.career && STATE.career[careerKey]) || []).map(t => ({ text: t }));
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">${titleText}</h2>
+        <p style="${STYLE_HELPER}">${helperText}</p>
+        <div id="f-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-row" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add row</button>
+        ${footerHTML({ skipText: 'Skip' })}
+      `;
+      bindRows(card, 'f-list', '__career_rows', 'grid-template-columns:1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="${escapeAttr(placeholder)}" data-k="text" value="${escapeAttr(s.text ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        initial, 'add-row', () => ({ text: '' })
+      );
+      wireFooter(card, { onNext: async () => {
+        const list = (STATE.__career_rows || []).map(r => (r.text || '').trim()).filter(Boolean);
+        STATE.career = { ...(STATE.career || {}), [careerKey]: list };
+        await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ career: STATE.career }) });
+        return true;
+      }});
+    }
+    function renderCareerFestivals(card)     { renderCareerList(card, 'festivals', 'Festivals played.', 'One per row. e.g. UNTOLD 2024, Electric Castle 2023, Neversea 2022.', 'UNTOLD 2024'); }
+    function renderCareerInternational(card) { renderCareerList(card, 'international', 'International reach.', 'Cities or countries you have performed / shipped to. One per row.', 'Berlin, Germany — Watergate 2024'); }
+    function renderCareerCharts(card)        { renderCareerList(card, 'charts', 'Charts & radio.', 'Notable chart positions, radio plays, playlist features. One per row.', '#1 charted in Portugal — Antena 3'); }
+
+    // ── Step: portfolio / discography (year + title + role) ──
+    function renderPortfolio(card) {
+      const isMusician = ['dj','producer','musician'].includes(STATE.role) || STATE.kit_type === 'musician';
+      const title = isMusician ? 'Releases.' : 'Portfolio.';
+      const helper = isMusician
+        ? 'Year, title, and "Original" / "Remix" / "EP". We group by year on the page.'
+        : 'Year, project title, and your role. We group by year on the page.';
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">${title}</h2>
+        <p style="${STYLE_HELPER}">${helper}</p>
+        <div id="f-port" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-port" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add entry</button>
+        ${footerHTML({ skipText: 'Skip' })}
+      `;
+      bindRows(card, 'f-port', 'press', 'grid-template-columns:80px 1.6fr 1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="Year" data-k="year" value="${escapeAttr(s.year ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="${escapeAttr(isMusician ? 'Track title' : 'Project title')}" data-k="title" value="${escapeAttr(s.title ?? s.name ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="${escapeAttr(isMusician ? 'Original / Remix' : 'Your role')}" data-k="role" value="${escapeAttr(s.role ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        STATE.press, 'add-port', () => ({ year: '', title: '', role: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: big statistics (label + value) ───────────────
+    function renderStatistics(card) {
+      const initial = STATE.big_stats || [];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Headline statistics.</h2>
+        <p style="${STYLE_HELPER}">The big numbers — printed two-up on the Statistics page. e.g. "Monthly Listeners — 412K", "Total Streams — 3.42M".</p>
+        <div id="f-big" style="display:flex;flex-direction:column;gap:10px;"></div>
+        <button type="button" id="add-big" class="pkw-add" style="${STYLE_ADD};margin-top:12px;">+ Add headline stat</button>
+        ${footerHTML({ skipText: 'Skip' })}
+      `;
+      bindRows(card, 'f-big', 'big_stats', 'grid-template-columns:1.4fr 1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="Monthly Listeners" data-k="label" value="${escapeAttr(s.label ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="412K" data-k="value" value="${escapeAttr(s.value ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        initial, 'add-big', () => ({ label: '', value: '' })
+      );
+      wireFooter(card);
+    }
+
+    // ── Step: contact & booking ────────────────────────────
+    function renderContactBooking(card) {
+      const b = STATE.booking || {};
+      const agents = b.agents || [];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Booking & contact.</h2>
+        <p style="${STYLE_HELPER}">Who handles what, where to find you, and where journalists can grab high-res assets.</p>
+
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <div>
+            <label style="${STYLE_LABEL}">Primary booking email</label>
+            <input id="f-email" type="email" class="pkw-input" value="${escapeAttr(STATE.contact_email ?? '')}" placeholder="booking@you.com" style="${STYLE_INPUT}" />
+          </div>
+          <div>
+            <label style="${STYLE_LABEL}">Booking agents &amp; management</label>
+            <div id="f-agents" style="display:flex;flex-direction:column;gap:10px;"></div>
+            <button type="button" id="add-agent" class="pkw-add" style="${STYLE_ADD};margin-top:10px;">+ Add agent</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="${STYLE_LABEL}">Instagram</label>
+              <input id="f-ig" type="text" class="pkw-input" value="${escapeAttr(b.instagram ?? '')}" placeholder="@handle or full URL" style="${STYLE_INPUT}" />
+            </div>
+            <div>
+              <label style="${STYLE_LABEL}">Press materials link</label>
+              <input id="f-press" type="url" class="pkw-input" value="${escapeAttr(b.press_link ?? '')}" placeholder="https://drive.google.com/…" style="${STYLE_INPUT}" />
+            </div>
+          </div>
+        </div>
+
+        ${footerHTML({ nextText: 'Review →' })}
+      `;
+      card.querySelector('#f-email').addEventListener('input', e => queueSave({ contact_email: e.target.value }));
+      const persistBooking = () => {
+        STATE.booking = {
+          ...(STATE.booking || {}),
+          instagram: card.querySelector('#f-ig').value,
+          press_link: card.querySelector('#f-press').value,
+        };
+        queueSave({ booking: STATE.booking });
+      };
+      card.querySelector('#f-ig').addEventListener('input', persistBooking);
+      card.querySelector('#f-press').addEventListener('input', persistBooking);
+
+      bindRows(card, 'f-agents', '__agents_rows', 'grid-template-columns:1.2fr 1.5fr 1fr 40px;',
+        (s) => `
+          <input type="text" placeholder="Name" data-k="name" value="${escapeAttr(s.name ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="email" placeholder="email" data-k="email" value="${escapeAttr(s.email ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <input type="text" placeholder="Phone / role" data-k="phone" value="${escapeAttr(s.phone ?? '')}" style="height:42px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-family:inherit;font-size:13.5px;outline:none;" />
+          <button type="button" class="pkw-rm" data-rm>×</button>
+        `,
+        agents, 'add-agent', () => ({ name: '', email: '', phone: '' })
+      );
+      wireFooter(card, { onNext: async () => {
+        const list = (STATE.__agents_rows || []).filter(a => a.name || a.email);
+        STATE.booking = { ...(STATE.booking || {}), agents: list };
+        await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ booking: STATE.booking }) });
+        return true;
+      }});
     }
 
     // ── Logo-gen sub-step state ────────────────────────────
@@ -1400,28 +1830,37 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         { title: 'Identity', step: idxOf('identity'), rows: [
           ['Name', STATE.name || '—'],
           ['Tagline', STATE.tagline || '—'],
+          ['Role', STATE.role || '—'],
         ]},
-        { title: 'Brand', step: idxOf('brand'), rows: [
-          ['Logo', `${STATE.assets?.logo ? 'Yes' : '—'}${STATE.assets?.logo_svg ? ' · SVG ready' : ''}`],
-          ['Palette', `<span style="display:inline-flex;gap:4px;justify-content:flex-end;">${['primary','accent','bg'].map(k => `<span style="width:14px;height:14px;border-radius:3px;background:${STATE.palette?.[k] ?? '#000'};border:1px solid rgba(255,255,255,0.12);"></span>`).join('')}</span>`],
-          ['Fonts', `<span style="font-family:'${heading}', sans-serif;">${escapeHtml(heading)} <span style="opacity:.55;font-family:'${body}',sans-serif;">/ ${escapeHtml(body)}</span></span>`],
+        { title: 'Cover', step: idxOf('cover-portrait'), rows: [
+          ['Cover portrait', STATE.assets?.cover_portrait ? 'Uploaded' : '—'],
+          ['Signature', STATE.assets?.signature ? 'PNG uploaded' : 'Script-font fallback'],
+          ['Spread portraits', String((STATE.assets?.spread_portraits || []).length) + ' / 5'],
         ]},
-        { title: 'Story', step: idxOf('bio-short'), rows: [
-          ['Short bio', STATE.bio_short ? escapeHtml(STATE.bio_short.slice(0, 70)) + (STATE.bio_short.length > 70 ? '…' : '') : '—'],
+        { title: 'Overview', step: idxOf('overview-intro'), rows: [
+          ['Intro', STATE.overview_intro ? escapeHtml(STATE.overview_intro.slice(0, 70)) + (STATE.overview_intro.length > 70 ? '…' : '') : '—'],
+          ['Inline stats', String((STATE.stats || []).length)],
+          ['Key highlights', String((STATE.key_highlights || []).length)],
+        ]},
+        { title: 'Biography', step: idxOf('biography'), rows: [
           ['Long bio', STATE.bio_long ? `${STATE.bio_long.split(/\s+/).length} words` : '—'],
+          ['Shared stage', STATE.shared_stage ? `${(STATE.shared_stage || '').split(',').filter(Boolean).length} names` : '—'],
         ]},
-        { title: 'Numbers', step: idxOf('numbers'), rows: [
-          ['Stats', String((STATE.stats || []).length)],
+        { title: 'Career', step: idxOf('career-festivals'), rows: [
+          ['Festivals', String((STATE.career?.festivals || []).length)],
+          ['International', String((STATE.career?.international || []).length)],
+          ['Charts', String((STATE.career?.charts || []).length)],
         ]},
-        { title: 'Press', step: idxOf('press'), rows: [
-          ['Mentions', String((STATE.press || []).length)],
+        { title: 'Portfolio', step: idxOf('discography-releases'), rows: [
+          ['Entries', String((STATE.press || []).length)],
         ]},
-        { title: 'Awards', step: idxOf('awards'), rows: [
-          ['Awards', String((STATE.awards || []).length)],
+        { title: 'Statistics', step: idxOf('statistics'), rows: [
+          ['Big stats', String((STATE.big_stats || []).length)],
         ]},
-        { title: 'Links', step: idxOf('links'), rows: [
+        { title: 'Contact', step: idxOf('contact-booking'), rows: [
           ['Email', escapeHtml(STATE.contact_email ?? '—')],
-          ['Links', String((STATE.links || []).length)],
+          ['Agents', String(((STATE.booking || {}).agents || []).length)],
+          ['Instagram', STATE.booking?.instagram ? 'Set' : '—'],
         ]},
       ];
 
@@ -1451,12 +1890,13 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
       // Header for the recap
       const head = document.createElement('div');
-      head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
+      head.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
       head.innerHTML = `
         <div>
           <span style="${STYLE_EYEBROW}"><span style="${STYLE_EYEBROW_DOT}"></span>Review</span>
           <h2 style="font-family:'Inter',sans-serif;font-size:24px;font-weight:300;letter-spacing:-0.025em;color:#fff;margin:14px 0 4px;">What you’ve answered</h2>
-          <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0;line-height:1.5;">Tap any section to edit. The preview on the right updates live.</p>
+          <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0 0 8px;line-height:1.5;">Tap any section to edit. The preview on the right updates live.</p>
+          <button type="button" id="use-sample" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;background:rgba(167,139,250,0.12);color:#c4b5fd;border:1px solid rgba(167,139,250,0.36);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;">Use sample content (DENY-like)</button>
         </div>
       `;
       recap.prepend(head);
@@ -1464,6 +1904,67 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       recap.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
       const pubBtn = recap.querySelector('#publish-btn');
       if (pubBtn) pubBtn.addEventListener('click', publishFlow);
+      recap.querySelector('#use-sample')?.addEventListener('click', loadSampleContent);
+    }
+
+    async function loadSampleContent() {
+      const btn = document.getElementById('use-sample');
+      if (btn) { btn.disabled = true; btn.textContent = 'Filling…'; }
+      const sample = {
+        name: STATE.name || 'DENY',
+        tagline: 'Bucharest-based DJ & producer shaping the Romanian electronic scene.',
+        role: 'dj',
+        overview_intro: 'DENY is a Bucharest-based DJ and producer shaping the modern Romanian electronic scene — melodic, hypnotic, and uncompromisingly editorial.',
+        bio_long: 'Across the last five years DENY has built a sound that hovers between hypnotic minimal and warm melodic house — at home in dark Bucharest basements and on the main stage at UNTOLD.\n\nResidencies at Form Space and Guesthouse Club bookended a 2024 European tour spanning Berlin, Lisbon, and Athens, while collaborations with Cap Records and Sunrise have pushed his records onto Beatport, Spotify editorial and Romania\'s national radio.',
+        shared_stage: 'Solomun, Tale Of Us, Adriatique, Bedouin, Dixon',
+        stats: [
+          { label: 'Social Media Followers', value: '97.7K' },
+          { label: 'Total Streams', value: '3.42M' },
+          { label: 'Countries Performed', value: '+8' },
+          { label: 'Active Since', value: '2019' },
+        ],
+        key_highlights: [
+          '#1 — Charted track in Portugal (Beatport Melodic House)',
+          'Performed at — UNTOLD, Electric Castle, Neversea, Sunwaves',
+          'Editorial — Featured in Mixmag Romania, Resident Advisor',
+          'Releases — Cap Records, Sunrise, All Day I Dream submission',
+          'Radio — Heavy rotation on Kiss FM & Pro FM Romania',
+        ],
+        career: {
+          festivals: ['UNTOLD 2024 — Cluj-Napoca', 'Electric Castle 2023 — Bonțida', 'Neversea 2022 — Constanța', 'Sunwaves 2024 — Mamaia'],
+          international: ['Berlin, Germany — Watergate 2024', 'Lisbon, Portugal — Lux Frágil 2024', 'Athens, Greece — Lohan Nightclub 2023'],
+          charts: ['#1 — Beatport Melodic House (Portugal, 2024)', '#7 — Spotify Viral Romania (2023)', 'Radio rotation — Kiss FM, Pro FM (2022-2024)'],
+        },
+        press: [
+          { year: '2025', title: 'Mirage', role: 'Original' },
+          { year: '2024', title: 'Vortex', role: 'Remix — Adriatique' },
+          { year: '2024', title: 'Casa', role: 'Original' },
+          { year: '2023', title: 'Sundream EP', role: 'EP — 3 tracks' },
+        ],
+        big_stats: [
+          { label: 'Monthly Listeners', value: '412K' },
+          { label: 'Total Streams', value: '3.42M' },
+          { label: 'Instagram Followers', value: '64.8K' },
+          { label: 'TikTok Reach', value: '12.1M' },
+          { label: 'Countries Played', value: '8' },
+          { label: 'Years Active', value: '6' },
+        ],
+        booking: {
+          agents: [
+            { name: 'Andrei Popescu', email: 'andrei@booking.ro', phone: 'Worldwide' },
+            { name: 'Maria Ionescu',  email: 'maria@mgmt.ro',   phone: 'Romania · Management' },
+          ],
+          instagram: '@deny.music',
+          press_link: 'https://drive.google.com/press-kit-deny',
+        },
+        contact_email: 'booking@deny.music',
+      };
+      Object.assign(STATE, sample);
+      try {
+        await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(sample) });
+        renderReview(); reloadPreview();
+      } catch { alert('Could not load sample.'); }
+      if (btn) { btn.disabled = false; btn.textContent = 'Use sample content (DENY-like)'; }
     }
 
     async function publishFlow() {
