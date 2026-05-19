@@ -118,11 +118,14 @@ function recraftApiKey(): string {
  */
 function buildPrompt(input: GenerateLogoInput): string {
   let colorHint: string;
-  if (input.paletteColors && input.paletteColors.length > 0) {
+  if (input.primaryColor) {
+    // primaryColor wins over paletteColors. We also recolor the SVG post-hoc
+    // since Recraft treats colors as a soft signal, but the prompt still
+    // helps the model pick contrast / mood appropriate to this hue.
+    colorHint = `Color: monochrome mark in EXACTLY this color: ${input.primaryColor}. The entire mark must use ONLY this single color, no other hues, no shading, no accents.`;
+  } else if (input.paletteColors && input.paletteColors.length > 0) {
     const cs = input.paletteColors.slice(0, 3).join(", ");
     colorHint = `Use the brand's existing palette for the mark's fill: ${cs}. Prefer ONE of these as the dominant color (pick the boldest, most saturated one).`;
-  } else if (input.primaryColor) {
-    colorHint = `Use this color as the mark's solid fill: ${input.primaryColor}.`;
   } else {
     const accent = pickAccent();
     colorHint = `Use a single bold accent color for the mark: ${accent.name} (${accent.hex}). NEVER default to black. NEVER use grey.`;
@@ -279,6 +282,49 @@ async function generateSvgFromRecraft(input: GenerateLogoInput): Promise<{ svg: 
 }
 
 /**
+ * Force every fill (and explicit stroke) in the SVG to a single hex color.
+ * Recraft's `controls.colors` is documented as a "preferable" signal, not a
+ * hard constraint — V4 routinely drifts to other hues. When the user has
+ * explicitly forced a color, we recolor the geometry deterministically so the
+ * result matches what they picked.
+ *
+ * We leave fill="none" alone (those are transparent regions) and we leave
+ * gradients/patterns alone (skip url(...) references). Strokes that were
+ * explicitly defined get retinted too; missing strokes stay missing.
+ */
+function recolorSvgMono(svg: string, hex: string): string {
+  const safeHex = /^#?[0-9a-fA-F]{6}$/.test(hex) ? (hex.startsWith("#") ? hex : `#${hex}`) : null;
+  if (!safeHex) return svg;
+
+  // Replace fill="<color>" attributes — but leave fill="none" and url(...) refs.
+  let out = svg.replace(/fill\s*=\s*"([^"]+)"/g, (m, val) => {
+    const v = val.trim().toLowerCase();
+    if (v === "none" || v.startsWith("url(")) return m;
+    return `fill="${safeHex}"`;
+  });
+
+  // Replace stroke="<color>" too (only if it isn't "none" / url ref).
+  out = out.replace(/stroke\s*=\s*"([^"]+)"/g, (m, val) => {
+    const v = val.trim().toLowerCase();
+    if (v === "none" || v.startsWith("url(")) return m;
+    return `stroke="${safeHex}"`;
+  });
+
+  // CSS-style: fill: <color>; in style attributes.
+  out = out.replace(/fill\s*:\s*([^;\"]+)/g, (m, val) => {
+    const v = val.trim().toLowerCase();
+    if (v === "none" || v.startsWith("url(")) return m;
+    return `fill:${safeHex}`;
+  });
+  out = out.replace(/stroke\s*:\s*([^;\"]+)/g, (m, val) => {
+    const v = val.trim().toLowerCase();
+    if (v === "none" || v.startsWith("url(")) return m;
+    return `stroke:${safeHex}`;
+  });
+  return out;
+}
+
+/**
  * Render a PNG companion from the generated SVG using sharp. sharp accepts
  * SVG input natively — we size the longest edge to 1024px on a transparent
  * background so the PNG mirrors the SVG visually.
@@ -303,6 +349,15 @@ export async function generateLogo(input: GenerateLogoInput): Promise<GeneratedL
   } catch (e) {
     console.error("[logo-gen] Recraft generation failed:", e);
     throw e;
+  }
+
+  // Deterministic color enforcement: when the user explicitly picked a color
+  // (Force a specific color), Recraft's soft signal isn't reliable on V4 — so
+  // we recolor the SVG geometry directly. This is safe for monochrome marks,
+  // which is what 95% of brand logos are.
+  if (input.primaryColor) {
+    svg = recolorSvgMono(svg, input.primaryColor);
+    svgBytes = Buffer.from(svg, "utf8");
   }
 
   const pngBytes = await svgToPng(svgBytes);
