@@ -9,8 +9,7 @@
       "schedule": "0 9 * * *"
     }
   ],
-  "rewrites": [
-    { "source": "/reels", "destination": "https://grappes-reel-lab.vercel.app/reels" },
-    { "source": "/reels/:path*", "destination": "https://grappes-reel-lab.vercel.app/reels/:path*" }
-  ]
+  "functions": {
+    "src/pages/api/reels/analyze.ts": { "maxDuration": 800, "memory": 3008 }
+  }
 }
