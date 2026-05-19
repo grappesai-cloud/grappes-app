@@ -398,48 +398,158 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
         // ── Step: palette ──────────────────────────────────────
         function renderPalette(card) {
-          // Seed from palette_named or kit.palette
-          let pn = Array.isArray(STATE.palette_named) ? STATE.palette_named.slice() : [];
-          if (pn.length === 0) {
-            const p = STATE.palette || {};
-            const roles = [['primary','Primary'],['secondary','Secondary'],['accent','Accent'],['bg','Background'],['text','Text']];
-            for (const [k, label] of roles) {
-              if (p[k]) pn.push({ hex: p[k], label, role: k });
+          // Inline color-theory fill so the brand book always shows a coherent
+          // 5-slot palette derived from whatever the logo extractor found.
+          // Mirrors fillPalette() in src/lib/press-kit.ts.
+          function hexToHsl(hex) {
+            const m = /^#?([0-9a-f]{6})$/i.exec((hex||'').trim());
+            const v = m ? parseInt(m[1], 16) : 0;
+            const r = ((v>>16)&0xff)/255, g = ((v>>8)&0xff)/255, b = (v&0xff)/255;
+            const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+            const l = (mx+mn)/2;
+            let h=0, s=0;
+            if (mx!==mn) {
+              const d = mx-mn;
+              s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+              if (mx===r) h = (g-b)/d + (g<b?6:0);
+              else if (mx===g) h = (b-r)/d + 2;
+              else h = (r-g)/d + 4;
+              h /= 6;
             }
-            pn = pn.slice(0, 5);
-            if (pn.length === 0) pn = [{ hex: '#0F5132', label: 'Primary', role: 'primary' }];
+            return [h*360, s, l];
           }
-          STATE.palette_named = pn;
+          function hslToHex(h, s, l) {
+            h = ((h%360)+360)%360/360;
+            s = Math.max(0, Math.min(1, s));
+            l = Math.max(0, Math.min(1, l));
+            const hue2rgb = (p,q,t) => { if(t<0)t+=1; if(t>1)t-=1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; };
+            let r,g,b;
+            if (s===0) r=g=b=l;
+            else {
+              const q = l<0.5 ? l*(1+s) : l+s-l*s;
+              const p = 2*l - q;
+              r = hue2rgb(p,q,h+1/3); g = hue2rgb(p,q,h); b = hue2rgb(p,q,h-1/3);
+            }
+            const x = n => Math.round(n*255).toString(16).padStart(2,'0');
+            return `#${x(r)}${x(g)}${x(b)}`;
+          }
+          function deriveFromHue(role, primary) {
+            const [h, s] = hexToHsl(primary);
+            if (role === 'secondary') return hslToHex(h, Math.max(0.18, s*0.55), 0.32);
+            if (role === 'accent')    return hslToHex(h+180, Math.max(0.55, s), 0.55);
+            if (role === 'background')return hslToHex(h, 0.04, 0.97);
+            if (role === 'text')      return hslToHex(h, 0.30, 0.10);
+            return hslToHex(h, Math.max(0.4, s), 0.5);
+          }
+          const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary', accent: 'Accent', background: 'Background', text: 'Text' };
+
+          // Seed once: if palette_named is empty, build it from kit.palette but
+          // only push slots whose hex matches a non-default value. Whatever's
+          // missing gets auto-derived via color theory below.
+          if (!Array.isArray(STATE.palette_named) || STATE.palette_named.length === 0) {
+            const p = STATE.palette || {};
+            const seeded = [];
+            // Role -> kit.palette key
+            const roleKey = { primary: 'primary', secondary: 'secondary', accent: 'accent', background: 'bg', text: 'text' };
+            for (const role of Object.keys(roleKey)) {
+              const hex = p[roleKey[role]];
+              if (hex) seeded.push({ hex, label: ROLE_LABELS[role], role });
+            }
+            // If primary missing entirely, default to a neutral graphite so
+            // derivation has something to work with.
+            if (!seeded.some(c => c.role === 'primary')) {
+              seeded.unshift({ hex: '#0a0a0a', label: 'Primary', role: 'primary' });
+            }
+            // Fill missing roles via color theory using the primary's hue.
+            const primary = (seeded.find(c => c.role === 'primary') || seeded[0]).hex;
+            for (const role of ['secondary','accent','background','text']) {
+              if (!seeded.some(c => c.role === role)) {
+                seeded.push({ hex: deriveFromHue(role, primary), label: ROLE_LABELS[role], role, _derived: true });
+              }
+            }
+            STATE.palette_named = seeded;
+            queueSave({ palette_named: STATE.palette_named });
+          }
+
           card.innerHTML = `
             ${eyebrowHTML()}
             <h2 style="${STYLE_TITLE}">Lock in your color palette.</h2>
-            <p style="${STYLE_HELPER}">3-5 colors with names. We auto-filled from your logo — adjust as needed. Each row appears as a labelled swatch in the book.</p>
-            <div id="f-pal" style="display:flex;flex-direction:column;gap:12px;"></div>
-            ${pn.length < 5 ? `<button type="button" id="bb-add-color" class="bbw-add" style="${STYLE_ADD};margin-top:12px;">+ Add color (${pn.length}/5)</button>` : ''}
+            <p style="${STYLE_HELPER}">3–5 colors with names. Auto-filled from your logo + completed with color theory where the logo was too monochrome. Adjust freely.</p>
+            <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+              <button type="button" id="bb-pal-rederive" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:38px;font-size:11.5px;">Re-derive from primary</button>
+              ${STATE.palette_named.length < 5 ? `<button type="button" id="bb-add-color" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:38px;font-size:11.5px;">+ Add color (${STATE.palette_named.length}/5)</button>` : ''}
+            </div>
+            <div id="f-pal" style="display:flex;flex-direction:column;gap:14px;"></div>
             ${footerHTML({ hideSkip: true })}
           `;
           function renderRows() {
             const wrap = card.querySelector('#f-pal');
-            wrap.innerHTML = STATE.palette_named.map((c, i) => `
-              <div data-row="${i}" style="display:grid;grid-template-columns:64px 1fr 130px 40px;gap:10px;align-items:center;">
-                <input type="color" data-k="hex" value="${escapeAttr(c.hex)}" style="width:64px;height:48px;border:1px solid rgba(255,255,255,0.14);border-radius:12px;background:transparent;cursor:pointer;padding:2px;" />
-                <input type="text" data-k="label" placeholder="Tea Green" value="${escapeAttr(c.label ?? '')}" style="${STYLE_INPUT};height:48px;" />
-                <select data-k="role" style="height:48px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:13px;">
-                  ${['primary','secondary','accent','background','text'].map(r => `<option value="${r}" ${(c.role||'').toLowerCase()===r?'selected':''}>${r}</option>`).join('')}
-                </select>
-                <button type="button" class="bbw-rm" data-rm="${i}">×</button>
-              </div>
-            `).join('');
+            const rolesInUse = STATE.palette_named.map(c => c.role);
+            wrap.innerHTML = STATE.palette_named.map((c, i) => {
+              const isDerived = c._derived === true;
+              const rolePills = ['primary','secondary','accent','background','text'].map(r => {
+                const active = (c.role || '').toLowerCase() === r;
+                const used = rolesInUse.includes(r) && !active;
+                return `<button type="button" data-role-pill="${r}" ${used ? 'disabled' : ''} style="padding:5px 10px;border-radius:999px;font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:${used ? 'not-allowed' : 'pointer'};border:1px solid ${active ? '#a78bfa' : 'rgba(255,255,255,0.12)'};background:${active ? 'rgba(167,139,250,0.18)' : (used ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)')};color:${active ? '#fff' : (used ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.6)')};">${r === 'background' ? 'BG' : r.charAt(0).toUpperCase() + r.slice(1)}</button>`;
+              }).join('');
+              return `
+                <div data-row="${i}" style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:14px;display:flex;gap:14px;align-items:center;">
+                  <label style="flex-shrink:0;position:relative;cursor:pointer;">
+                    <input type="color" data-k="hex" value="${escapeAttr(c.hex)}" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" />
+                    <div data-k="swatch" style="width:84px;height:84px;border-radius:14px;background:${c.hex};border:1px solid rgba(255,255,255,0.12);box-shadow:0 4px 14px -4px ${c.hex}66;"></div>
+                  </label>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;">
+                    <input type="text" data-k="label" placeholder="e.g. Brand Green" value="${escapeAttr(c.label ?? '')}" style="${STYLE_INPUT};height:38px;font-size:14px;font-weight:600;" />
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                      <input type="text" data-k="hex-text" value="${escapeAttr((c.hex||'').toUpperCase())}" maxlength="7" pattern="#[0-9A-Fa-f]{6}" style="width:104px;height:32px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:9px;color:#fff;font-family:'SF Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;letter-spacing:0.04em;outline:none;text-transform:uppercase;" />
+                      ${isDerived ? '<span style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#a78bfa;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.3);padding:3px 8px;border-radius:999px;">AI · color theory</span>' : ''}
+                    </div>
+                    <div style="display:flex;gap:5px;flex-wrap:wrap;">${rolePills}</div>
+                  </div>
+                  <button type="button" data-rm="${i}" style="flex-shrink:0;width:34px;height:34px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.45);cursor:pointer;font-family:inherit;font-size:16px;line-height:1;" title="Remove color">×</button>
+                </div>
+              `;
+            }).join('');
+
             wrap.querySelectorAll('[data-row]').forEach((row, i) => {
-              row.querySelectorAll('[data-k]').forEach(el => el.addEventListener('input', () => {
-                STATE.palette_named[i] = {
-                  hex:   row.querySelector('[data-k=hex]').value,
-                  label: row.querySelector('[data-k=label]').value,
-                  role:  row.querySelector('[data-k=role]').value,
-                };
+              const colorEl = row.querySelector('[data-k=hex]');
+              const labelEl = row.querySelector('[data-k=label]');
+              const hexTextEl = row.querySelector('[data-k=hex-text]');
+              const swatchEl = row.querySelector('[data-k=swatch]');
+              const update = (patch) => {
+                STATE.palette_named[i] = { ...STATE.palette_named[i], ...patch, _derived: false };
                 queueSave({ palette_named: STATE.palette_named });
+              };
+              colorEl.addEventListener('input', () => {
+                const v = colorEl.value;
+                hexTextEl.value = v.toUpperCase();
+                swatchEl.style.background = v;
+                swatchEl.style.boxShadow = `0 4px 14px -4px ${v}66`;
+                update({ hex: v });
+              });
+              labelEl.addEventListener('input', () => update({ label: labelEl.value }));
+              hexTextEl.addEventListener('change', () => {
+                const v = hexTextEl.value.trim();
+                if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
+                  const norm = v.startsWith('#') ? v : `#${v}`;
+                  colorEl.value = norm.toLowerCase();
+                  swatchEl.style.background = norm;
+                  swatchEl.style.boxShadow = `0 4px 14px -4px ${norm}66`;
+                  update({ hex: norm });
+                } else {
+                  hexTextEl.value = (STATE.palette_named[i].hex || '').toUpperCase();
+                }
+              });
+              row.querySelectorAll('[data-role-pill]').forEach(b => b.addEventListener('click', () => {
+                if (b.disabled) return;
+                const newRole = b.dataset.rolePill;
+                STATE.palette_named[i].role = newRole;
+                STATE.palette_named[i].label = STATE.palette_named[i].label || ROLE_LABELS[newRole];
+                queueSave({ palette_named: STATE.palette_named });
+                renderRows();
               }));
               row.querySelector('[data-rm]')?.addEventListener('click', () => {
+                if (STATE.palette_named.length <= 1) return;
                 STATE.palette_named.splice(i, 1);
                 queueSave({ palette_named: STATE.palette_named });
                 renderPalette(card);
@@ -449,7 +559,24 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           renderRows();
           card.querySelector('#bb-add-color')?.addEventListener('click', () => {
             if (STATE.palette_named.length >= 5) return;
-            STATE.palette_named.push({ hex: '#888888', label: 'New', role: 'accent' });
+            const used = new Set(STATE.palette_named.map(c => c.role));
+            const nextRole = ['secondary','accent','background','text','primary'].find(r => !used.has(r)) || 'accent';
+            const primary = (STATE.palette_named.find(c => c.role === 'primary') || STATE.palette_named[0]).hex;
+            STATE.palette_named.push({
+              hex: deriveFromHue(nextRole, primary),
+              label: ROLE_LABELS[nextRole],
+              role: nextRole,
+              _derived: true,
+            });
+            queueSave({ palette_named: STATE.palette_named });
+            renderPalette(card);
+          });
+          card.querySelector('#bb-pal-rederive')?.addEventListener('click', () => {
+            const primary = (STATE.palette_named.find(c => c.role === 'primary') || STATE.palette_named[0]).hex;
+            STATE.palette_named = STATE.palette_named.map(c => {
+              if (c.role === 'primary') return c;
+              return { ...c, hex: deriveFromHue(c.role, primary), _derived: true };
+            });
             queueSave({ palette_named: STATE.palette_named });
             renderPalette(card);
           });
