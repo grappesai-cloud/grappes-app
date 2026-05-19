@@ -122,10 +122,18 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     let needsLogoGen = false;
 
     function buildSteps() {
+      const logoGenSteps = needsLogoGen ? [
+        { key: 'logo-type',  chapter: 'Brand', title: 'What kind of logo do you want?' },
+        { key: 'logo-vibe',  chapter: 'Brand', title: 'What should it feel like?' },
+        { key: 'logo-desc',  chapter: 'Brand', title: 'What should appear in it?' },
+        { key: 'logo-refs',  chapter: 'Brand', title: 'Any visual references?' },
+        { key: 'logo-color', chapter: 'Brand', title: 'A specific color in mind?' },
+        { key: 'logo-go',    chapter: 'Brand', title: 'Ready — let’s generate it.' },
+      ] : [];
       const base = [
         { key: 'logo-gate',     chapter: 'Brand',    title: 'Do you already have a logo?' },
         { key: 'identity',      chapter: 'Identity', title: 'What’s the name + tagline?' },
-        ...(needsLogoGen ? [{ key: 'logo-gen', chapter: 'Brand', title: 'Let’s generate your logo' }] : []),
+        ...logoGenSteps,
         { key: 'bio-short',     chapter: 'Story',    title: 'The one-line story.' },
         { key: 'bio-long',      chapter: 'Story',    title: 'The longer version.' },
         { key: 'numbers',       chapter: 'Numbers',  title: 'What numbers matter?' },
@@ -272,7 +280,12 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
       if (step.key === 'logo-gate')      renderLogoGate(card);
       else if (step.key === 'identity')  renderIdentity(card);
-      else if (step.key === 'logo-gen')  renderLogoGen(card);
+      else if (step.key === 'logo-type') renderLogoType(card);
+      else if (step.key === 'logo-vibe') renderLogoVibe(card);
+      else if (step.key === 'logo-desc') renderLogoDesc(card);
+      else if (step.key === 'logo-refs') renderLogoRefs(card);
+      else if (step.key === 'logo-color') renderLogoColor(card);
+      else if (step.key === 'logo-go')   renderLogoGo(card);
       else if (step.key === 'bio-short') renderBioShort(card);
       else if (step.key === 'bio-long')  renderBioLong(card);
       else if (step.key === 'numbers')   renderNumbers(card);
@@ -424,7 +437,308 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       wireFooter(card);
     }
 
-    // ── Step: logo gen (AI) ────────────────────────────────
+    // ── Logo-gen sub-step state ────────────────────────────
+    // One conversational question per screen. All answers live on a session
+    // object so the user can flow back/forward without losing them.
+    window.__LG__ = window.__LG__ || { type: 'icon', mood: '', desc: '', style: '', primaryColor: null };
+    const LG = window.__LG__;
+
+    function selectableTile({ value, title, sub, selected }) {
+      const border = selected ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.12)';
+      const bg = selected ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)';
+      const ring = selected ? 'box-shadow:0 0 0 4px rgba(249,115,22,0.16);' : '';
+      const dot = selected
+        ? `<span style="position:absolute;top:14px;right:14px;width:18px;height:18px;border-radius:50%;background:#f97316;display:inline-flex;align-items:center;justify-content:center;color:#0a0a0a;font-size:11px;font-weight:900;">&#10003;</span>`
+        : '';
+      return `
+        <button type="button" data-tile="${value}" style="position:relative;text-align:left;padding:22px 22px 20px;background:${bg};border:${border};border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;${ring}">
+          ${dot}
+          <div style="font-size:16px;font-weight:600;letter-spacing:-0.01em;margin-bottom:4px;color:#fff;">${title}</div>
+          <div style="font-size:12.5px;color:rgba(255,255,255,0.6);line-height:1.5;">${sub}</div>
+        </button>
+      `;
+    }
+
+    function selectablePill({ value, label, selected }) {
+      const border = selected ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.14)';
+      const bg = selected ? 'rgba(249,115,22,0.16)' : 'rgba(255,255,255,0.04)';
+      const color = selected ? '#fff' : 'rgba(255,255,255,0.78)';
+      const weight = selected ? '700' : '500';
+      const ring = selected ? 'box-shadow:0 0 0 3px rgba(249,115,22,0.18);' : '';
+      return `
+        <button type="button" data-pill="${value}" style="padding:11px 18px;background:${bg};border:${border};border-radius:999px;color:${color};font-family:inherit;font-size:13px;font-weight:${weight};cursor:pointer;transition:all .15s;${ring}">
+          ${label}
+        </button>
+      `;
+    }
+
+    // ── Step: logo type ────────────────────────────────────
+    function renderLogoType(card) {
+      const opts = [
+        { value: 'icon',        title: 'Just an icon', sub: 'A symbol or mark on its own. Cleanest at small sizes — favicons, app icons.' },
+        { value: 'wordmark',    title: 'A wordmark',   sub: `Your brand name ("${STATE.name || 'your brand'}") as the whole logo, in a strong custom letterform.` },
+        { value: 'combination', title: 'Icon + text',  sub: `An icon next to "${STATE.name || 'your brand'}", working together as one mark.` },
+      ];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">What kind of logo do you want?</h2>
+        <p style="${STYLE_HELPER}">Pick the shape. We'll figure out the details together over the next few questions.</p>
+        <div id="lg-type-grid" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:8px;">
+          ${opts.map(o => selectableTile({ ...o, selected: LG.type === o.value })).join('')}
+        </div>
+        ${footerHTML({ hideSkip: true, nextText: 'Continue →' })}
+      `;
+      card.querySelector('#lg-type-grid').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-tile]'); if (!b) return;
+        LG.type = b.dataset.tile;
+        renderLogoType(card);
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: logo vibe ────────────────────────────────────
+    function renderLogoVibe(card) {
+      const moods = [
+        ['minimal','Minimal · clean'], ['bold','Bold · loud'], ['editorial','Editorial · refined'],
+        ['geometric','Geometric'], ['organic','Organic · flowing'], ['playful','Playful'],
+        ['hand-drawn','Hand-drawn'], ['brutalist','Brutalist'], ['modernist','Modernist · swiss'],
+        ['retro','Retro · vintage'], ['futuristic','Futuristic'], ['luxury','Luxury'],
+      ];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">What should it feel like?</h2>
+        <p style="${STYLE_HELPER}">Pick one vibe. This becomes the mood the AI aims for.</p>
+        <div id="lg-vibe-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+          ${moods.map(([v,l]) => selectablePill({ value: v, label: l, selected: LG.mood === v })).join('')}
+        </div>
+        ${footerHTML({ skipText: 'Skip vibe', nextText: 'Continue →' })}
+      `;
+      card.querySelector('#lg-vibe-grid').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-pill]'); if (!b) return;
+        LG.mood = LG.mood === b.dataset.pill ? '' : b.dataset.pill;
+        renderLogoVibe(card);
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: logo desc ────────────────────────────────────
+    function renderLogoDesc(card) {
+      const subTitle = LG.type === 'wordmark'
+        ? `Anything you want us to know about the wordmark? (e.g. "all-caps, geometric sans, single weight")`
+        : LG.type === 'combination'
+          ? `Describe the icon that should sit next to "${STATE.name}". Name the motif, shape, or concept.`
+          : `Describe the icon. Name the motif, shape, or concept — be specific so the AI uses it.`;
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">What should appear in it?</h2>
+        <p style="${STYLE_HELPER}">${subTitle}</p>
+        <textarea id="lg-desc" maxlength="500" class="pkw-textarea" placeholder="${LG.type === 'wordmark' ? 'e.g. all-caps geometric sans, tight tracking, single weight, sharp terminals' : 'e.g. an abstract snowflake fused with the letter A — single line, sharp, geometric'}" style="${STYLE_TEXTAREA};min-height:130px;">${escapeAttr(LG.desc || '')}</textarea>
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:6px 0 14px;line-height:1.5;">The AI takes this <b style="color:rgba(255,255,255,0.7);font-weight:600;">literally</b>. Whatever you name here will land in the logo.</p>
+        <label style="${STYLE_LABEL};margin-top:6px;">Extra style keywords (optional)</label>
+        <input id="lg-style" type="text" maxlength="120" class="pkw-input" value="${escapeAttr(LG.style || '')}" placeholder="e.g. monogram, single line, swiss, art deco" style="${STYLE_INPUT}" />
+        ${footerHTML({ skipText: 'Skip details', nextText: 'Continue →' })}
+      `;
+      const ta = card.querySelector('#lg-desc');
+      ta.addEventListener('input', () => { LG.desc = ta.value; });
+      card.querySelector('#lg-style').addEventListener('input', (e) => { LG.style = e.target.value; });
+      wireFooter(card);
+    }
+
+    // ── Step: logo refs ────────────────────────────────────
+    function renderLogoRefs(card) {
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">Any visual references?</h2>
+        <p style="${STYLE_HELPER}">Up to 3 photos of logos / styles you'd like ours to <em>feel like</em> (not copy). Optional.</p>
+        <div id="lg-refs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;"></div>
+        <button type="button" id="lg-add-ref" class="pkw-add" style="${STYLE_ADD}">+ Add reference photo</button>
+        <input type="file" accept="image/*" id="lg-ref-input" style="display:none;" />
+        ${footerHTML({ skipText: 'Skip references', nextText: 'Continue →' })}
+      `;
+      function renderRefs() {
+        const wrap = card.querySelector('#lg-refs');
+        const list = STATE.assets?.logo_refs || [];
+        if (list.length === 0) { wrap.innerHTML = ''; return; }
+        wrap.innerHTML = list.map((u, i) => `
+          <div style="position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);">
+            <img src="${u}" alt="" style="width:100%;height:100%;object-fit:cover;" />
+            <button type="button" data-rm-ref="${i}" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,0.75);color:#fff;cursor:pointer;font-size:13px;font-family:inherit;">×</button>
+          </div>
+        `).join('');
+        wrap.querySelectorAll('[data-rm-ref]').forEach(b => b.addEventListener('click', () => {
+          const idx = +b.dataset.rmRef;
+          STATE.assets.logo_refs = (STATE.assets.logo_refs || []).filter((_, j) => j !== idx);
+          queueSave({ assets: { ...STATE.assets } });
+          renderRefs();
+        }));
+      }
+      renderRefs();
+      card.querySelector('#lg-add-ref').addEventListener('click', () => {
+        if ((STATE.assets?.logo_refs || []).length >= 3) return;
+        card.querySelector('#lg-ref-input').click();
+      });
+      card.querySelector('#lg-ref-input').addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        markDirty();
+        try {
+          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+          STATE.assets = { ...(STATE.assets || {}), logo_refs: [...(STATE.assets?.logo_refs || []), blob.url] };
+          queueSave({ assets: STATE.assets });
+          renderRefs();
+        } catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: logo color ───────────────────────────────────
+    function renderLogoColor(card) {
+      const presets = ['#0f5132','#6b1d1d','#1d2bd1','#e25822','#1e3a8a','#b65238','#5a6b2f','#0b1f3a','#c97064','#7a8b6f','#0a0a0a','#fafafa'];
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">A specific color in mind?</h2>
+        <p style="${STYLE_HELPER}">Skip and we'll use your kit palette if you have one, or pick a bold accent automatically.</p>
+        <div id="lg-color-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;">
+          ${presets.map(h => `
+            <button type="button" data-color="${h}" title="${h}" style="aspect-ratio:1;border-radius:12px;background:${h};border:${LG.primaryColor === h ? '3px solid #fff' : '1px solid rgba(255,255,255,0.12)'};cursor:pointer;position:relative;${LG.primaryColor === h ? 'box-shadow:0 0 0 3px rgba(249,115,22,0.4);' : ''}"></button>
+          `).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;">
+          <input id="lg-custom-color" type="color" value="${LG.primaryColor || '#f97316'}" style="width:48px;height:36px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
+          <span style="font-size:13px;color:rgba(255,255,255,0.78);font-weight:500;">Or pick any custom color</span>
+          ${LG.primaryColor ? `<button type="button" id="lg-clear-color" style="margin-left:auto;height:32px;padding:0 14px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;">Clear</button>` : ''}
+        </div>
+        ${footerHTML({ skipText: 'Skip color', nextText: 'Continue →' })}
+      `;
+      card.querySelector('#lg-color-grid').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-color]'); if (!b) return;
+        LG.primaryColor = LG.primaryColor === b.dataset.color ? null : b.dataset.color;
+        renderLogoColor(card);
+      });
+      card.querySelector('#lg-custom-color').addEventListener('input', (e) => {
+        LG.primaryColor = e.target.value;
+        renderLogoColor(card);
+      });
+      card.querySelector('#lg-clear-color')?.addEventListener('click', () => {
+        LG.primaryColor = null;
+        renderLogoColor(card);
+      });
+      wireFooter(card);
+    }
+
+    // ── Step: logo go (generate + review) ──────────────────
+    function renderLogoGo(card) {
+      const logo = STATE.assets?.logo;
+      const refsCount = (STATE.assets?.logo_refs || []).length;
+      const typeLabel = ({ icon: 'Icon only', wordmark: 'Wordmark', combination: 'Icon + text' })[LG.type] || LG.type;
+      const summaryRow = (k, v) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12.5px;"><span style="color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">${k}</span><span style="color:#fff;text-align:right;max-width:60%;">${v}</span></div>`;
+      card.innerHTML = `
+        ${eyebrowHTML()}
+        <h2 style="${STYLE_TITLE}">${logo ? 'Here it is.' : 'Ready — let&rsquo;s generate it.'}</h2>
+        <p style="${STYLE_HELPER}">${logo ? 'Happy with it? Continue. Want a different direction? Go back and adjust, then regenerate here.' : 'Quick recap of your answers, then we&rsquo;ll create your logo.'}</p>
+
+        <div id="lg-result" style="${logo ? '' : 'display:none;'}margin-bottom:18px;"></div>
+
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:14px 18px;margin-bottom:18px;">
+          ${summaryRow('Type', typeLabel)}
+          ${summaryRow('Vibe', LG.mood || '—')}
+          ${summaryRow('Description', LG.desc ? (LG.desc.length > 64 ? LG.desc.slice(0, 64) + '…' : LG.desc) : '—')}
+          ${summaryRow('Style keywords', LG.style || '—')}
+          ${summaryRow('References', refsCount > 0 ? refsCount + ' photo' + (refsCount === 1 ? '' : 's') : '—')}
+          ${summaryRow('Color', LG.primaryColor ? `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:3px;background:${LG.primaryColor};border:1px solid rgba(255,255,255,0.2);"></span>${LG.primaryColor}</span>` : 'Auto')}
+        </div>
+
+        <button type="button" id="lg-go" style="${STYLE_BTN_PRIMARY};height:54px;width:100%;font-size:14.5px;background:linear-gradient(135deg,#f97316 0%, #a78bfa 140%);">
+          ${logo ? 'Generate another version' : 'Generate my logo'}
+        </button>
+
+        <div id="lg-progress" style="display:none;font-size:12.5px;color:rgba(255,255,255,0.65);margin-top:12px;">
+          <div data-pstep="1" style="padding:6px 0;color:#f97316;">1. Generating with AI…</div>
+          <div data-pstep="2" style="padding:6px 0;color:rgba(255,255,255,0.35);">2. Removing background…</div>
+          <div data-pstep="3" style="padding:6px 0;color:rgba(255,255,255,0.35);">3. Vectorizing to SVG…</div>
+        </div>
+        <p id="lg-error" style="display:none;font-size:12.5px;color:#ff8a8a;margin-top:8px;"></p>
+
+        ${footerHTML({ hideSkip: true, nextText: logo ? 'Looks good — continue →' : 'Continue →' })}
+      `;
+
+      function renderResult() {
+        const wrap = card.querySelector('#lg-result');
+        const url = STATE.assets?.logo;
+        if (!url) { wrap.style.display = 'none'; return; }
+        wrap.style.display = 'block';
+        wrap.innerHTML = `
+          <div style="background:#fafafa;border-radius:18px;padding:34px;display:flex;align-items:center;justify-content:center;min-height:220px;border:1px solid rgba(255,255,255,0.08);">
+            <img src="${url}" alt="" style="max-width:260px;max-height:180px;object-fit:contain;" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:rgba(255,255,255,0.55);font-weight:600;letter-spacing:0.04em;">
+            ${STATE.assets?.logo_svg ? '<span style="color:#6ee7a3;">SVG ready</span>' : '<span>Vectorizing…</span>'}
+          </div>
+        `;
+      }
+      renderResult();
+
+      function setPStep(n, status) {
+        card.querySelectorAll('#lg-progress [data-pstep]').forEach(el => {
+          const s = +el.dataset.pstep;
+          if (s < n) { el.style.color = '#6ee7a3'; }
+          else if (s === n) { el.style.color = status === 'done' ? '#6ee7a3' : '#f97316'; }
+          else { el.style.color = 'rgba(255,255,255,0.35)'; }
+        });
+      }
+
+      card.querySelector('#lg-go').addEventListener('click', async () => {
+        const goBtn = card.querySelector('#lg-go');
+        const err = card.querySelector('#lg-error');
+        const prog = card.querySelector('#lg-progress');
+        const referenceImages = (STATE.assets?.logo_refs || []).slice(0, 3);
+        const baseDesc = (LG.desc && LG.desc.length >= 4) ? LG.desc : `Logo for ${STATE.name}${STATE.tagline ? ' — ' + STATE.tagline : ''}`;
+
+        err.style.display = 'none';
+        prog.style.display = 'block';
+        const oldLabel = goBtn.textContent;
+        goBtn.disabled = true; goBtn.textContent = 'Generating…';
+
+        setPStep(1, 'active');
+        const t2 = setTimeout(() => setPStep(2, 'active'), 8000);
+        const t3 = setTimeout(() => setPStep(3, 'active'), 18000);
+
+        try {
+          const r = await fetch(`/api/kits/${kitId}/generate-logo`, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              description: baseDesc,
+              style: LG.style || undefined,
+              primaryColor: LG.primaryColor || undefined,
+              referenceImages,
+              logoType: LG.type,
+              mood: LG.mood || undefined,
+            }),
+          });
+          const data = await r.json();
+          clearTimeout(t2); clearTimeout(t3);
+          if (!r.ok) {
+            err.textContent = data.error || 'Generation failed.';
+            err.style.display = 'block'; prog.style.display = 'none';
+            goBtn.disabled = false; goBtn.textContent = oldLabel;
+            return;
+          }
+          setPStep(3, 'done');
+          STATE.assets = { ...(STATE.assets || {}), logo: data.pngUrl || data.logo, logo_svg: data.svgUrl || data.logo_svg };
+          renderLogoGo(card); // re-render with the result
+          setTimeout(() => { prog.style.display = 'none'; }, 800);
+        } catch (e) {
+          clearTimeout(t2); clearTimeout(t3);
+          err.textContent = 'Network error.';
+          err.style.display = 'block'; prog.style.display = 'none';
+          goBtn.disabled = false; goBtn.textContent = oldLabel;
+        }
+      });
+
+      wireFooter(card, { onNext: async () => !!STATE.assets?.logo || (alert('Generate your logo first (or go back to skip).'), false) });
+    }
+
+    // ── (deprecated, retained for safety if cached) ────────
     function renderLogoGen(card) {
       const logo = STATE.assets?.logo;
       const svg = STATE.assets?.logo_svg;
