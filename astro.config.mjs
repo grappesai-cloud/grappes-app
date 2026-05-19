@@ -5,7 +5,7 @@ import sentry from '@sentry/astro';
 
 export default defineConfig({
   output: 'server',
-  adapter: vercel(),
+  adapter: vercel({ maxDuration: 800 }),
   security: { checkOrigin: false }, // CSRF handled via auth middleware — Astro's checkOrigin breaks Vercel preview URLs
 
   server: {
