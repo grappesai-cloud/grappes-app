@@ -212,9 +212,11 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
   }
   .page-head-block {
     position: absolute; top: 26mm; left: 16mm; right: 16mm;
+    max-height: 56mm;
+    overflow: hidden;
   }
   .page-body {
-    position: absolute; left: 16mm; right: 16mm; top: 68mm; bottom: 22mm;
+    position: absolute; left: 16mm; right: 16mm; top: 88mm; bottom: 22mm;
   }
 
   /* ── Page 1: Cover ───────────────────────────────────────────────── */
@@ -249,10 +251,15 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
     font-family: var(--bb-heading); font-weight: 700;
     font-size: 13mm; letter-spacing: -0.04em;
     margin-bottom: 14mm;
+    overflow: hidden;
+    padding: 3mm;
   }
   .cover-glyph img {
-    max-width: 70%; max-height: 70%; object-fit: contain;
+    width: 100%; height: 100%;
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
     filter: brightness(0) invert(1);
+    padding: 1mm;
   }
   .cover-glyph.dark-on-light img { filter: none; }
   .cover-brand-name {
@@ -288,7 +295,7 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
 
   /* ── Page 2: Logo system ─────────────────────────────────────────── */
   .logo-grid {
-    position: absolute; left: 16mm; right: 16mm; top: 70mm; bottom: 22mm;
+    position: absolute; left: 16mm; right: 16mm; top: 90mm; bottom: 22mm;
     display: grid;
     grid-template-rows: 1fr 1fr 1fr;
     gap: 5mm;
@@ -424,16 +431,17 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
     color: #0a0a0a;
     max-width: 170mm;
     margin-bottom: 14mm;
+    position: relative;
   }
   .voice-quote::before {
     content: '“';
+    display: block;
     font-family: var(--bb-heading);
     font-size: 90px;
+    line-height: 0.8;
     color: var(--accentColor);
-    line-height: 0;
-    margin-right: 0.05em;
-    vertical-align: -0.18em;
     font-weight: 700;
+    margin-bottom: 6mm;
   }
   .voice-kwds { display: flex; flex-wrap: wrap; gap: 8px; }
   .voice-pill {
@@ -470,7 +478,10 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
   .donts-title { color: #c0392b; }
   .donts-list { display: flex; flex-direction: column; gap: 6mm; }
   .donts-row {
-    display: flex; align-items: flex-start; gap: 8mm;
+    display: grid;
+    grid-template-columns: 14mm 11mm 1fr;
+    align-items: center;
+    column-gap: 6mm;
     font-size: 15px; line-height: 1.45;
     padding-bottom: 5mm;
     border-bottom: 1px solid rgba(0,0,0,0.07);
@@ -480,16 +491,16 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
     font-size: 12px; font-weight: 700;
     color: #c0392b;
     letter-spacing: 0.06em;
-    min-width: 14mm;
+    align-self: center;
   }
   .donts-x {
-    flex-shrink: 0;
     width: 11mm; height: 11mm; border-radius: 50%;
     background: #c0392b; color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-weight: 800; font-size: 16px; line-height: 1;
+    align-self: center;
   }
-  .donts-text { color: #0a0a0a; }
+  .donts-text { color: #0a0a0a; align-self: center; }
 
   /* ── Credits page ────────────────────────────────────────────────── */
   .credits-page {
@@ -505,6 +516,14 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
     font-family: var(--bb-heading); font-weight: 700;
     font-size: 13mm; letter-spacing: -0.04em;
     margin-bottom: 14mm;
+    overflow: hidden;
+    padding: 3mm;
+  }
+  .credits-mono img {
+    width: 100%; height: 100%;
+    max-width: 100%; max-height: 100%;
+    object-fit: contain;
+    padding: 1mm;
   }
   .credits-name {
     font-family: var(--bb-heading);
@@ -539,6 +558,13 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
 
 </head>
 <body>
+{showApps && (
+  <div aria-hidden="true" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;left:-9999px;top:-9999px;">
+    {validApps.map((id) => (
+      <img src={mockupSrc(id)} alt="" loading="eager" decoding="async" />
+    ))}
+  </div>
+)}
 <div class="bb">
 
   {/* ───────── Page 1 — Cover ───────── */}
@@ -772,7 +798,7 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
               const t = MOCKUPS[id];
               return (
                 <div class="apps-cell">
-                  <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
+                  <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} loading="eager" decoding="async" /></div>
                   <div class="apps-label">{t.label}</div>
                 </div>
               );
@@ -800,8 +826,8 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
         <div class="donts-list">
           {dontsList.map((d, i) => (
             <div class="donts-row">
-              <div class="donts-x">×</div>
               <div class="donts-num">{String(i + 1).padStart(2, '0')}</div>
+              <div class="donts-x">×</div>
               <div class="donts-text">{d}</div>
             </div>
           ))}
@@ -829,7 +855,44 @@ const paletteCols = palette.length <= 4 ? 2 : 3;
 
 {printMode && (
   <script is:inline>
-    window.addEventListener('load', () => setTimeout(() => window.print(), 600));
+    (function() {
+      function waitForImages() {
+        var imgs = Array.prototype.slice.call(document.images || []);
+        var promises = imgs.map(function (img) {
+          if (img.complete && img.naturalWidth > 0) {
+            return (typeof img.decode === 'function')
+              ? img.decode().catch(function(){})
+              : Promise.resolve();
+          }
+          return new Promise(function (resolve) {
+            var done = false;
+            function settle() {
+              if (done) return;
+              done = true;
+              if (typeof img.decode === 'function') {
+                img.decode().catch(function(){}).then(resolve);
+              } else {
+                resolve();
+              }
+            }
+            img.addEventListener('load', settle, { once: true });
+            img.addEventListener('error', settle, { once: true });
+          });
+        });
+        var timeout = new Promise(function (resolve) { setTimeout(resolve, 12000); });
+        return Promise.race([Promise.all(promises), timeout]);
+      }
+      function kickoff() {
+        waitForImages().then(function () {
+          setTimeout(function () { window.print(); }, 120);
+        });
+      }
+      if (document.readyState === 'complete') {
+        kickoff();
+      } else {
+        window.addEventListener('load', kickoff);
+      }
+    })();
   </script>
 )}
 </body>
