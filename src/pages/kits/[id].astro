@@ -807,22 +807,49 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
         // ── Step: don'ts ───────────────────────────────────────
         function renderDonts(card) {
+          // Suggestion presets — clicking adds to the list. Helps non-designers
+          // get started without a blank canvas.
+          const SUGGESTIONS = [
+            'Don’t stretch or skew the logo',
+            'Don’t recolor outside the palette',
+            'Don’t apply shadows, glows, or gradients',
+            'Don’t place the logo on busy photography',
+            'Don’t rotate or angle the logo',
+            'Don’t use the logo smaller than 24px',
+            'Don’t crop or mask the brandmark',
+            'Don’t mix brand fonts with system defaults',
+          ];
+
           const list = (STATE.donts || []).slice();
           if (list.length === 0) list.push('');
+
           card.innerHTML = `
             ${eyebrowHTML()}
             <h2 style="${STYLE_TITLE}">Set a few rules.</h2>
-            <p style="${STYLE_HELPER}">3-5 rules of thumb. e.g. "Don't stretch the logo", "Don't recolor outside the palette", "Don't use shadows or gradients."</p>
+            <p style="${STYLE_HELPER}">3–5 things people should never do with your brand. Tap a suggestion below or type your own.</p>
+
+            <label style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.45);display:block;margin-bottom:10px;">Quick suggestions</label>
+            <div id="bb-dont-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px;">
+              ${SUGGESTIONS.map(s => `<button type="button" data-suggest="${escapeAttr(s)}" style="padding:7px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:999px;color:rgba(255,255,255,0.78);font-family:inherit;font-size:12px;cursor:pointer;transition:all .15s;">${escapeHtml(s)}</button>`).join('')}
+            </div>
+
+            <label style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.45);display:block;margin-bottom:10px;">Your rules <span id="bb-dont-count" style="color:#f87171;font-size:10.5px;font-weight:700;margin-left:4px;">(${list.filter(s => s && s.trim()).length}/5)</span></label>
             <div id="f-donts" style="display:flex;flex-direction:column;gap:10px;"></div>
-            <button type="button" id="bb-add-dont" class="bbw-add" style="${STYLE_ADD};margin-top:12px;">+ Add rule</button>
+            <button type="button" id="bb-add-dont" style="margin-top:12px;width:100%;height:42px;background:transparent;border:1px dashed rgba(255,255,255,0.18);border-radius:12px;color:rgba(255,255,255,0.6);font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:0.04em;cursor:pointer;transition:all .15s;">+ Add another rule</button>
             ${footerHTML({ skipText: "Skip — no don'ts", nextText: 'Review →' })}
           `;
+          function updateCount() {
+            const n = list.filter(s => s && s.trim()).length;
+            const el = card.querySelector('#bb-dont-count');
+            if (el) el.textContent = `(${n}/5)`;
+          }
           function render() {
             const wrap = card.querySelector('#f-donts');
             wrap.innerHTML = list.map((d, i) => `
-              <div data-row="${i}" style="display:grid;grid-template-columns:1fr 40px;gap:10px;align-items:center;">
-                <input type="text" data-k="text" value="${escapeAttr(d)}" placeholder="Don't stretch the logo" style="${STYLE_INPUT};height:42px;" />
-                <button type="button" class="bbw-rm" data-rm="${i}">×</button>
+              <div data-row="${i}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(248,113,113,0.05);border:1px solid rgba(248,113,113,0.18);border-radius:14px;">
+                <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(248,113,113,0.18);border:1px solid rgba(248,113,113,0.4);color:#fca5a5;font-family:'SF Mono',ui-monospace,monospace;font-size:13px;font-weight:700;">${i + 1}</span>
+                <input type="text" data-k="text" value="${escapeAttr(d)}" placeholder="e.g. Don’t apply gradients to the logo" style="flex:1;min-width:0;height:32px;background:transparent;border:0;color:#fff;font-family:inherit;font-size:14px;font-weight:500;outline:none;" />
+                <button type="button" data-rm="${i}" title="Remove rule" style="flex-shrink:0;width:30px;height:30px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.45);cursor:pointer;font-family:inherit;font-size:14px;line-height:1;">×</button>
               </div>
             `).join('');
             wrap.querySelectorAll('[data-row]').forEach((row, i) => {
@@ -830,21 +857,53 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
                 list[i] = e.target.value;
                 STATE.donts = list.filter(s => s && s.trim()).slice(0, 5);
                 queueSave({ donts: STATE.donts });
+                updateCount();
               });
               row.querySelector('[data-rm]').addEventListener('click', () => {
                 list.splice(i, 1);
+                if (list.length === 0) list.push('');
                 STATE.donts = list.filter(s => s && s.trim()).slice(0, 5);
                 queueSave({ donts: STATE.donts });
                 render();
+                updateCount();
               });
             });
           }
           render();
+          updateCount();
+
           card.querySelector('#bb-add-dont').addEventListener('click', () => {
             if (list.length >= 5) return;
             list.push('');
             render();
+            updateCount();
+            const inputs = card.querySelectorAll('#f-donts input');
+            inputs[inputs.length - 1]?.focus();
           });
+
+          card.querySelector('#bb-dont-suggestions').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-suggest]');
+            if (!b) return;
+            const txt = b.dataset.suggest;
+            // If the current last row is empty, fill it; otherwise push a new row.
+            const lastIdx = list.length - 1;
+            if (list[lastIdx] === '' || list[lastIdx] == null) {
+              list[lastIdx] = txt;
+            } else if (list.length < 5) {
+              list.push(txt);
+            } else {
+              return; // already 5
+            }
+            STATE.donts = list.filter(s => s && s.trim()).slice(0, 5);
+            queueSave({ donts: STATE.donts });
+            render();
+            updateCount();
+            // Visual feedback: dim the suggestion after picking
+            b.style.opacity = '0.4';
+            b.style.cursor = 'default';
+            b.disabled = true;
+          });
+
           wireFooter(card);
         }
 
