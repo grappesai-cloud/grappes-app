@@ -51,6 +51,10 @@ function rowToAnalysis(r: any): Analysis {
 }
 
 export async function insertAnalysis(a: NewAnalysis): Promise<void> {
+  // postgres-js handles JSONB via plain JSON strings when the column type is
+  // jsonb — pass JSON.stringify(...) for objects, null otherwise. Using
+  // sql.json() inside a tagged template was failing with a type error.
+  const progressJson = a.progress ? JSON.stringify(a.progress) : null;
   await sql`
     INSERT INTO reel_analyses (
       id, user_id, blob_url, blob_pathname, file_name, file_size_bytes,
@@ -58,7 +62,7 @@ export async function insertAnalysis(a: NewAnalysis): Promise<void> {
     )
     VALUES (
       ${a.id}, ${a.userId}, ${a.blobUrl}, ${a.blobPathname}, ${a.fileName}, ${a.fileSizeBytes},
-      ${a.status ?? 'pending'}, ${a.progress ? sql.json(a.progress as any) : null}
+      ${a.status ?? 'pending'}, ${progressJson}::jsonb
     )
   `;
 }
@@ -81,7 +85,9 @@ export async function listAnalysesByUser(userId: string, limit = 8): Promise<Ana
 export async function setProgress(id: string, progress: ProcessingProgress): Promise<void> {
   await sql`
     UPDATE reel_analyses
-    SET progress = ${sql.json(progress as any)}, status = 'processing', updated_at = now()
+    SET progress = ${JSON.stringify(progress)}::jsonb,
+        status = 'processing',
+        updated_at = now()
     WHERE id = ${id}
   `;
 }
@@ -90,8 +96,8 @@ export async function setDone(id: string, result: AnalysisResult): Promise<void>
   const finalProgress: ProcessingProgress = { step: 'finalizing', pct: 100, message: 'Done' };
   await sql`
     UPDATE reel_analyses
-    SET result = ${sql.json(result as any)},
-        progress = ${sql.json(finalProgress as any)},
+    SET result = ${JSON.stringify(result)}::jsonb,
+        progress = ${JSON.stringify(finalProgress)}::jsonb,
         status = 'done',
         updated_at = now()
     WHERE id = ${id}
@@ -107,9 +113,10 @@ export async function setFailed(id: string, error: string): Promise<void> {
 }
 
 export async function saveIntakeAnswers(id: string, answers: IntakeAnswers): Promise<void> {
+  const patch = JSON.stringify({ intakeAnswers: answers });
   await sql`
     UPDATE reel_analyses
-    SET progress = COALESCE(progress, '{}'::jsonb) || ${sql.json({ intakeAnswers: answers } as any)},
+    SET progress = COALESCE(progress, '{}'::jsonb) || ${patch}::jsonb,
         updated_at = now()
     WHERE id = ${id}
   `;
