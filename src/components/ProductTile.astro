@@ -23,17 +23,45 @@ const {
   isNew = false,
 } = Astro.props;
 
-const Tag = comingSoon ? 'div' : 'a';
-
 // Stable per-card id so animations don't collide across tiles.
 const cardId = `pt-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 ---
 
-<Tag
-  {...(comingSoon ? {} : { href })}
+{comingSoon && (
+  <div
+    id={cardId}
+    class="pt-card pt-card--soon"
+    style={`--pt-accent:${accent};`}
+  >
+    <span class="pt-grid" aria-hidden="true"></span>
+    <div class="pt-inner">
+      <div class="pt-head">
+        <div class="pt-icon">
+          <div class="pt-icon-bg" aria-hidden="true"></div>
+          <div class="pt-icon-svg" set:html={icon}></div>
+        </div>
+        <span class="pt-badge pt-badge--soon">Soon</span>
+      </div>
+      <div class="pt-body">
+        <h3 class="pt-name">{name}</h3>
+        <p class="pt-tagline">{tagline}</p>
+      </div>
+      {meter && (
+        <div class="pt-foot">
+          <span class="pt-meter">{meter}</span>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{!comingSoon && (
+<a
+  href={href}
   id={cardId}
-  class={`pt-card${comingSoon ? ' pt-card--soon' : ''}`}
+  class="pt-card"
   style={`--pt-accent:${accent};`}
+  data-tile-href={href}
 >
   <!-- Animated gradient border (clipped via mask, so only the ring shows) -->
   <span class="pt-ring" aria-hidden="true"></span>
@@ -72,7 +100,8 @@ const cardId = `pt-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
       )}
     </div>
   </div>
-</Tag>
+</a>
+)}
 
 <style>
   .pt-card {
