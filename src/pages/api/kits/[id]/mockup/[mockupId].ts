@@ -13,18 +13,24 @@ import { MOCKUPS, isMockupId } from "../../../../../lib/mockups";
 export const maxDuration = 30;
 
 export const GET: APIRoute = async ({ locals, params }) => {
-  const user = locals.user;
-  if (!user) return new Response("Sign in first.", { status: 401 });
   if (!params.id || !params.mockupId) return new Response("Missing param.", { status: 400 });
   if (!isMockupId(params.mockupId)) return new Response("Unknown mockup.", { status: 404 });
 
   const client = createAdminClient();
   const { data: kit } = await client
     .from("press_kits")
-    .select("id, user_id, assets")
+    .select("id, user_id, status, assets")
     .eq("id", params.id)
     .maybeSingle();
-  if (!kit || kit.user_id !== user.id) return new Response("Not found", { status: 404 });
+  if (!kit) return new Response("Not found", { status: 404 });
+
+  // Owner can always view their own mockups; anyone can view a published
+  // kit's mockups (the public /kit/<slug> page embeds them).
+  const user = locals.user;
+  const isOwner = user && user.id === kit.user_id;
+  if (!isOwner && kit.status !== "published") {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   const logoUrl = (kit.assets as any)?.logo as string | undefined;
   const template = MOCKUPS[params.mockupId];

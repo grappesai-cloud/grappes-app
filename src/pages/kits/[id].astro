@@ -962,17 +962,42 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
             </div>
           `).join('') + `
             <div style="margin-top:22px;display:flex;flex-direction:column;gap:10px;">
-              ${published
-                ? `<a href="/kit/${STATE.slug}" target="_blank" style="height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.02em;">View live book ↗</a>
-                   <a href="/kit/${STATE.slug}?print=1" target="_blank" style="height:52px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:#a78bfa;color:#0a0a0a;border-radius:999px;font-family:inherit;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.04em;">Download PDF ↓</a>`
-                : `<button type="button" id="bb-publish-btn" class="bbw-primary" style="height:54px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Publish for €15 →</button>
-                   <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:0;line-height:1.5;">You'll be charged once. Shareable link + PDF unlock immediately after.</p>`
-              }
+              <button type="button" id="bb-download-btn" style="height:54px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Open + Download PDF →</button>
+              <button type="button" id="bb-share-btn" style="height:42px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;">Get shareable link</button>
+              <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:6px 0 0;line-height:1.5;">Free download. Use your browser's Save-as-PDF on the print view.</p>
             </div>
           `;
           recap.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
-          recap.querySelector('#bb-publish-btn')?.addEventListener('click', publishFlow);
+          recap.querySelector('#bb-download-btn')?.addEventListener('click', () => finalizeAndOpen(true));
+          recap.querySelector('#bb-share-btn')?.addEventListener('click', () => finalizeAndOpen(false));
           recap.querySelector('#bb-use-sample')?.addEventListener('click', loadSampleContent);
+        }
+
+        async function finalizeAndOpen(printMode) {
+          let slug = STATE.slug;
+          if (!slug) {
+            try {
+              const r = await fetch(`/api/kits/${kitId}/finalize`, { method: 'POST' });
+              const data = await r.json();
+              if (r.ok && data.slug) {
+                slug = data.slug;
+                STATE.slug = slug;
+                STATE.status = 'published';
+              } else {
+                alert(data.error || 'Could not finalize.');
+                return;
+              }
+            } catch (e) {
+              alert('Network error.');
+              return;
+            }
+          }
+          if (printMode) {
+            window.open(`/kit/${slug}?print=1`, '_blank');
+          } else {
+            navigator.clipboard?.writeText(`${location.origin}/kit/${slug}`).catch(() => {});
+            alert(`Link copied: ${location.origin}/kit/${slug}`);
+          }
         }
 
         async function loadSampleContent() {
@@ -1008,18 +1033,8 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           if (btn) { btn.disabled = false; btn.textContent = 'Use sample content'; }
         }
 
-        async function publishFlow() {
-          const btn = document.getElementById('bb-publish-btn');
-          btn.disabled = true; btn.textContent = 'Opening checkout…';
-          await flushSave();
-          try {
-            const r = await fetch(`/api/kits/${kitId}/publish`, { method: 'POST' });
-            const data = await r.json();
-            if (data.url) { window.location.href = data.url; return; }
-            alert(data.error || 'Payment error.');
-          } catch { alert('Network error.'); }
-          btn.disabled = false; btn.textContent = 'Publish for €15 →';
-        }
+        // (publishFlow removed — billing was retired; brand book downloads
+        //  are free now via /api/kits/[id]/finalize + Save-as-PDF in browser.)
 
         function initialStepFromHash() {
           const m = (window.location.hash || '').match(/step=([\w-]+)/);
@@ -2827,12 +2842,9 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         </div>
       `).join('') + `
         <div style="margin-top:22px;display:flex;flex-direction:column;gap:10px;">
-          ${published
-            ? `<a href="/kit/${STATE.slug}" target="_blank" style="height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.02em;">View live kit ↗</a>
-               <a href="/kit/${STATE.slug}?print=1" target="_blank" style="height:52px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:#f97316;color:#0a0a0a;border-radius:999px;font-family:inherit;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.04em;">Download PDF ↓</a>`
-            : `<button type="button" id="publish-btn" class="pkw-primary" style="height:54px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Publish for €15 →</button>
-               <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:0;line-height:1.5;">You’ll be charged once. Shareable link + PDF unlock immediately after.</p>`
-          }
+          <button type="button" id="pk-download-btn" style="height:54px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Open + Download PDF →</button>
+          <button type="button" id="pk-share-btn" style="height:42px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;letter-spacing:0.02em;cursor:pointer;">Get shareable link</button>
+          <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:6px 0 0;line-height:1.5;">Free download. Use your browser's Save-as-PDF on the print view.</p>
         </div>
       `;
 
@@ -2850,8 +2862,8 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       recap.prepend(head);
 
       recap.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
-      const pubBtn = recap.querySelector('#publish-btn');
-      if (pubBtn) pubBtn.addEventListener('click', publishFlow);
+      recap.querySelector('#pk-download-btn')?.addEventListener('click', () => pkFinalizeAndOpen(true));
+      recap.querySelector('#pk-share-btn')?.addEventListener('click', () => pkFinalizeAndOpen(false));
       recap.querySelector('#use-sample')?.addEventListener('click', loadSampleContent);
     }
 
@@ -2915,17 +2927,32 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       if (btn) { btn.disabled = false; btn.textContent = 'Use sample content (DENY-like)'; }
     }
 
-    async function publishFlow() {
-      const btn = document.getElementById('publish-btn');
-      btn.disabled = true; btn.textContent = 'Opening checkout…';
+    async function pkFinalizeAndOpen(printMode) {
       await flushSave();
-      try {
-        const r = await fetch(`/api/kits/${kitId}/publish`, { method: 'POST' });
-        const data = await r.json();
-        if (data.url) { window.location.href = data.url; return; }
-        alert(data.error || 'Payment error.');
-      } catch { alert('Network error.'); }
-      btn.disabled = false; btn.textContent = 'Publish for €15 →';
+      let slug = STATE.slug;
+      if (!slug) {
+        try {
+          const r = await fetch(`/api/kits/${kitId}/finalize`, { method: 'POST' });
+          const data = await r.json();
+          if (r.ok && data.slug) {
+            slug = data.slug;
+            STATE.slug = slug;
+            STATE.status = 'published';
+          } else {
+            alert(data.error || 'Could not finalize.');
+            return;
+          }
+        } catch (e) {
+          alert('Network error.');
+          return;
+        }
+      }
+      if (printMode) {
+        window.open(`/kit/${slug}?print=1`, '_blank');
+      } else {
+        navigator.clipboard?.writeText(`${location.origin}/kit/${slug}`).catch(() => {});
+        alert(`Link copied: ${location.origin}/kit/${slug}`);
+      }
     }
 
     // ── Palette presets ────────────────────────────────────
