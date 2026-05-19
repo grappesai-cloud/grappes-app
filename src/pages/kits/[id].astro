@@ -54,7 +54,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
   {justPublished && (
     <div style="background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:14px 18px;color:#6ee7a3;font-size:13.5px;margin-bottom:22px;text-align:center;">
-      ✓ Published. Your shareable link is grappes.dev/kit/{k.slug ?? '…'}
+      Published — your shareable link is grappes.dev/kit/{k.slug ?? '…'}
     </div>
   )}
 
@@ -77,7 +77,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
   <div id="wiz-stage"></div>
 
   {/* ─── Review stage (only screen with live preview) ──── */}
-  <div id="review-stage" hidden style="display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start;margin-top:6px;">
+  <div id="review-stage" hidden style="grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start;margin-top:6px;">
     <aside id="review-recap" style="background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:24px;max-height:calc(100vh - 140px);overflow-y:auto;position:sticky;top:90px;"></aside>
     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.55);font-weight:700;">
@@ -193,8 +193,12 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
       window.location.hash = `step=${STEPS[i].key}`;
       renderProgress();
       const review = STEPS[i].key === 'review';
-      document.getElementById('wiz-stage').hidden = review;
-      document.getElementById('review-stage').hidden = !review;
+      const wiz = document.getElementById('wiz-stage');
+      const rev = document.getElementById('review-stage');
+      wiz.hidden = review;
+      wiz.style.display = review ? 'none' : '';
+      rev.hidden = !review;
+      rev.style.display = review ? 'grid' : 'none';
       if (review) { renderReview(); reloadPreview(); }
       else { renderStep(); }
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -286,15 +290,15 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         <p style="${STYLE_HELPER}">Either upload yours or we’ll generate one with AI based on your name + style. You can change it later.</p>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;" id="lg-tiles">
-          <button type="button" class="pkw-tile ${hasLogo ? 'is-active' : ''}" data-choice="yes" style="text-align:left;padding:22px 22px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
-            <div style="font-size:24px;margin-bottom:8px;">\u{1F4E4}</div>
-            <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;">Yes, I have one</div>
-            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:4px;line-height:1.45;">Upload PNG / SVG / JPG. We’ll extract your palette automatically.</div>
+          <button type="button" class="pkw-tile ${hasLogo ? 'is-active' : ''}" data-choice="yes" style="text-align:left;padding:24px 24px 22px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
+            <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:14px;">A · Upload</div>
+            <div style="font-size:16px;font-weight:600;letter-spacing:-0.015em;">Yes, I have one</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.5;">Upload PNG / SVG / JPG. We’ll extract your palette automatically.</div>
           </button>
-          <button type="button" class="pkw-tile" data-choice="no" style="text-align:left;padding:22px 22px 20px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
-            <div style="font-size:24px;margin-bottom:8px;">✨</div>
-            <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;">No, generate with AI</div>
-            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:4px;line-height:1.45;">We’ll create a clean vector mark from your name + tagline.</div>
+          <button type="button" class="pkw-tile" data-choice="no" style="text-align:left;padding:24px 24px 22px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:16px;color:#fff;font-family:inherit;cursor:pointer;transition:all .15s;">
+            <div style="font-size:10.5px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#a78bfa;margin-bottom:14px;">B · Generate with AI</div>
+            <div style="font-size:16px;font-weight:600;letter-spacing:-0.015em;">No, generate one</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.55);margin-top:6px;line-height:1.5;">We’ll create a clean vector mark from your name + tagline.</div>
           </button>
         </div>
 
@@ -456,7 +460,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           </div>
 
           <button type="button" id="lg-go" class="pkw-primary" style="${STYLE_BTN_PRIMARY};height:52px;width:100%;margin-top:4px;background:linear-gradient(135deg,#f97316 0%, #a78bfa 140%);">
-            ✨ Generate logo
+            Generate logo
           </button>
 
           <div id="lg-progress" style="display:none;font-size:12.5px;color:rgba(255,255,255,0.65);">
@@ -578,7 +582,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           // Pull fresh state for assets
           STATE.assets = { ...(STATE.assets || {}), logo: data.pngUrl || data.logo, logo_svg: data.svgUrl || data.logo_svg };
           renderResult();
-          goBtn.disabled = false; goBtn.textContent = '✨ Generate another';
+          goBtn.disabled = false; goBtn.textContent = 'Generate another';
           setTimeout(() => { prog.style.display = 'none'; }, 800);
         } catch (e) {
           clearTimeout(t2); clearTimeout(t3);
@@ -1014,8 +1018,10 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     stepIdx = initialStepFromHash();
     renderProgress();
     if (STEPS[stepIdx].key === 'review') {
-      document.getElementById('wiz-stage').hidden = true;
-      document.getElementById('review-stage').hidden = false;
+      const wiz = document.getElementById('wiz-stage');
+      const rev = document.getElementById('review-stage');
+      wiz.hidden = true; wiz.style.display = 'none';
+      rev.hidden = false; rev.style.display = 'grid';
       renderReview(); reloadPreview();
     } else {
       renderStep();
