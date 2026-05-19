@@ -33,10 +33,18 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
   const client = createAdminClient();
   const { data: kit } = await client
     .from("press_kits")
-    .select("id, user_id, name, assets")
+    .select("id, user_id, name, assets, palette")
     .eq("id", params.id)
     .maybeSingle();
   if (!kit || kit.user_id !== user.id) return json({ error: "Not found" }, 404);
+
+  // Pull palette colors so the generator stays on brand. Skip when palette is
+  // still the default (untouched by user, no logo extraction yet).
+  const pal = (kit.palette as any) ?? {};
+  const paletteColors: string[] = [];
+  if (pal.primary && pal.primary !== "#0a0a0a") paletteColors.push(pal.primary);
+  if (pal.accent && pal.accent !== "#22d3ee") paletteColors.push(pal.accent);
+  if (pal.secondary && pal.secondary !== "#262626") paletteColors.push(pal.secondary);
 
   // Lifetime cap per kit — count previous logos in the assets folder via the
   // simple "logo_generation_count" sidecar (stored in assets.logo_generations).
@@ -49,6 +57,7 @@ export const POST: APIRoute = async ({ locals, params, request }) => {
     kitId: params.id,
     description,
     primaryColor: body.primaryColor,
+    paletteColors: paletteColors.length > 0 ? paletteColors : undefined,
     style: body.style,
   };
 

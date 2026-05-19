@@ -18,14 +18,37 @@ const Hierarchical_Stacked = 0;
 const PathSimplifyMode_Spline = 2;
 import { put } from "@vercel/blob";
 
+// Premium accent palette — used when caller doesn't pass primaryColor.
+// One is picked at random per generation so successive logos for the same
+// brand differ visually (caller is free to regenerate).
+const ACCENT_PALETTE: { name: string; hex: string }[] = [
+  { name: "deep emerald",       hex: "#0f5132" },
+  { name: "oxblood",            hex: "#6b1d1d" },
+  { name: "electric ultramarine", hex: "#1d2bd1" },
+  { name: "cadmium orange",     hex: "#e25822" },
+  { name: "warm graphite",      hex: "#2a2a2a" },
+  { name: "ivory",              hex: "#f5efe0" },
+  { name: "cobalt",             hex: "#1e3a8a" },
+  { name: "terracotta",         hex: "#b65238" },
+  { name: "olive",              hex: "#5a6b2f" },
+  { name: "midnight",           hex: "#0b1f3a" },
+  { name: "blush",              hex: "#c97064" },
+  { name: "sage",               hex: "#7a8b6f" },
+];
+
+function pickAccent(): { name: string; hex: string } {
+  return ACCENT_PALETTE[Math.floor(Math.random() * ACCENT_PALETTE.length)];
+}
+
 const SYSTEM_PROMPT_RULES = [
-  "flat vector logo, single solid color silhouette, perfectly centered",
-  "pure white #FFFFFF background",
-  "NO gradients, NO shadows, NO drop-shadow, NO inner shadow, NO outer glow",
-  "NO 3D effects, NO photorealism, NO photographs, NO textures",
+  "flat vector logo mark, single or two-tone solid color silhouette, perfectly centered",
+  "soft off-white #FAFAFA background — no harsh pure white",
+  "NO gradients, NO drop shadows, NO inner shadows, NO outer glow, NO bevels, NO 3D",
+  "NO photorealism, NO photographs, NO textures, NO noise",
   "NO text, NO letters, NO numbers anywhere in the image",
-  "thick clean strokes, geometric, recognizable at 16px favicon scale",
-  "high contrast, large solid shapes — easy to vectorize to SVG",
+  "thick clean shapes, geometric or organic, recognizable at 16px favicon scale",
+  "high contrast against the background — large solid shapes that vectorize cleanly to SVG",
+  "negative space allowed inside the mark",
 ].join("; ");
 
 export interface GeneratedLogo {
@@ -39,8 +62,14 @@ export interface GenerateLogoInput {
   kitId: string;
   /** User-provided description: brand name + what they do */
   description: string;
-  /** Optional hex color the user wants for the mark. If absent, the model picks. */
+  /** Optional hex color the user wants for the mark. */
   primaryColor?: string;
+  /**
+   * Optional set of palette hexes (primary/accent/secondary) already chosen
+   * for the kit. When present, gpt-image-1 is told to use one of these as the
+   * dominant fill so the logo coheres with the rest of the kit.
+   */
+  paletteColors?: string[];
   /** Optional style adjective: "minimalist", "bold", "playful", etc. */
   style?: string;
 }
@@ -55,16 +84,23 @@ async function generateRawLogo(input: GenerateLogoInput): Promise<Buffer> {
 
   const openai = new OpenAI({ apiKey });
 
-  const colorHint = input.primaryColor
-    ? `Use this color as the mark's solid fill: ${input.primaryColor}.`
-    : "Pick a single bold solid color for the mark that fits the brand.";
+  let colorHint: string;
+  if (input.paletteColors && input.paletteColors.length > 0) {
+    const cs = input.paletteColors.slice(0, 3).join(", ");
+    colorHint = `Use the brand's existing palette for the mark's fill: ${cs}. Prefer ONE of these as the dominant color (pick the boldest, most saturated one).`;
+  } else if (input.primaryColor) {
+    colorHint = `Use this color as the mark's solid fill: ${input.primaryColor}.`;
+  } else {
+    const accent = pickAccent();
+    colorHint = `Use a single bold accent color for the mark: ${accent.name} (${accent.hex}). NEVER default to black. NEVER use grey.`;
+  }
   const styleHint = input.style ? `Style: ${input.style}.` : "";
 
-  const prompt = `Design a single-color flat vector LOGO MARK (not wordmark) for: "${input.description}".
+  const prompt = `Design a flat vector LOGO MARK (no text, no wordmark) for: "${input.description}".
 ${colorHint}
 ${styleHint}
 STRICT VISUAL RULES: ${SYSTEM_PROMPT_RULES}.
-The result will be vectorized to SVG, so it must be a clean silhouette with strong contrast against white.`;
+The result will be vectorized to SVG, so it must be a clean silhouette with strong contrast against the off-white background.`;
 
   const res = await openai.images.generate({
     model: "gpt-image-1",
