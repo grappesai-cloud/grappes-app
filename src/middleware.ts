@@ -134,6 +134,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
   }
 
+  // Mockup composite endpoint enforces its own owner/published check at the
+  // route handler. Don't block here so the public /kit/<slug> page can embed
+  // the rendered JPEGs without auth.
+  const isPublicMockup = /^\/api\/kits\/[0-9a-f-]{36}\/mockup\/[a-z_]+$/.test(path);
+
   // Guard authenticated API routes (defence-in-depth).
   if (
     path.startsWith('/api/') &&
@@ -145,6 +150,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     !path.startsWith('/api/cron/') &&
     !path.startsWith('/api/domains/check') &&
     !path.startsWith('/api/admin/') &&
+    !isPublicMockup &&
     path !== '/api/health' &&
     path !== '/api/contact'
   ) {
