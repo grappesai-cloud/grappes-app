@@ -1,11 +1,11 @@
 ---
-// ── Brand Book template (PR 3) ─────────────────────────────────────────────
-// Portrait A4 multi-spread brand book modeled on Santai Coffee / So Matcha /
-// Cherry Chewy / Chill brand guidelines. Heavy color blocks, big specimen
-// typography, labelled palette circles, logo system grids, mockup applications.
+// ── Brand Book template — redesigned ──────────────────────────────────────
+// Portrait A4 spreads modelled on Santai Coffee / So Matcha / Cherry Chewy /
+// Chill brand guidelines. Heavy color blocks, asymmetric cover, oversized
+// Aa specimens, labelled palette cards, photoreal mockup grid.
 //
 // Each spread is one .page (210mm × 297mm). The PDF print path uses
-// `?print=1` from /kit/[slug]; the editor iframe also renders this same
+// `?print=1` from /kit/[slug]; the editor iframe renders this same
 // component directly via /kit/preview/[id].
 
 import type { PressKit } from '../lib/press-kit';
@@ -23,11 +23,12 @@ const YEAR = new Date(k.created_at ?? Date.now()).getFullYear() || new Date().ge
 
 // ── Palette ──────────────────────────────────────────────────────────────
 type NamedColor = { hex: string; label?: string; role?: string };
+const ROLE_ORDER = ['primary', 'secondary', 'accent', 'background', 'bg', 'text'];
 const DEFAULT_ROLES = ['Primary', 'Secondary', 'Accent', 'Background', 'Text'];
+
 const rawPalette: NamedColor[] = Array.isArray(k.palette_named) && k.palette_named.length
   ? k.palette_named
   : (() => {
-      // Synthesize from kit.palette if user never filled labels.
       const p = k.palette || ({} as any);
       const seq: NamedColor[] = [];
       if (p.primary)   seq.push({ hex: p.primary,   label: 'Primary',    role: 'primary' });
@@ -37,24 +38,46 @@ const rawPalette: NamedColor[] = Array.isArray(k.palette_named) && k.palette_nam
       if (p.text)      seq.push({ hex: p.text,      label: 'Text',       role: 'text' });
       return seq.slice(0, 5);
     })();
+
 const palette: NamedColor[] = rawPalette.slice(0, 5).map((c, i) => ({
   hex: c.hex || '#0a0a0a',
   label: c.label || DEFAULT_ROLES[i] || 'Color',
-  role: c.role || DEFAULT_ROLES[i]?.toLowerCase() || 'color',
-}));
+  role: (c.role || DEFAULT_ROLES[i]?.toLowerCase() || 'color').toLowerCase(),
+})).sort((a, b) => {
+  const ai = ROLE_ORDER.indexOf(a.role); const bi = ROLE_ORDER.indexOf(b.role);
+  return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+});
 
-// Cover background — prefer named "primary", else first palette, else accent.
-const coverBg = (palette.find(p => p.role === 'primary')?.hex)
-  || palette[0]?.hex
-  || accent;
+const findRole = (r: string) => palette.find(p => p.role === r);
+const coverBg = findRole('primary')?.hex || palette[0]?.hex || accent;
 const coverFg = readableForeground(coverBg);
 
-// Logo system swatches: use secondary + primary if present, else fallbacks.
-const secondaryColor = palette.find(p => p.role === 'secondary')?.hex || palette[1]?.hex || '#f3eee4';
-const primaryColor   = palette.find(p => p.role === 'primary')?.hex   || palette[0]?.hex || '#0a0a0a';
-const accentColor    = palette.find(p => p.role === 'accent')?.hex    || accent;
+const primaryColor   = findRole('primary')?.hex   || palette[0]?.hex || '#0a0a0a';
+const secondaryColor = findRole('secondary')?.hex || palette[1]?.hex || '#f3eee4';
+const accentColor    = findRole('accent')?.hex    || accent;
+const primaryFg = readableForeground(primaryColor);
+const secondaryFg = readableForeground(secondaryColor);
+const accentFg = readableForeground(accentColor);
 
-// ── Typography (Google Fonts via the kit.fonts object) ───────────────────
+// Hex → rgba helper for low-opacity chips.
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace('#', '');
+  const n = m.length === 3
+    ? m.split('').map(c => c + c).join('')
+    : m;
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function hexToRgb(hex: string): string {
+  const m = hex.replace('#', '');
+  const n = m.length === 3 ? m.split('').map(c => c + c).join('') : m;
+  return `${parseInt(n.slice(0,2),16)}, ${parseInt(n.slice(2,4),16)}, ${parseInt(n.slice(4,6),16)}`;
+}
+
+// ── Typography ──────────────────────────────────────────────────────────
 const fontsCss = googleFontsUrl(k.fonts);
 const headingFamily = `'${k.fonts?.heading || 'Inter'}', sans-serif`;
 const bodyFamily    = `'${k.fonts?.body    || 'Inter'}', sans-serif`;
@@ -72,18 +95,16 @@ const validApps: MockupId[] = (Array.isArray(k.applications) ? k.applications : 
 
 const monogram = (k.name || 'BK').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'BK';
 
-// Pages
 const showMascot = !!mascotUrl;
 const showVoice  = voicePara.length > 0 || voiceKwds.length > 0;
 const showApps   = validApps.length > 0;
 const showDonts  = dontsList.length > 0;
 
-// Mockup endpoint URL builder (per-kit, owner-only render).
 function mockupSrc(id: MockupId): string {
   return `/api/kits/${k.id}/mockup/${id}`;
 }
 
-// Pages ordering for the small footer page-number line.
+// Pages ordering
 const pages: { key: string; title: string; show: boolean }[] = [
   { key: 'cover',       title: 'COVER',         show: true },
   { key: 'logo-system', title: 'LOGO SYSTEM',   show: true },
@@ -97,6 +118,17 @@ const pages: { key: string; title: string; show: boolean }[] = [
 ].filter(p => p.show);
 const pageNum = (key: string) => String(pages.findIndex(p => p.key === key) + 1).padStart(2, '0');
 const totalPages = pages.length;
+
+// Brand name display: scale aggressively long names
+const brandName = k.name || 'Brand';
+const brandLen = brandName.length;
+const coverNameSize = brandLen <= 6 ? '210px' : brandLen <= 10 ? '170px' : brandLen <= 14 ? '130px' : brandLen <= 20 ? '100px' : '78px';
+
+// Role chip styling helper
+const roleChipBg = (hex: string) => hexToRgba(hex, 0.14);
+
+// Build palette columns layout — 2 cols when <=4 items, 3 cols otherwise
+const paletteCols = palette.length <= 4 ? 2 : 3;
 ---
 
 <!DOCTYPE html>
@@ -110,15 +142,17 @@ const totalPages = pages.length;
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href={fontsCss} />
 <style is:inline define:vars={{
-  accentColor, coverBg, coverFg, primaryColor, secondaryColor,
+  accentColor, coverBg, coverFg,
+  primaryColor, secondaryColor,
+  primaryFg, secondaryFg, accentFg,
+  coverNameSize,
 }}>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: #1a1a1d;
     color: #0a0a0a;
-    font-family: var(--bb-body);
     -webkit-font-smoothing: antialiased;
-    line-height: 1.5;
+    line-height: 1.45;
   }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   img { display: block; max-width: 100%; }
@@ -134,242 +168,330 @@ const totalPages = pages.length;
     color: #0a0a0a;
     page-break-after: always;
     break-after: page;
+    page-break-before: always;
+    break-before: page;
     margin: 0 auto;
   }
+  .page:first-child { page-break-before: avoid; break-before: avoid; }
   .page:last-child { page-break-after: auto; break-after: auto; }
 
-  /* Footer */
+  /* ── Common framing ──────────────────────────────────────────────── */
   .bb-footer {
     position: absolute;
-    left: 16mm; right: 16mm; bottom: 10mm;
+    left: 16mm; right: 16mm; bottom: 12mm;
     display: flex; justify-content: space-between; align-items: center;
-    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: rgba(0,0,0,0.5); font-weight: 600;
+    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(0,0,0,0.45); font-weight: 600;
     font-feature-settings: "tnum","lnum";
   }
-  .bb-footer .num { color: #0a0a0a; }
-  .bb-footer .sec { color: var(--accentColor); font-weight: 800; }
-
-  /* Page header */
+  .bb-footer .num { color: #0a0a0a; font-weight: 700; }
+  .bb-footer .sec { color: #0a0a0a; font-weight: 700; }
   .page-head {
-    position: absolute; top: 16mm; left: 16mm; right: 16mm;
+    position: absolute; top: 14mm; left: 16mm; right: 16mm;
     display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: rgba(0,0,0,0.45); font-weight: 600;
+    font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(0,0,0,0.55); font-weight: 600;
+  }
+  .page-eyebrow {
+    font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: rgba(0,0,0,0.5); font-weight: 700;
+    margin-bottom: 6mm;
   }
   .page-title {
-    font-family: var(--bb-heading);
-    font-size: 48px;
-    line-height: 1;
-    letter-spacing: -0.03em;
+    font-size: 56px;
+    line-height: 0.95;
+    letter-spacing: -0.035em;
     color: #0a0a0a;
     font-weight: 700;
   }
+  .page-title-sub {
+    margin-top: 6mm;
+    font-size: 14px; line-height: 1.5;
+    color: rgba(0,0,0,0.62);
+    max-width: 130mm;
+  }
+  .page-head-block {
+    position: absolute; top: 26mm; left: 16mm; right: 16mm;
+  }
+  .page-body {
+    position: absolute; left: 16mm; right: 16mm; top: 68mm; bottom: 22mm;
+  }
 
-  /* ── Cover page ───────────────────────────────────────────────── */
+  /* ── Page 1: Cover ───────────────────────────────────────────────── */
   .cover {
     background: var(--coverBg);
     color: var(--coverFg);
-    padding: 22mm 18mm;
+    padding: 0;
+    position: relative;
+  }
+  .cover-frame {
+    position: absolute; inset: 18mm 18mm 18mm 18mm;
     display: flex; flex-direction: column; justify-content: space-between;
   }
   .cover-top {
     display: flex; justify-content: space-between; align-items: flex-start;
-    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
-    font-weight: 600;
+    font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase;
+    font-weight: 700;
   }
-  .cover-logo-wrap {
-    display: flex; justify-content: center; align-items: center;
-    margin: 18mm 0 14mm;
-    min-height: 60mm;
+  .cover-top .top-tag {
+    border: 1px solid currentColor;
+    padding: 5px 10px; border-radius: 999px;
+    opacity: 0.85;
   }
-  .cover-logo-wrap img { max-width: 130mm; max-height: 60mm; object-fit: contain; }
+  .cover-middle {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    margin-top: 14mm;
+  }
+  .cover-glyph {
+    width: 28mm; height: 28mm; border-radius: 50%;
+    border: 1.5px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--bb-heading); font-weight: 700;
+    font-size: 13mm; letter-spacing: -0.04em;
+    margin-bottom: 14mm;
+  }
+  .cover-glyph img {
+    max-width: 70%; max-height: 70%; object-fit: contain;
+    filter: brightness(0) invert(1);
+  }
+  .cover-glyph.dark-on-light img { filter: none; }
   .cover-brand-name {
     font-family: var(--bb-heading);
-    font-size: clamp(60px, 12vw, 130px);
-    letter-spacing: -0.04em;
-    line-height: 0.92;
+    font-size: var(--coverNameSize);
+    letter-spacing: -0.045em;
+    line-height: 0.88;
     font-weight: 700;
     color: var(--coverFg);
-    margin-bottom: 8mm;
-    text-transform: none;
+    word-break: break-word;
   }
   .cover-tagline {
     font-family: var(--bb-body);
-    font-size: 16px;
-    line-height: 1.5;
-    max-width: 140mm;
-    opacity: 0.85;
+    font-size: 15px; line-height: 1.55;
+    max-width: 130mm;
+    margin-top: 12mm;
+    opacity: 0.9;
+  }
+  .cover-rule {
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.35;
+    margin: 10mm 0;
   }
   .cover-bottom {
     display: flex; justify-content: space-between; align-items: flex-end;
-    font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase;
+    font-size: 10.5px; letter-spacing: 0.26em; text-transform: uppercase;
     font-weight: 700;
   }
+  .cover-bottom .left { display: flex; flex-direction: column; gap: 4px; opacity: 0.9; }
+  .cover-bottom .right { text-align: right; display: flex; flex-direction: column; gap: 4px; opacity: 0.9; }
 
-  /* ── Logo system page ────────────────────────────────────────── */
+  /* ── Page 2: Logo system ─────────────────────────────────────────── */
   .logo-grid {
-    position: absolute; left: 16mm; right: 16mm; top: 38mm; bottom: 22mm;
-    display: grid; grid-template-rows: 1fr 1fr auto;
-    gap: 8mm;
+    position: absolute; left: 16mm; right: 16mm; top: 70mm; bottom: 22mm;
+    display: grid;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 5mm;
   }
   .logo-row {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 4mm;
+    display: grid; grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 5mm;
   }
   .logo-cell {
     display: flex; align-items: center; justify-content: center;
-    border-radius: 6px;
-    padding: 8mm;
+    border-radius: 4px;
+    padding: 10mm;
     position: relative;
+    overflow: hidden;
   }
-  .logo-cell img { max-width: 80%; max-height: 80%; object-fit: contain; }
-  .logo-cell .submark-mono {
+  .logo-cell .cell-cap {
+    position: absolute; bottom: 5mm; left: 6mm;
+    font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+    font-weight: 700; opacity: 0.55;
+  }
+  .logo-cell img.logo-img { max-width: 80%; max-height: 70%; object-fit: contain; }
+  .logo-cell img.logo-img.small { max-width: 50%; max-height: 50%; }
+  .submark-mono {
     font-family: var(--bb-heading);
     width: 36mm; height: 36mm; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 24mm; font-weight: 700; letter-spacing: -0.04em;
-  }
-  .logo-captions {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm;
-    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: rgba(0,0,0,0.55); font-weight: 600; text-align: center;
+    font-size: 22mm; font-weight: 700; letter-spacing: -0.04em;
   }
 
-  /* ── Mascot page ─────────────────────────────────────────────── */
+  /* ── Mascot ──────────────────────────────────────────────────────── */
   .mascot-page {
     background: var(--secondaryColor);
+    color: var(--secondaryFg);
     display: flex; flex-direction: column; justify-content: center; align-items: center;
-    padding: 30mm 20mm;
+    padding: 36mm 22mm 22mm;
   }
-  .mascot-page img { max-width: 130mm; max-height: 180mm; object-fit: contain; }
+  .mascot-page img { max-width: 130mm; max-height: 170mm; object-fit: contain; }
   .mascot-caption {
     margin-top: 12mm;
     font-family: var(--bb-body);
-    font-size: 14px; color: rgba(0,0,0,0.7); text-align: center;
-    max-width: 140mm; line-height: 1.55;
+    font-size: 13px; opacity: 0.7; text-align: center;
+    max-width: 130mm; line-height: 1.55;
   }
 
-  /* ── Color palette page ──────────────────────────────────────── */
-  .palette-stack {
-    position: absolute; left: 16mm; right: 16mm; top: 42mm; bottom: 22mm;
-    display: flex; flex-direction: column; gap: 6mm;
-  }
-  .palette-row {
+  /* ── Palette page ────────────────────────────────────────────────── */
+  .palette-grid {
     display: grid;
-    grid-template-columns: 60mm 1fr;
-    gap: 8mm;
-    align-items: center;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    padding-bottom: 6mm;
+    gap: 6mm;
+    height: 100%;
   }
-  .palette-row:last-child { border-bottom: 0; }
-  .swatch {
-    width: 60mm; height: 38mm; border-radius: 4px;
-    border: 1px solid rgba(0,0,0,0.06);
+  .palette-card {
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
   }
-  .palette-info { display: flex; flex-direction: column; gap: 6px; }
+  .palette-fill {
+    flex: 1.5;
+    min-height: 60mm;
+  }
+  .palette-meta {
+    padding: 6mm 7mm 7mm;
+    display: flex; flex-direction: column; gap: 3mm;
+    background: #fff;
+  }
+  .palette-chip {
+    align-self: flex-start;
+    font-size: 8.5px; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 999px;
+    font-weight: 700;
+  }
+  .palette-name {
+    font-family: var(--bb-heading);
+    font-size: 22px; line-height: 1.05;
+    letter-spacing: -0.02em; font-weight: 700;
+    color: #0a0a0a;
+  }
   .palette-hex {
     font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 13px; color: #0a0a0a; font-feature-settings: "tnum","lnum";
+    font-size: 12px;
+    color: rgba(0,0,0,0.72);
     letter-spacing: 0.04em;
+    font-feature-settings: "tnum","lnum";
   }
-  .palette-label {
-    font-family: var(--bb-heading);
-    font-size: 26px; line-height: 1.05; letter-spacing: -0.02em; font-weight: 700;
-  }
-  .palette-role {
-    align-self: flex-start;
-    display: inline-block;
-    font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    background: rgba(0,0,0,0.06);
-    padding: 4px 9px; border-radius: 999px;
-    font-weight: 700; color: rgba(0,0,0,0.6);
+  .palette-rgb {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px;
+    color: rgba(0,0,0,0.45);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 1mm;
   }
 
-  /* ── Typography page ─────────────────────────────────────────── */
+  /* ── Typography page ─────────────────────────────────────────────── */
   .typo-stack {
-    position: absolute; left: 16mm; right: 16mm; top: 42mm; bottom: 22mm;
-    display: flex; flex-direction: column; gap: 8mm;
+    display: flex; flex-direction: column; gap: 12mm;
+    height: 100%;
   }
   .typo-block {
-    border-top: 1px solid rgba(0,0,0,0.1);
-    padding-top: 6mm;
-    display: flex; flex-direction: column; gap: 4mm;
+    display: grid;
+    grid-template-columns: 90mm 1fr;
+    gap: 10mm;
+    align-items: center;
   }
   .typo-aa {
-    font-size: 220px; line-height: 0.85; letter-spacing: -0.05em;
+    font-size: 260px; line-height: 0.82; letter-spacing: -0.06em;
     color: #0a0a0a; font-weight: 700;
   }
-  .typo-alphabet {
-    font-size: 16px; line-height: 1.5; letter-spacing: 0.04em;
-    color: rgba(0,0,0,0.7); word-break: break-all;
-  }
+  .typo-aa.body { font-size: 220px; }
+  .typo-side { display: flex; flex-direction: column; gap: 4mm; }
   .typo-meta {
-    font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
-    color: rgba(0,0,0,0.55); font-weight: 700;
-    border-top: 1px solid rgba(0,0,0,0.06); padding-top: 3mm;
+    font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--accentColor); font-weight: 800;
+  }
+  .typo-name {
+    font-family: var(--bb-heading);
+    font-size: 30px; line-height: 1; letter-spacing: -0.02em;
+    font-weight: 700; color: #0a0a0a;
+  }
+  .typo-alphabet {
+    font-size: 13px; line-height: 1.7; letter-spacing: 0.04em;
+    color: rgba(0,0,0,0.78); word-break: break-all;
+  }
+  .typo-rule {
+    height: 1px; background: rgba(0,0,0,0.1); width: 100%;
   }
 
-  /* ── Voice page ──────────────────────────────────────────────── */
-  .voice-page { padding: 42mm 18mm 22mm; }
+  /* ── Voice page ──────────────────────────────────────────────────── */
   .voice-quote {
     font-family: var(--bb-body);
-    font-size: 32px; line-height: 1.35; letter-spacing: -0.01em;
+    font-size: 28px; line-height: 1.35; letter-spacing: -0.005em;
     color: #0a0a0a;
-    max-width: 180mm;
+    max-width: 170mm;
     margin-bottom: 14mm;
   }
-  .voice-quote::before { content: '“'; font-family: var(--bb-heading); font-size: 64px; color: var(--accentColor); line-height: 0; margin-right: 0.05em; vertical-align: -0.18em; }
+  .voice-quote::before {
+    content: '“';
+    font-family: var(--bb-heading);
+    font-size: 90px;
+    color: var(--accentColor);
+    line-height: 0;
+    margin-right: 0.05em;
+    vertical-align: -0.18em;
+    font-weight: 700;
+  }
   .voice-kwds { display: flex; flex-wrap: wrap; gap: 8px; }
   .voice-pill {
-    font-size: 12px; letter-spacing: 0.06em;
+    font-size: 11px; letter-spacing: 0.14em;
     background: var(--accentColor);
-    color: #fff;
+    color: var(--accentFg);
     padding: 6px 14px; border-radius: 999px;
     font-weight: 700; text-transform: uppercase;
   }
 
-  /* ── Applications page ───────────────────────────────────────── */
-  .apps-page { padding: 42mm 14mm 22mm; }
+  /* ── Applications page ───────────────────────────────────────────── */
   .apps-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 8mm 6mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9mm 7mm;
   }
   .apps-cell {
     display: flex; flex-direction: column; gap: 4mm;
   }
   .apps-img-wrap {
     aspect-ratio: 1 / 1;
-    border-radius: 4px; overflow: hidden;
+    border-radius: 4px;
+    overflow: hidden;
     background: #f3f0ea;
     border: 1px solid rgba(0,0,0,0.06);
   }
   .apps-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
   .apps-label {
-    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(0,0,0,0.6); font-weight: 700; text-align: center;
+    font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: rgba(0,0,0,0.62); font-weight: 700; text-align: center;
   }
 
-  /* ── Don'ts page ─────────────────────────────────────────────── */
-  .donts-page { padding: 42mm 18mm 22mm; }
+  /* ── Don'ts page ─────────────────────────────────────────────────── */
   .donts-title { color: #c0392b; }
-  .donts-list { display: flex; flex-direction: column; gap: 5mm; margin-top: 8mm; }
+  .donts-list { display: flex; flex-direction: column; gap: 6mm; }
   .donts-row {
-    display: flex; align-items: flex-start; gap: 10mm;
-    font-size: 16px; line-height: 1.45;
+    display: flex; align-items: flex-start; gap: 8mm;
+    font-size: 15px; line-height: 1.45;
     padding-bottom: 5mm;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+  }
+  .donts-num {
+    font-family: var(--bb-heading);
+    font-size: 12px; font-weight: 700;
+    color: #c0392b;
+    letter-spacing: 0.06em;
+    min-width: 14mm;
   }
   .donts-x {
     flex-shrink: 0;
-    width: 12mm; height: 12mm; border-radius: 50%;
+    width: 11mm; height: 11mm; border-radius: 50%;
     background: #c0392b; color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 18px;
+    font-weight: 800; font-size: 16px; line-height: 1;
   }
+  .donts-text { color: #0a0a0a; }
 
-  /* ── Credits page ────────────────────────────────────────────── */
+  /* ── Credits page ────────────────────────────────────────────────── */
   .credits-page {
     background: var(--coverBg);
     color: var(--coverFg);
@@ -377,16 +499,25 @@ const totalPages = pages.length;
     padding: 30mm 20mm; text-align: center;
   }
   .credits-mono {
-    width: 30mm; height: 30mm; border-radius: 50%;
-    border: 2px solid currentColor;
+    width: 28mm; height: 28mm; border-radius: 50%;
+    border: 1.5px solid currentColor;
     display: flex; align-items: center; justify-content: center;
-    font-family: var(--bb-heading); font-weight: 700; font-size: 14mm;
-    margin-bottom: 12mm;
+    font-family: var(--bb-heading); font-weight: 700;
+    font-size: 13mm; letter-spacing: -0.04em;
+    margin-bottom: 14mm;
   }
-
-  /* ── Variables for fonts ─────────────────────────────────────── */
-  body {
-    --bb-heading: ${''};
+  .credits-name {
+    font-family: var(--bb-heading);
+    font-size: 56px; line-height: 0.95;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+  }
+  .credits-sub {
+    font-family: var(--bb-body);
+    font-size: 11px; letter-spacing: 0.28em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-top: 10mm;
   }
 
   /* Print rules */
@@ -395,17 +526,15 @@ const totalPages = pages.length;
     html, body, .bb { background: #fff; }
     .page { box-shadow: none !important; margin: 0 !important; }
   }
-
-  /* Screen presentation (when not printing) */
   @media screen {
     .bb { padding: 24px 0; }
     .page { box-shadow: 0 24px 60px -20px rgba(0,0,0,0.45); margin-bottom: 18px; }
   }
 </style>
 
-<!-- Inline font-family vars (Astro can't interpolate strings inside is:inline + define:vars) -->
 <style is:inline set:html={`
-  body { --bb-heading: ${headingFamily}; --bb-body: ${bodyFamily}; }
+  body { --bb-heading: ${headingFamily}; --bb-body: ${bodyFamily}; font-family: ${bodyFamily}; }
+  .page-title, .cover-brand-name, .palette-name, .typo-aa, .typo-name, .credits-name, .submark-mono, .cover-glyph { font-family: ${headingFamily}; }
 `}></style>
 
 </head>
@@ -414,59 +543,104 @@ const totalPages = pages.length;
 
   {/* ───────── Page 1 — Cover ───────── */}
   <section class="page cover">
-    <div class="cover-top">
-      <span>BRAND GUIDELINES</span>
-      <span>{YEAR}</span>
-    </div>
-    {logoUrl && (
-      <div class="cover-logo-wrap"><img src={logoUrl} alt={`${k.name} logo`} /></div>
-    )}
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
-      <h1 class="cover-brand-name">{k.name}</h1>
-      {tagline && <p class="cover-tagline">{tagline}</p>}
-    </div>
-    <div class="cover-bottom">
-      <span>{k.industry || 'Brand'}</span>
-      <span>Vol. 01</span>
+    <div class="cover-frame">
+      <div class="cover-top">
+        <span class="top-tag">BRAND BOOK</span>
+        <span class="top-tag">Vol. 01 — {YEAR}</span>
+      </div>
+
+      <div class="cover-middle">
+        <div class={`cover-glyph ${coverFg === '#0a0a0a' ? 'dark-on-light' : ''}`}>
+          {logoUrl ? <img src={logoUrl} alt="" /> : <span>{monogram}</span>}
+        </div>
+        <h1 class="cover-brand-name">{brandName}</h1>
+        {tagline && <p class="cover-tagline">{tagline}</p>}
+      </div>
+
+      <div>
+        <div class="cover-rule"></div>
+        <div class="cover-bottom">
+          <div class="left">
+            <span>{k.industry || 'Identity System'}</span>
+            <span style="opacity:0.65;">Guidelines</span>
+          </div>
+          <div class="right">
+            <span>Issue 01</span>
+            <span style="opacity:0.65;">{YEAR}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   {/* ───────── Page 2 — Logo system ───────── */}
   <section class="page">
-    <div class="page-head"><span>{pageNum('logo-system')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
-      <h2 class="page-title">LOGO SYSTEM</h2>
+    <div class="page-head"><span>{k.name}</span><span>{pageNum('logo-system')} / {String(totalPages).padStart(2,'0')}</span></div>
+    <div class="page-head-block">
+      <div class="page-eyebrow">02 · Identity</div>
+      <h2 class="page-title">Logo<br/>System.</h2>
+      <p class="page-title-sub">How the mark works across light, dark and accent surfaces. Always preserve clearspace equal to the height of the wordmark's cap-height.</p>
     </div>
+
     <div class="logo-grid">
-      {/* Row 1 — light backgrounds (secondary color tinted) */}
+      {/* Row 1 — light bg */}
       <div class="logo-row">
-        <div class="logo-cell" style={`background:${secondaryColor};`}>
-          {logoUrl ? <img src={logoUrl} alt="Logotype" /> : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+        <div class="logo-cell" style={`background:${secondaryColor};color:${secondaryFg};`}>
+          {logoUrl
+            ? <img class="logo-img" src={logoUrl} alt="Logotype" />
+            : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+          <span class="cell-cap">Logotype</span>
         </div>
-        <div class="logo-cell" style={`background:${secondaryColor};`}>
-          {logoUrl ? <img src={logoUrl} alt="Brandmark" style="max-width:50%;max-height:50%;" /> : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+        <div class="logo-cell" style={`background:${secondaryColor};color:${secondaryFg};`}>
+          {logoUrl
+            ? <img class="logo-img small" src={logoUrl} alt="Brandmark" />
+            : <div class="submark-mono" style={`color:${primaryColor};border:2px solid ${primaryColor};`}>{monogram}</div>}
+          <span class="cell-cap">Brandmark</span>
         </div>
-        <div class="logo-cell" style={`background:${secondaryColor};`}>
-          <div class="submark-mono" style={`color:${primaryColor};background:transparent;border:2px solid ${primaryColor};`}>{monogram}</div>
+        <div class="logo-cell" style={`background:${secondaryColor};color:${secondaryFg};`}>
+          <div class="submark-mono" style={`color:${secondaryFg};background:transparent;border:2px solid ${secondaryFg};`}>{monogram}</div>
+          <span class="cell-cap">Submark</span>
         </div>
       </div>
-      {/* Row 2 — primary color backgrounds (inverse) */}
+
+      {/* Row 2 — primary bg, inverse */}
       <div class="logo-row">
-        <div class="logo-cell" style={`background:${primaryColor};`}>
-          {logoUrl ? <img src={logoUrl} alt="Logotype on color" style="filter:brightness(0) invert(1);" /> : <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};`}>{monogram}</div>}
+        <div class="logo-cell" style={`background:${primaryColor};color:${primaryFg};`}>
+          {logoUrl
+            ? <img class="logo-img" src={logoUrl} alt="Logotype" style={primaryFg === '#0a0a0a' ? '' : 'filter:brightness(0) invert(1);'} />
+            : <div class="submark-mono" style={`color:${primaryFg};border:2px solid ${primaryFg};`}>{monogram}</div>}
+          <span class="cell-cap" style="opacity:0.75;">Reverse</span>
         </div>
-        <div class="logo-cell" style={`background:${primaryColor};`}>
-          {logoUrl ? <img src={logoUrl} alt="Brandmark on color" style="filter:brightness(0) invert(1);max-width:50%;max-height:50%;" /> : <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};`}>{monogram}</div>}
+        <div class="logo-cell" style={`background:${primaryColor};color:${primaryFg};`}>
+          {logoUrl
+            ? <img class="logo-img small" src={logoUrl} alt="Brandmark" style={primaryFg === '#0a0a0a' ? '' : 'filter:brightness(0) invert(1);'} />
+            : <div class="submark-mono" style={`color:${primaryFg};border:2px solid ${primaryFg};`}>{monogram}</div>}
+          <span class="cell-cap" style="opacity:0.75;">Brandmark</span>
         </div>
-        <div class="logo-cell" style={`background:${primaryColor};`}>
-          <div class="submark-mono" style={`color:${secondaryColor};border:2px solid ${secondaryColor};background:transparent;`}>{monogram}</div>
+        <div class="logo-cell" style={`background:${primaryColor};color:${primaryFg};`}>
+          <div class="submark-mono" style={`color:${primaryFg};background:transparent;border:2px solid ${primaryFg};`}>{monogram}</div>
+          <span class="cell-cap" style="opacity:0.75;">Submark</span>
         </div>
       </div>
-      {/* Captions */}
-      <div class="logo-captions">
-        <span>Logotype · primary</span>
-        <span>Brandmark · icon-only</span>
-        <span>Submark · favicon</span>
+
+      {/* Row 3 — accent bg */}
+      <div class="logo-row">
+        <div class="logo-cell" style={`background:${accentColor};color:${accentFg};`}>
+          {logoUrl
+            ? <img class="logo-img" src={logoUrl} alt="Logotype" style={accentFg === '#0a0a0a' ? '' : 'filter:brightness(0) invert(1);'} />
+            : <div class="submark-mono" style={`color:${accentFg};border:2px solid ${accentFg};`}>{monogram}</div>}
+          <span class="cell-cap" style="opacity:0.75;">Accent</span>
+        </div>
+        <div class="logo-cell" style={`background:${accentColor};color:${accentFg};`}>
+          {logoUrl
+            ? <img class="logo-img small" src={logoUrl} alt="Brandmark" style={accentFg === '#0a0a0a' ? '' : 'filter:brightness(0) invert(1);'} />
+            : <div class="submark-mono" style={`color:${accentFg};border:2px solid ${accentFg};`}>{monogram}</div>}
+          <span class="cell-cap" style="opacity:0.75;">Brandmark</span>
+        </div>
+        <div class="logo-cell" style={`background:${accentColor};color:${accentFg};`}>
+          <div class="submark-mono" style={`color:${accentFg};background:transparent;border:2px solid ${accentFg};`}>{monogram}</div>
+          <span class="cell-cap" style="opacity:0.75;">Submark</span>
+        </div>
       </div>
     </div>
     <div class="bb-footer">
@@ -475,36 +649,41 @@ const totalPages = pages.length;
     </div>
   </section>
 
-  {/* ───────── Page 3 — Mascot (optional) ───────── */}
+  {/* ───────── Mascot ───────── */}
   {showMascot && (
     <section class="page mascot-page">
-      <div class="page-head"><span>{pageNum('mascot')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
+      <div class="page-head" style={`color:${secondaryFg};opacity:0.7;`}><span>{k.name}</span><span>{pageNum('mascot')} / {String(totalPages).padStart(2,'0')}</span></div>
       <img src={mascotUrl} alt={`${k.name} mascot`} />
-      <p class="mascot-caption">Our mascot shows up on packaging, social, and signage. Use generously — it's the soul of the brand.</p>
-      <div class="bb-footer">
-        <span class="sec">MASCOT</span>
-        <span><span class="num">{pageNum('mascot')}</span> / {String(totalPages).padStart(2,'0')}</span>
+      <p class="mascot-caption">Our mascot. Use on light surfaces. Don't recolor or warp the proportions.</p>
+      <div class="bb-footer" style={`color:${secondaryFg};opacity:0.7;`}>
+        <span class="sec" style={`color:${secondaryFg};`}>MASCOT</span>
+        <span><span class="num" style={`color:${secondaryFg};`}>{pageNum('mascot')}</span> / {String(totalPages).padStart(2,'0')}</span>
       </div>
     </section>
   )}
 
-  {/* ───────── Page 4 — Color palette ───────── */}
+  {/* ───────── Palette ───────── */}
   <section class="page">
-    <div class="page-head"><span>{pageNum('palette')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
-      <h2 class="page-title">COLOR PALETTE</h2>
+    <div class="page-head"><span>{k.name}</span><span>{pageNum('palette')} / {String(totalPages).padStart(2,'0')}</span></div>
+    <div class="page-head-block">
+      <div class="page-eyebrow">{pageNum('palette')} · Color</div>
+      <h2 class="page-title">Color<br/>Palette.</h2>
+      <p class="page-title-sub">A focused set of {palette.length} colors. Primary leads, secondary supports, accent punctuates.</p>
     </div>
-    <div class="palette-stack">
-      {palette.map((c) => (
-        <div class="palette-row">
-          <div class="swatch" style={`background:${c.hex};`}></div>
-          <div class="palette-info">
-            <span class="palette-role">{c.role}</span>
-            <span class="palette-label">{c.label}</span>
-            <span class="palette-hex">{c.hex.toUpperCase()}</span>
+    <div class="page-body">
+      <div class="palette-grid" style={`grid-template-columns: repeat(${paletteCols}, 1fr); grid-auto-rows: 1fr;`}>
+        {palette.map((c) => (
+          <div class="palette-card">
+            <div class="palette-fill" style={`background:${c.hex};`}></div>
+            <div class="palette-meta">
+              <span class="palette-chip" style={`background:${roleChipBg(c.hex)};color:${c.hex};`}>{(c.role || 'color').toUpperCase()}</span>
+              <span class="palette-name">{c.label}</span>
+              <span class="palette-hex">{c.hex.toUpperCase()}</span>
+              <span class="palette-rgb">RGB {hexToRgb(c.hex)}</span>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
     <div class="bb-footer">
       <span class="sec">COLOR PALETTE</span>
@@ -512,26 +691,37 @@ const totalPages = pages.length;
     </div>
   </section>
 
-  {/* ───────── Page 5 — Typography ───────── */}
+  {/* ───────── Typography ───────── */}
   <section class="page">
-    <div class="page-head"><span>{pageNum('typography')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-    <div style="position:absolute;top:30mm;left:16mm;right:16mm;">
-      <h2 class="page-title">TYPOGRAPHY</h2>
+    <div class="page-head"><span>{k.name}</span><span>{pageNum('typography')} / {String(totalPages).padStart(2,'0')}</span></div>
+    <div class="page-head-block">
+      <div class="page-eyebrow">{pageNum('typography')} · Type</div>
+      <h2 class="page-title">Typography.</h2>
+      <p class="page-title-sub">Two families, used with intent. Headings carry the voice. Body text gets out of the way.</p>
     </div>
-    <div class="typo-stack">
-      <div class="typo-block" style={`font-family:${headingFamily};`}>
-        <div class="typo-aa" style={`font-family:${headingFamily};`}>Aa</div>
-        <div class="typo-alphabet" style={`font-family:${headingFamily};`}>
-          ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+    <div class="page-body">
+      <div class="typo-stack">
+        <div class="typo-block">
+          <div class="typo-aa" style={`font-family:${headingFamily};`}>Aa</div>
+          <div class="typo-side">
+            <span class="typo-meta">Heading</span>
+            <span class="typo-name" style={`font-family:${headingFamily};`}>{k.fonts?.heading || 'Inter'}</span>
+            <div class="typo-alphabet" style={`font-family:${headingFamily};`}>
+              ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+            </div>
+          </div>
         </div>
-        <div class="typo-meta">{k.fonts?.heading || 'Inter'} · Heading</div>
-      </div>
-      <div class="typo-block" style={`font-family:${bodyFamily};`}>
-        <div class="typo-aa" style={`font-family:${bodyFamily};font-size:160px;`}>Aa</div>
-        <div class="typo-alphabet" style={`font-family:${bodyFamily};`}>
-          ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+        <div class="typo-rule"></div>
+        <div class="typo-block">
+          <div class="typo-aa body" style={`font-family:${bodyFamily};`}>Aa</div>
+          <div class="typo-side">
+            <span class="typo-meta">Body</span>
+            <span class="typo-name" style={`font-family:${bodyFamily};`}>{k.fonts?.body || 'Inter'}</span>
+            <div class="typo-alphabet" style={`font-family:${bodyFamily};`}>
+              ABCDEFGHIJKLMNOPQRSTUVWXYZ<br/>abcdefghijklmnopqrstuvwxyz<br/>0123456789 . , : ; ! ? &amp; @ # $ %
+            </div>
+          </div>
         </div>
-        <div class="typo-meta">{k.fonts?.body || 'Inter'} · Body</div>
       </div>
     </div>
     <div class="bb-footer">
@@ -540,14 +730,16 @@ const totalPages = pages.length;
     </div>
   </section>
 
-  {/* ───────── Page 6 — Voice (optional) ───────── */}
+  {/* ───────── Voice ───────── */}
   {showVoice && (
-    <section class="page voice-page">
-      <div class="page-head"><span>{pageNum('voice')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-      <div style="position:absolute;top:30mm;left:18mm;right:18mm;">
-        <h2 class="page-title">BRAND VOICE</h2>
+    <section class="page">
+      <div class="page-head"><span>{k.name}</span><span>{pageNum('voice')} / {String(totalPages).padStart(2,'0')}</span></div>
+      <div class="page-head-block">
+        <div class="page-eyebrow">{pageNum('voice')} · Voice</div>
+        <h2 class="page-title">Brand Voice.</h2>
+        <p class="page-title-sub">How we sound on the page. Keep it consistent across every touchpoint.</p>
       </div>
-      <div style="margin-top:24mm;">
+      <div class="page-body">
         {voicePara && <p class="voice-quote">{voicePara}</p>}
         {voiceKwds.length > 0 && (
           <div class="voice-kwds">
@@ -562,102 +754,82 @@ const totalPages = pages.length;
     </section>
   )}
 
-  {/* ───────── Page 7 — Applications (optional, 2x3 grid; overflow→next page) ───────── */}
+  {/* ───────── Applications (chunked 6/page) ───────── */}
   {showApps && (() => {
-    const firstChunk = validApps.slice(0, 6);
-    const secondChunk = validApps.slice(6, 8);
-    return (
-      <>
-        <section class="page apps-page">
-          <div class="page-head"><span>{pageNum('applications')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-          <div style="position:absolute;top:30mm;left:14mm;right:14mm;">
-            <h2 class="page-title">APPLICATIONS</h2>
+    const chunks: MockupId[][] = [];
+    for (let i = 0; i < validApps.length; i += 6) chunks.push(validApps.slice(i, i + 6));
+    return chunks.map((chunk, idx) => (
+      <section class="page">
+        <div class="page-head"><span>{k.name}</span><span>{pageNum('applications')} / {String(totalPages).padStart(2,'0')}</span></div>
+        <div class="page-head-block">
+          <div class="page-eyebrow">{pageNum('applications')} · Applications {chunks.length > 1 ? `(${idx + 1}/${chunks.length})` : ''}</div>
+          <h2 class="page-title">In the Wild.</h2>
+          <p class="page-title-sub">The mark applied across surfaces — print, packaging, environment.</p>
+        </div>
+        <div class="page-body">
+          <div class="apps-grid">
+            {chunk.map((id) => {
+              const t = MOCKUPS[id];
+              return (
+                <div class="apps-cell">
+                  <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
+                  <div class="apps-label">{t.label}</div>
+                </div>
+              );
+            })}
           </div>
-          <div style="margin-top:24mm;">
-            <div class="apps-grid">
-              {firstChunk.map((id) => {
-                const t = MOCKUPS[id];
-                return (
-                  <div class="apps-cell">
-                    <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
-                    <div class="apps-label">{t.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div class="bb-footer">
-            <span class="sec">APPLICATIONS</span>
-            <span><span class="num">{pageNum('applications')}</span> / {String(totalPages).padStart(2,'0')}</span>
-          </div>
-        </section>
-        {secondChunk.length > 0 && (
-          <section class="page apps-page">
-            <div class="page-head"><span>{pageNum('applications')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-            <div style="position:absolute;top:30mm;left:14mm;right:14mm;">
-              <h2 class="page-title">APPLICATIONS — CONT.</h2>
-            </div>
-            <div style="margin-top:24mm;">
-              <div class="apps-grid">
-                {secondChunk.map((id) => {
-                  const t = MOCKUPS[id];
-                  return (
-                    <div class="apps-cell">
-                      <div class="apps-img-wrap"><img src={mockupSrc(id)} alt={t.label} /></div>
-                      <div class="apps-label">{t.label}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div class="bb-footer">
-              <span class="sec">APPLICATIONS</span>
-              <span><span class="num">{pageNum('applications')}</span> / {String(totalPages).padStart(2,'0')}</span>
-            </div>
-          </section>
-        )}
-      </>
-    );
+        </div>
+        <div class="bb-footer">
+          <span class="sec">APPLICATIONS</span>
+          <span><span class="num">{pageNum('applications')}</span> / {String(totalPages).padStart(2,'0')}</span>
+        </div>
+      </section>
+    ));
   })()}
 
-  {/* ───────── Page 8 — Don'ts (optional) ───────── */}
+  {/* ───────── Don'ts ───────── */}
   {showDonts && (
-    <section class="page donts-page">
-      <div class="page-head"><span>{pageNum('donts')} / {String(totalPages).padStart(2,'0')}</span><span>{k.name}</span></div>
-      <div style="position:absolute;top:30mm;left:18mm;right:18mm;">
-        <h2 class="page-title donts-title">DON'TS</h2>
+    <section class="page">
+      <div class="page-head"><span>{k.name}</span><span>{pageNum('donts')} / {String(totalPages).padStart(2,'0')}</span></div>
+      <div class="page-head-block">
+        <div class="page-eyebrow" style="color:#c0392b;">{pageNum('donts')} · Misuse</div>
+        <h2 class="page-title donts-title">Don'ts.</h2>
+        <p class="page-title-sub">Hard rules. Breaking these breaks the brand.</p>
       </div>
-      <div class="donts-list" style="margin-top:24mm;">
-        {dontsList.map((d) => (
-          <div class="donts-row">
-            <div class="donts-x">×</div>
-            <div>{d}</div>
-          </div>
-        ))}
+      <div class="page-body">
+        <div class="donts-list">
+          {dontsList.map((d, i) => (
+            <div class="donts-row">
+              <div class="donts-x">×</div>
+              <div class="donts-num">{String(i + 1).padStart(2, '0')}</div>
+              <div class="donts-text">{d}</div>
+            </div>
+          ))}
+        </div>
       </div>
       <div class="bb-footer">
-        <span class="sec">DON'TS</span>
+        <span class="sec" style="color:#c0392b;">DON'TS</span>
         <span><span class="num">{pageNum('donts')}</span> / {String(totalPages).padStart(2,'0')}</span>
       </div>
     </section>
   )}
 
-  {/* ───────── Final page — Credits ───────── */}
+  {/* ───────── Credits ───────── */}
   <section class="page credits-page">
-    <div class="credits-mono">{monogram}</div>
-    <p style="font-family:var(--bb-heading);font-size:42px;letter-spacing:-0.025em;font-weight:700;line-height:1.05;margin-top:14mm;">
-      {k.name}
-    </p>
-    <p style="font-family:var(--bb-body);font-size:13px;letter-spacing:0.22em;text-transform:uppercase;opacity:0.65;margin-top:8mm;">
-      {YEAR} · Vol. 01 · Brand Book
-    </p>
+    <div class="credits-mono">
+      {logoUrl
+        ? <img src={logoUrl} alt="" style={`max-width:70%;max-height:70%;object-fit:contain;${coverFg === '#0a0a0a' ? '' : 'filter:brightness(0) invert(1);'}`} />
+        : <span>{monogram}</span>}
+    </div>
+    <p class="credits-name">{k.name}</p>
+    <p class="credits-sub">{YEAR} · Vol. 01 · Brand Book</p>
   </section>
 
 </div>
 
 {printMode && (
   <script is:inline>
-    window.addEventListener('load', () => setTimeout(() => window.print(), 400));
+    window.addEventListener('load', () => setTimeout(() => window.print(), 600));
   </script>
 )}
 </body>
