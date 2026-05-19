@@ -181,34 +181,117 @@ function hslToHex(h: number, s: number, l: number): string {
 
 // ── Server-side palette extraction from a logo URL ─────────────────────────
 // Returns ONLY colors actually present in the logo (no hardcoded fallbacks).
+// For SVG logos we parse fill/stroke directly from markup (node-vibrant
+// can't decode SVGs reliably and was returning null, which then froze the
+// palette at DEFAULT_PALETTE forever). For PNG/JPG we use node-vibrant.
 // Caller pairs this with fillPalette() to complete the 5-slot palette using
 // color theory based on whatever was extracted.
 export async function extractPaletteFromLogo(logoUrl: string): Promise<Palette | null> {
+  const isSvg = logoUrl.toLowerCase().endsWith(".svg") || logoUrl.toLowerCase().includes(".svg?");
   try {
-    const palette = await Vibrant.from(logoUrl).getPalette();
-    const primary   = palette.Vibrant?.hex   ?? palette.DarkVibrant?.hex ?? null;
-    const secondary = palette.Muted?.hex     ?? palette.DarkMuted?.hex   ?? null;
-    const accent    = palette.LightVibrant?.hex ?? null;
-    const text      = palette.DarkMuted?.hex  ?? palette.DarkVibrant?.hex ?? null;
-    const bg        = palette.LightMuted?.hex ?? null;
+    let partial: Partial<Palette> | null = null;
 
-    // If nothing usable came out, bail.
-    if (!primary && !secondary && !accent && !text && !bg) return null;
+    if (isSvg) {
+      partial = await extractFromSvg(logoUrl);
+    } else {
+      partial = await extractViaVibrant(logoUrl);
+    }
 
-    // Build a partial palette of ONLY real extracted colors, then fill the
-    // rest using color theory derived from the dominant hue.
-    const partial: Partial<Palette> = {};
-    if (primary) partial.primary = primary;
-    if (secondary) partial.secondary = secondary;
-    if (accent) partial.accent = accent;
-    if (text) partial.text = text;
-    if (bg) partial.bg = bg;
-
+    if (!partial || Object.keys(partial).length === 0) return null;
     return { ...fillPalette(partial), extracted_from_logo: true };
   } catch (err) {
     console.error("[press-kit] palette extraction failed:", err);
     return null;
   }
+}
+
+// Parse fill / stroke colors directly from SVG markup, count each color's
+// total path-byte footprint (rough proxy for surface area), classify by
+// HSL → assign to primary / secondary / accent / bg / text slots.
+async function extractFromSvg(svgUrl: string): Promise<Partial<Palette>> {
+  const res = await fetch(svgUrl);
+  if (!res.ok) throw new Error(`Failed to fetch SVG: ${res.status}`);
+  const svg = await res.text();
+
+  // Find all explicit fill/stroke colors with their containing path's length.
+  // We weight each color by the byte-length of its parent <path d="..."> as a
+  // cheap proxy for surface area on the canvas.
+  type Entry = { hex: string; weight: number };
+  const entries: Entry[] = [];
+
+  // Match each element with a fill or stroke attribute + capture surrounding
+  // path data length if present.
+  const re = /<([a-z]+)[^>]*?\b(fill|stroke)\s*=\s*"([^"]+)"[^>]*?(?:d\s*=\s*"([^"]*)")?[^>]*?\/?>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(svg))) {
+    const value = m[3];
+    const pathData = m[4] ?? "";
+    const hex = colorTokenToHex(value);
+    if (!hex) continue;
+    const weight = Math.max(pathData.length, 32);
+    entries.push({ hex, weight });
+  }
+
+  if (entries.length === 0) return {};
+
+  // Aggregate by hex.
+  const totals = new Map<string, number>();
+  for (const e of entries) totals.set(e.hex, (totals.get(e.hex) || 0) + e.weight);
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([hex]) => hex);
+
+  // Bucket by lightness / saturation.
+  const bgCandidate    = sorted.find(h => { const [, s, l] = hexToHslTuple(h); return l > 0.92 && s < 0.18; });
+  const textCandidate  = sorted.find(h => { const [, s, l] = hexToHslTuple(h); return l < 0.18; });
+  const colors         = sorted.filter(h => {
+    const [, s, l] = hexToHslTuple(h);
+    return s > 0.2 && l > 0.18 && l < 0.85; // chromatic, not too dark/light
+  });
+
+  const partial: Partial<Palette> = {};
+  if (colors[0]) partial.primary = colors[0];
+  if (colors[1]) partial.secondary = colors[1];
+  // Accent = a 3rd chromatic color if present, otherwise complementary derived
+  // by fillPalette() later.
+  if (colors[2]) partial.accent = colors[2];
+  if (bgCandidate) partial.bg = bgCandidate;
+  if (textCandidate) partial.text = textCandidate;
+  return partial;
+}
+
+function colorTokenToHex(raw: string): string | null {
+  const v = raw.trim().toLowerCase();
+  if (v === "none" || v === "transparent" || v === "currentcolor" || v.startsWith("url(")) return null;
+  const hex6 = /^#?([0-9a-f]{6})$/i.exec(v);
+  if (hex6) return `#${hex6[1].toLowerCase()}`;
+  const hex3 = /^#?([0-9a-f]{3})$/i.exec(v);
+  if (hex3) {
+    const [r, g, b] = hex3[1].split("");
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  const rgb = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(v);
+  if (rgb) {
+    const [r, g, b] = [+rgb[1], +rgb[2], +rgb[3]].map(n => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0"));
+    return `#${r}${g}${b}`;
+  }
+  if (v === "white") return "#ffffff";
+  if (v === "black") return "#000000";
+  return null;
+}
+
+async function extractViaVibrant(logoUrl: string): Promise<Partial<Palette>> {
+  const palette = await Vibrant.from(logoUrl).getPalette();
+  const partial: Partial<Palette> = {};
+  const primary   = palette.Vibrant?.hex   ?? palette.DarkVibrant?.hex ?? null;
+  const secondary = palette.Muted?.hex     ?? palette.DarkMuted?.hex   ?? null;
+  const accent    = palette.LightVibrant?.hex ?? null;
+  const text      = palette.DarkMuted?.hex  ?? palette.DarkVibrant?.hex ?? null;
+  const bg        = palette.LightMuted?.hex ?? null;
+  if (primary) partial.primary = primary;
+  if (secondary) partial.secondary = secondary;
+  if (accent) partial.accent = accent;
+  if (text) partial.text = text;
+  if (bg) partial.bg = bg;
+  return partial;
 }
 
 // ── Color-theory completion ────────────────────────────────────────────────
