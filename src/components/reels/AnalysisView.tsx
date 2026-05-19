@@ -480,49 +480,68 @@ export function Dashboard({
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-wrap items-end justify-between gap-6"
+        className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.01)_100%),rgba(14,14,18,0.85)] p-6 backdrop-blur-2xl lg:p-8"
       >
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-              Reel Lab · Analysis
-            </span>
-            {result.niche && (
-              <Pill>
-                {result.niche.niche.replace(/_/g, " ")} ·{" "}
-                {result.niche.confidence}
-              </Pill>
-            )}
+        <div className="pointer-events-none absolute -right-32 -top-32 h-72 w-72 rounded-full bg-violet-500/[0.08] blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 -bottom-24 h-56 w-56 rounded-full bg-cyan-500/[0.04] blur-3xl" />
+
+        <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                <span className="h-1 w-1 rounded-full bg-violet-300 shadow-[0_0_6px_currentColor]" />
+                Reel · Analysis
+              </span>
+              {result.niche && (
+                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/70">
+                  {result.niche.niche.replace(/_/g, " ")} · {result.niche.confidence}
+                </span>
+              )}
+            </div>
+
+            <h1 className="mt-5 max-w-2xl text-balance font-sans text-[clamp(28px,3.4vw,40px)] font-light leading-[1.1] tracking-[-0.025em] text-white">
+              Here&apos;s what a social-graph ranker would do with this reel.
+            </h1>
+
+            <p className="mt-4 max-w-xl text-[13.5px] leading-relaxed text-white/50">
+              We scored every second across attention, emotion, memory, decision and comprehension —
+              then ran the same 10 signals an algorithmic feed uses to decide if you get boost or burial.
+            </p>
+
+            <dl className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-white/40">
+              <MetaItem k="duration" v={`${result.meta.duration_sec.toFixed(1)}s`} />
+              <MetaItem k="ratio" v={result.meta.aspect_ratio} />
+              <MetaItem k="fps" v={`${result.meta.fps}`} />
+              <MetaItem k="size" v={`${result.meta.file_size_mb}MB`} />
+              <MetaItem k="file" v={row.fileName} truncate />
+            </dl>
+
+            <div className="mt-5 flex flex-wrap items-center gap-1.5">
+              <SourceTag source="measured" />
+              <SourceTag source="model" />
+              <SourceTag source="estimated" />
+            </div>
           </div>
-          <h1 className="font-serif text-5xl font-normal tracking-tight text-zinc-50 sm:text-6xl">
-            {row.fileName}
-          </h1>
-          <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-zinc-500">
-            {result.meta.duration_sec.toFixed(1)}s · {result.meta.aspect_ratio} ·{" "}
-            {result.meta.fps}fps · {result.meta.file_size_mb}MB
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <SourceTag source="measured" />
-            <SourceTag source="model" />
-            <SourceTag source="estimated" />
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-3">
-          <ScoreBadge score={result.overall.score} />
-          <div className="flex items-center gap-2" data-print-hide="true">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-zinc-300 hover:bg-zinc-900"
-            >
-              ⤓ export · pdf
-            </button>
-            <span
-              className="hidden rounded-full border border-zinc-900 bg-zinc-950/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:inline-flex"
-              title="Space / K = play/pause · ←/→ = ±2s · J/L = ±10s"
-            >
-              ⌨ space · ← → · j l
-            </span>
+
+          <div className="flex flex-col items-stretch gap-3 lg:items-end">
+            <ScoreBadge score={result.overall.score} />
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end" data-print-hide="true">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70 transition hover:border-white/25 hover:text-white"
+              >
+                <span aria-hidden>⤓</span> Export PDF
+              </button>
+              <span
+                className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/35 sm:inline-flex"
+                title="Space / K play · ← → ±2s · J L ±10s"
+              >
+                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">␣</kbd>
+                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">← →</kbd>
+                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">J L</kbd>
+              </span>
+            </div>
           </div>
         </div>
       </motion.header>
@@ -567,20 +586,25 @@ export function Dashboard({
 
       {result.overall.verdict && (
         <Reveal>
-          <div className="relative overflow-hidden rounded-2xl border border-rose-900/50 bg-gradient-to-br from-rose-950/30 via-zinc-950 to-zinc-950 p-6 lg:p-8">
-            <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-rose-700/20 blur-3xl" />
-            <div className="relative">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)]" />
-                <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-rose-400">
-                  Verdict
-                </span>
-              </div>
-              <p className="max-w-4xl font-serif text-2xl leading-snug text-zinc-100 lg:text-3xl">
+          <figure className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.01)_100%),rgba(14,14,18,0.85)] p-7 backdrop-blur-xl lg:p-9">
+            <svg
+              aria-hidden
+              className="absolute left-6 top-6 h-7 w-7 text-white/15"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M9.5 6c-3.6 0-6 2.7-6 6.3 0 3.4 2 5.7 4.8 5.7 1.6 0 2.8-.9 2.8-2.4 0-1.3-.8-2.1-1.9-2.1-.3 0-.6 0-.9.1.2-2.5 1.7-4.6 3.6-5.4L9.5 6Zm10 0c-3.6 0-6 2.7-6 6.3 0 3.4 2 5.7 4.8 5.7 1.6 0 2.8-.9 2.8-2.4 0-1.3-.8-2.1-1.9-2.1-.3 0-.6 0-.9.1.2-2.5 1.7-4.6 3.6-5.4L19.5 6Z" />
+            </svg>
+            <div className="relative pl-10">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">
+                <span className="h-1 w-1 rounded-full bg-rose-300 shadow-[0_0_6px_currentColor]" />
+                Verdict
+              </span>
+              <blockquote className="mt-4 max-w-4xl font-sans text-[clamp(18px,1.7vw,22px)] font-normal leading-[1.5] text-white/92">
                 {result.overall.verdict}
-              </p>
+              </blockquote>
             </div>
-          </div>
+          </figure>
         </Reveal>
       )}
 
@@ -736,60 +760,66 @@ export function Dashboard({
       )}
 
       <Reveal>
-        <section className="rounded-2xl border border-zinc-900 bg-zinc-950/60 p-6">
-          <header className="mb-4 flex items-baseline justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-500">ⓘ</span>
-              <h3 className="text-base font-medium text-zinc-100">
-                How we score these
-              </h3>
-            </div>
-            <Pill>read methodology</Pill>
+        <section className="rounded-3xl border border-white/[0.08] bg-[rgba(14,14,18,0.6)] p-6 backdrop-blur-xl lg:p-7">
+          <header className="mb-3 flex items-baseline justify-between gap-4">
+            <h3 className="text-[15px] font-medium tracking-tight text-white/90">
+              How we score these
+            </h3>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/55">
+              Methodology
+            </span>
           </header>
-          <p className="max-w-prose text-sm leading-relaxed text-zinc-400">
-            We score every second of the video across five things the brain
-            does — attention, emotion, memory, decision, and comprehension —
-            then roll them up into the five cards above. The peaks and dips on
-            each chart are the moments your viewers reacted noticeably more (or
-            less) than the rest of the video.
+          <p className="max-w-prose text-[13.5px] leading-relaxed text-white/55">
+            Every second of the video is scored across five things the brain does —
+            attention, emotion, memory, decision and comprehension — then rolled up into
+            the cards above. The peaks and dips on each chart are the moments viewers
+            reacted noticeably more or less than the rest.
           </p>
         </section>
       </Reveal>
 
       <Reveal>
-        <section className="relative overflow-hidden rounded-2xl border border-emerald-900/60 bg-gradient-to-br from-emerald-950/30 via-zinc-950 to-zinc-950 p-6 lg:p-8">
-          <div className="absolute -left-12 -bottom-12 h-40 w-40 rounded-full bg-emerald-700/20 blur-3xl" />
+        <section className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.03)_0%,rgba(255,255,255,0.01)_100%),rgba(14,14,18,0.85)] p-7 backdrop-blur-xl lg:p-8">
+          <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-emerald-500/[0.08] blur-3xl" />
           <div className="relative">
-            <h3 className="mb-5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-              Top 3 actions for the next cut
-            </h3>
-            <ol className="space-y-4">
+            <header className="mb-6 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/[0.06] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <span className="h-1 w-1 rounded-full bg-emerald-300 shadow-[0_0_6px_currentColor]" />
+                  Top 3 actions
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
+                  for the next cut
+                </span>
+              </div>
+            </header>
+            <ol className="space-y-3">
               {result.overall.top_3_actions.map((a, i) => {
                 const meta = result.overall.top_3_actions_meta?.[i];
                 return (
                   <li
                     key={i}
-                    className="flex gap-4 border-l border-emerald-800/50 pl-4"
+                    className="group flex gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition hover:border-emerald-400/20 hover:bg-emerald-400/[0.03]"
                   >
-                    <span className="-ml-[18px] mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-800 bg-zinc-950 font-mono text-[11px] text-emerald-400">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-400/5 font-mono text-[11px] font-semibold tabular-nums text-emerald-200">
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <span className="text-base leading-relaxed text-zinc-200">
+                        <p className="text-[14.5px] leading-snug text-white/90">
                           {a}
-                        </span>
+                        </p>
                         {meta && (
                           <span
-                            className="shrink-0 rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-emerald-300"
+                            className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-400/[0.06] px-2.5 py-0.5 font-mono text-[10.5px] font-semibold tabular-nums text-emerald-200"
                             title={meta.rationale}
                           >
-                            +{meta.delta} score
+                            +{meta.delta}
                           </span>
                         )}
                       </div>
                       {meta && (
-                        <p className="mt-1.5 text-xs leading-relaxed text-emerald-200/70">
+                        <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/45">
                           {meta.rationale}
                         </p>
                       )}
@@ -800,31 +830,22 @@ export function Dashboard({
             </ol>
             {result.overall.top_3_actions_meta &&
               result.overall.top_3_actions_meta.length > 0 && (
-                <div className="mt-6 flex items-center gap-3 rounded-xl border border-emerald-800/50 bg-emerald-950/20 px-4 py-3 font-mono text-xs text-emerald-200">
-                  <span className="text-emerald-500">Σ</span>
-                  <span>
-                    Aplicând toate cele 3:{" "}
-                    <span className="tabular-nums text-emerald-100">
-                      {result.overall.score}
-                    </span>{" "}
-                    →{" "}
-                    <span className="tabular-nums text-emerald-100">
+                <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+                    Applying all 3
+                  </span>
+                  <span className="ml-auto flex items-baseline gap-1.5 font-mono text-[13px] tabular-nums">
+                    <span className="text-white/55">{result.overall.score}</span>
+                    <span className="text-white/30">→</span>
+                    <span className="text-white">
                       {Math.min(
                         100,
                         result.overall.score +
-                          result.overall.top_3_actions_meta.reduce(
-                            (a, b) => a + b.delta,
-                            0,
-                          ),
+                          result.overall.top_3_actions_meta.reduce((a, b) => a + b.delta, 0),
                       )}
-                    </span>{" "}
-                    <span className="text-emerald-400">
-                      (+
-                      {result.overall.top_3_actions_meta.reduce(
-                        (a, b) => a + b.delta,
-                        0,
-                      )}
-                      )
+                    </span>
+                    <span className="text-emerald-300">
+                      (+{result.overall.top_3_actions_meta.reduce((a, b) => a + b.delta, 0)})
                     </span>
                   </span>
                 </div>
@@ -835,28 +856,34 @@ export function Dashboard({
 
       {result.hook.variations && result.hook.variations.length > 0 && (
         <Reveal>
-          <section className="rounded-2xl border border-zinc-900 bg-zinc-950/60 p-6">
-            <h3 className="mb-5 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-              Hook variations · text overlay candidates
-            </h3>
-            <ul className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <section className="rounded-3xl border border-white/[0.08] bg-[rgba(14,14,18,0.6)] p-7 backdrop-blur-xl">
+            <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="text-[15px] font-medium tracking-tight text-white/90">
+                Hook variations
+              </h3>
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+                text overlay candidates
+              </span>
+            </header>
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {result.hook.variations.map((v, i) => (
                 <motion.li
                   key={i}
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: i * 0.08, duration: 0.5 }}
-                  whileHover={{ y: -3 }}
-                  className="rounded-xl border border-zinc-900 bg-zinc-900/30 p-4 transition-colors hover:border-emerald-900/60"
+                  transition={{ delay: i * 0.06, duration: 0.45 }}
+                  whileHover={{ y: -2 }}
+                  className="flex flex-col rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 transition hover:border-white/15 hover:bg-white/[0.04]"
                 >
-                  <p className="mb-3 text-base font-medium leading-snug text-zinc-100">
+                  <p className="mb-3 text-[14px] font-medium leading-snug text-white/95">
                     &ldquo;{v.text}&rdquo;
                   </p>
-                  <p className="mb-3 text-xs leading-relaxed text-zinc-400">
+                  <p className="mb-4 text-[12.5px] leading-relaxed text-white/50">
                     {v.rationale}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-400">
+                  <p className="mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-200">
+                    <span className="h-1 w-1 rounded-full bg-emerald-300 shadow-[0_0_5px_currentColor]" />
                     {v.estimated_impact}
                   </p>
                 </motion.li>
@@ -868,22 +895,27 @@ export function Dashboard({
 
       {result.pacing.dead_zones && result.pacing.dead_zones.length > 0 && (
         <Reveal>
-          <section className="rounded-2xl border border-rose-900/50 bg-gradient-to-br from-rose-950/20 via-zinc-950 to-zinc-950 p-6">
-            <h3 className="mb-5 font-mono text-[10px] uppercase tracking-[0.25em] text-rose-400">
-              Dead zones · click to jump
-            </h3>
-            <ul className="space-y-3">
+          <section className="rounded-3xl border border-white/[0.08] bg-[rgba(14,14,18,0.6)] p-7 backdrop-blur-xl">
+            <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+              <h3 className="text-[15px] font-medium tracking-tight text-white/90">
+                Dead zones
+              </h3>
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-200/70">
+                click to jump
+              </span>
+            </header>
+            <ul className="divide-y divide-white/[0.05]">
               {result.pacing.dead_zones.map((dz, i) => (
                 <motion.li
                   key={i}
-                  whileHover={{ x: 4 }}
-                  className="flex cursor-pointer items-start gap-4 rounded-lg p-3 transition-colors hover:bg-rose-950/30"
+                  whileHover={{ x: 3 }}
+                  className="group flex cursor-pointer items-start gap-4 py-3 transition"
                   onClick={() => seek(dz.start_sec)}
                 >
-                  <span className="font-mono text-xs tabular-nums text-rose-400">
+                  <span className="shrink-0 rounded-md border border-rose-400/25 bg-rose-400/[0.06] px-2 py-0.5 font-mono text-[11px] tabular-nums text-rose-200">
                     {dz.start_sec.toFixed(1)}–{dz.end_sec.toFixed(1)}s
                   </span>
-                  <span className="leading-relaxed text-zinc-300">
+                  <span className="text-[13.5px] leading-relaxed text-white/75 group-hover:text-white">
                     {dz.reason}
                   </span>
                 </motion.li>
@@ -894,21 +926,26 @@ export function Dashboard({
       )}
 
       <Reveal>
-        <section className="rounded-2xl border border-zinc-900 bg-zinc-950/60 p-6">
-          <h3 className="mb-5 font-mono text-[10px] uppercase tracking-[0.25em] text-rose-400">
-            Weaknesses · everything that will kill this reel
-          </h3>
-          <ul className="space-y-3">
+        <section className="rounded-3xl border border-white/[0.08] bg-[rgba(14,14,18,0.6)] p-7 backdrop-blur-xl">
+          <header className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+            <h3 className="text-[15px] font-medium tracking-tight text-white/90">
+              Weaknesses
+            </h3>
+            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-200/70">
+              what will kill this reel
+            </span>
+          </header>
+          <ul className="space-y-2.5">
             {result.overall.weaknesses.map((w, i) => (
               <motion.li
                 key={i}
                 initial={{ opacity: 0, x: -8 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-start gap-3 text-sm leading-relaxed text-zinc-300"
+                transition={{ delay: i * 0.04 }}
+                className="flex items-start gap-3 text-[13.5px] leading-relaxed text-white/80"
               >
-                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]" />
+                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-rose-300 shadow-[0_0_6px_currentColor]" />
                 <span>{w}</span>
               </motion.li>
             ))}
@@ -974,46 +1011,52 @@ function CritiqueDiff({
   );
 }
 
+function MetaItem({ k, v, truncate }: { k: string; v: string; truncate?: boolean }) {
+  return (
+    <div className={`flex items-center gap-1.5 ${truncate ? "min-w-0 max-w-[260px]" : ""}`}>
+      <span className="text-white/30">{k}</span>
+      <span className={`text-white/70 normal-case tracking-normal ${truncate ? "truncate" : ""}`}>{v}</span>
+    </div>
+  );
+}
+
 function ScoreBadge({ score }: { score: number }) {
   const tone =
     score >= 75
-      ? {
-          border: "border-emerald-700",
-          glow: "shadow-[0_0_28px_rgba(16,185,129,0.18)]",
-          text: "text-emerald-300",
-          dot: "bg-emerald-400",
-        }
+      ? { label: "Strong", accent: "#34d399", glow: "rgba(52,211,153,0.16)" }
       : score >= 50
-        ? {
-            border: "border-amber-700",
-            glow: "shadow-[0_0_28px_rgba(245,158,11,0.18)]",
-            text: "text-amber-300",
-            dot: "bg-amber-400",
-          }
-        : {
-            border: "border-rose-700",
-            glow: "shadow-[0_0_28px_rgba(244,63,94,0.20)]",
-            text: "text-rose-300",
-            dot: "bg-rose-400",
-          };
+        ? { label: "Mid", accent: "#fbbf24", glow: "rgba(251,191,36,0.16)" }
+        : { label: "Weak", accent: "#fb7185", glow: "rgba(251,113,133,0.18)" };
   return (
     <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
+      initial={{ scale: 0.92, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
-      className={`relative flex items-center gap-3 rounded-2xl border bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 px-5 py-3 ${tone.border} ${tone.glow}`}
+      transition={{ duration: 0.6, delay: 0.15 }}
+      className="relative flex min-w-[200px] items-center gap-4 rounded-2xl border border-white/10 bg-[rgba(14,14,18,0.7)] px-5 py-4 backdrop-blur"
+      style={{ boxShadow: `0 0 32px -8px ${tone.glow}` }}
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${tone.dot} shadow-[0_0_8px_currentColor]`}
-      />
-      <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
-        Overall
-      </span>
-      <AnimatedNumber
-        value={score}
-        className={`text-4xl font-semibold tabular-nums ${tone.text}`}
-      />
-      <span className="text-xs text-zinc-600">/100</span>
+      <div className="flex flex-col">
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
+          Overall
+        </span>
+        <span
+          className="mt-0.5 inline-flex items-center gap-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: tone.accent }}
+        >
+          <span
+            className="h-1 w-1 rounded-full"
+            style={{ background: tone.accent, boxShadow: `0 0 6px ${tone.accent}` }}
+          />
+          {tone.label}
+        </span>
+      </div>
+      <div className="ml-auto flex items-baseline gap-1">
+        <AnimatedNumber
+          value={score}
+          className="text-[44px] font-light leading-none tabular-nums text-white"
+        />
+        <span className="text-[11px] font-medium text-white/35">/100</span>
+      </div>
     </motion.div>
   );
 }

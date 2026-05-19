@@ -104,29 +104,29 @@ export default function VideoPlayer({
     else v.pause();
   };
   return (
-    <div className="rounded-2xl border border-zinc-900 bg-zinc-950 p-4">
+    <div className="rounded-3xl border border-white/[0.08] bg-[rgba(14,14,18,0.65)] p-4 backdrop-blur-xl">
       <header className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-700 font-mono text-[11px] text-emerald-400">
-            A
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">
+            Your reel
           </span>
-          <span className="font-medium text-zinc-200">Your Content</span>
         </div>
-        <span className="rounded-full border border-emerald-700/50 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-emerald-400">
-          live
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/55">
+          <span className={`h-1 w-1 rounded-full ${playing ? "bg-emerald-300 shadow-[0_0_5px_currentColor]" : "bg-white/30"}`} />
+          {playing ? "playing" : "ready"}
         </span>
       </header>
-      <div className="relative flex justify-center rounded-xl bg-black">
+      <div className="relative flex justify-center rounded-2xl bg-black/95 ring-1 ring-white/[0.04]">
         <video
           ref={videoRef}
           src={videoUrl}
-          className="max-h-[420px] rounded-xl"
+          className="max-h-[420px] rounded-2xl"
           playsInline
           preload="metadata"
         />
         {overlay && (
-          <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl border border-emerald-700/60 bg-black/85 px-3 py-2.5 font-mono text-xs leading-relaxed text-emerald-100 backdrop-blur">
-            <div className="mb-0.5 text-[9px] uppercase tracking-widest text-emerald-400">
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl border border-white/15 bg-black/80 px-3 py-2.5 font-mono text-xs leading-relaxed text-white/90 backdrop-blur">
+            <div className="mb-0.5 text-[9.5px] uppercase tracking-[0.18em] text-white/50">
               moment · paused
             </div>
             {overlay}
@@ -134,7 +134,7 @@ export default function VideoPlayer({
         )}
       </div>
       <div className="mt-3">
-        <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+        <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
           Scrub the video · previews {0}/{engagement.moments.length}
         </p>
         <ScrubBar
@@ -157,25 +157,25 @@ export default function VideoPlayer({
         <button
           type="button"
           onClick={() => skip(-10)}
-          className="rounded-full border border-zinc-800 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-300 hover:bg-zinc-900"
+          className="rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:border-white/25 hover:text-white"
         >
-          ⟨⟨ 10s
+          −10s
         </button>
         <button
           type="button"
           onClick={toggle}
-          className="rounded-full bg-zinc-100 px-4 py-1 font-mono text-[11px] uppercase tracking-widest text-zinc-900 hover:bg-zinc-200"
+          className="rounded-full bg-white px-5 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-black transition hover:bg-white/90"
         >
-          {playing ? "pause" : "play"}
+          {playing ? "Pause" : "Play"}
         </button>
         <button
           type="button"
           onClick={() => skip(10)}
-          className="rounded-full border border-zinc-800 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-zinc-300 hover:bg-zinc-900"
+          className="rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:border-white/25 hover:text-white"
         >
-          10s ⟩⟩
+          +10s
         </button>
-        <div className="ml-auto font-mono text-[11px] tabular-nums text-zinc-400">
+        <div className="ml-auto font-mono text-[11px] tabular-nums text-white/55">
           {formatTime(t)} / {formatTime(duration)}
         </div>
       </div>
@@ -183,10 +183,10 @@ export default function VideoPlayer({
         <button
           type="button"
           onClick={() => seek(recommendedThumbnailSec)}
-          className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-900/60 bg-emerald-950/30 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-emerald-300 hover:bg-emerald-950/50"
+          className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:border-amber-300/30 hover:text-amber-200"
         >
-          <span>★</span>
-          <span>jump to recommended thumbnail @ {formatTime(recommendedThumbnailSec)}</span>
+          <span className="text-amber-300">★</span>
+          <span>Jump to recommended thumbnail @ {formatTime(recommendedThumbnailSec)}</span>
         </button>
       )}
     </div>
