@@ -282,44 +282,74 @@ async function generateSvgFromRecraft(input: GenerateLogoInput): Promise<{ svg: 
 }
 
 /**
- * Force every fill (and explicit stroke) in the SVG to a single hex color.
- * Recraft's `controls.colors` is documented as a "preferable" signal, not a
- * hard constraint — V4 routinely drifts to other hues. When the user has
- * explicitly forced a color, we recolor the geometry deterministically so the
- * result matches what they picked.
+ * Force foreground fills (and explicit strokes) in the SVG to a single hex
+ * color. Recraft's `controls.colors` is documented as a "preferable" signal —
+ * V4 routinely drifts to other hues. When the user explicitly forces a color
+ * we recolor the geometry deterministically.
  *
- * We leave fill="none" alone (those are transparent regions) and we leave
- * gradients/patterns alone (skip url(...) references). Strokes that were
- * explicitly defined get retinted too; missing strokes stay missing.
+ * Critically we PRESERVE background fills (Recraft typically draws an
+ * off-white #FAFAFA backplate as the first rect). Heuristic: any color
+ * whose R, G, B channels are all >= 235 is treated as background.
+ * We also leave fill="none" and url(...) references alone.
  */
 function recolorSvgMono(svg: string, hex: string): string {
   const safeHex = /^#?[0-9a-fA-F]{6}$/.test(hex) ? (hex.startsWith("#") ? hex : `#${hex}`) : null;
   if (!safeHex) return svg;
 
-  // Replace fill="<color>" attributes — but leave fill="none" and url(...) refs.
-  let out = svg.replace(/fill\s*=\s*"([^"]+)"/g, (m, val) => {
-    const v = val.trim().toLowerCase();
-    if (v === "none" || v.startsWith("url(")) return m;
-    return `fill="${safeHex}"`;
-  });
+  // Parse various color forms to RGB, return null if unparseable.
+  function parseColor(s: string): [number, number, number] | null {
+    const t = s.trim().toLowerCase();
+    if (t === "none" || t === "currentcolor" || t === "transparent") return null;
+    if (t.startsWith("url(")) return null;
+    // Hex #rgb or #rrggbb
+    const h6 = /^#?([0-9a-f]{6})$/i.exec(t);
+    if (h6) {
+      const v = parseInt(h6[1], 16);
+      return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+    }
+    const h3 = /^#?([0-9a-f]{3})$/i.exec(t);
+    if (h3) {
+      const v = parseInt(h3[1], 16);
+      const r = ((v >> 8) & 0xf) * 17;
+      const g = ((v >> 4) & 0xf) * 17;
+      const b = (v & 0xf) * 17;
+      return [r, g, b];
+    }
+    const rgb = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(t);
+    if (rgb) return [+rgb[1], +rgb[2], +rgb[3]];
+    if (t === "white") return [255, 255, 255];
+    if (t === "black") return [0, 0, 0];
+    return null;
+  }
+  function isBackground(rgb: [number, number, number] | null): boolean {
+    if (!rgb) return false;
+    // Near-white plate — leave alone.
+    return rgb[0] >= 235 && rgb[1] >= 235 && rgb[2] >= 235;
+  }
 
-  // Replace stroke="<color>" too (only if it isn't "none" / url ref).
-  out = out.replace(/stroke\s*=\s*"([^"]+)"/g, (m, val) => {
+  function maybeReplace(val: string, replacement: string): string {
     const v = val.trim().toLowerCase();
-    if (v === "none" || v.startsWith("url(")) return m;
-    return `stroke="${safeHex}"`;
-  });
+    if (v === "none" || v === "transparent" || v.startsWith("url(")) return val;
+    const rgb = parseColor(val);
+    if (isBackground(rgb)) return val; // keep backplate
+    return replacement;
+  }
 
-  // CSS-style: fill: <color>; in style attributes.
-  out = out.replace(/fill\s*:\s*([^;\"]+)/g, (m, val) => {
-    const v = val.trim().toLowerCase();
-    if (v === "none" || v.startsWith("url(")) return m;
-    return `fill:${safeHex}`;
+  let out = svg.replace(/fill\s*=\s*"([^"]+)"/g, (_m, val) => {
+    const next = maybeReplace(val, safeHex);
+    return `fill="${next}"`;
   });
-  out = out.replace(/stroke\s*:\s*([^;\"]+)/g, (m, val) => {
-    const v = val.trim().toLowerCase();
-    if (v === "none" || v.startsWith("url(")) return m;
-    return `stroke:${safeHex}`;
+  out = out.replace(/stroke\s*=\s*"([^"]+)"/g, (_m, val) => {
+    const next = maybeReplace(val, safeHex);
+    return `stroke="${next}"`;
+  });
+  out = out.replace(/fill\s*:\s*([^;"]+)/g, (_m, val) => {
+    const next = maybeReplace(val, safeHex);
+    return `fill:${next}`;
+  });
+  out = out.replace(/stroke\s*:\s*([^;"]+)/g, (_m, val) => {
+    const next = maybeReplace(val, safeHex);
+    return `stroke:${next}`;
   });
   return out;
 }
