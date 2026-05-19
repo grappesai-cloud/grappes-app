@@ -440,7 +440,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
     // ── Logo-gen sub-step state ────────────────────────────
     // One conversational question per screen. All answers live on a session
     // object so the user can flow back/forward without losing them.
-    window.__LG__ = window.__LG__ || { type: 'icon', mood: '', desc: '', style: '', primaryColor: null };
+    window.__LG__ = window.__LG__ || { type: 'icon', mood: '', desc: '', style: '', primaryColor: null, returnTo: null };
     const LG = window.__LG__;
 
     function selectableTile({ value, title, sub, selected }) {
@@ -735,7 +735,20 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         }
       });
 
-      wireFooter(card, { onNext: async () => !!STATE.assets?.logo || (alert('Generate your logo first (or go back to skip).'), false) });
+      wireFooter(card, { onNext: async () => {
+        if (!STATE.assets?.logo) { alert('Generate your logo first (or go back to skip).'); return false; }
+        // If user came from the Brand step via "Generate with AI", route back there.
+        if (LG.returnTo) {
+          const target = LG.returnTo; LG.returnTo = null;
+          needsLogoGen = false;
+          rebuildSteps(target);
+          renderProgress();
+          renderStep();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return false; // we handled navigation
+        }
+        return true;
+      } });
     }
 
     // ── (deprecated, retained for safety if cached) ────────
@@ -1106,12 +1119,34 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
     // ── Step: brand (palette + fonts) ──────────────────────
     function renderBrand(card) {
+      const logoUrl = STATE.assets?.logo;
+      const logoSvgUrl = STATE.assets?.logo_svg;
       card.innerHTML = `
         ${eyebrowHTML()}
-        <h2 style="${STYLE_TITLE}">Palette & fonts.</h2>
-        <p style="${STYLE_HELPER}">We pulled these from your logo (where possible). Tweak any swatch — click to pick a color. Fonts search across all Google Fonts.</p>
+        <h2 style="${STYLE_TITLE}">Logo, palette & fonts.</h2>
+        <p style="${STYLE_HELPER}">We pulled the palette from your logo (where possible). Tweak any swatch. Fonts search across all Google Fonts. You can also regenerate the logo with AI any time.</p>
 
         <div style="display:flex;flex-direction:column;gap:22px;">
+          <div>
+            <label style="${STYLE_LABEL}">Logo</label>
+            <div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;">
+              ${logoUrl
+                ? `<img src="${logoUrl}" alt="" style="width:72px;height:72px;object-fit:contain;background:#fafafa;border-radius:10px;padding:6px;" />`
+                : `<div style="width:72px;height:72px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.18);border-radius:10px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:11px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;">None</div>`}
+              <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <strong style="font-size:13.5px;color:#fff;font-weight:600;">${logoUrl ? 'Current logo' : 'No logo yet'}</strong>
+                <span style="font-size:11.5px;color:rgba(255,255,255,0.45);">${logoSvgUrl ? 'SVG vector ready' : (logoUrl ? 'PNG only' : 'Upload or generate one with AI')}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+              ${logoUrl ? `<a href="${logoUrl}" download style="height:36px;padding:0 14px;display:inline-flex;align-items:center;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;text-decoration:none;cursor:pointer;">Download PNG</a>` : ''}
+              ${logoSvgUrl ? `<a href="${logoSvgUrl}" download style="height:36px;padding:0 14px;display:inline-flex;align-items:center;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;text-decoration:none;cursor:pointer;">Download SVG</a>` : ''}
+              <button type="button" id="brand-logo-replace" style="height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">${logoUrl ? 'Replace with new upload' : 'Upload a logo'}</button>
+              <button type="button" id="brand-logo-ai" style="height:36px;padding:0 14px;border-radius:999px;background:linear-gradient(135deg,rgba(167,139,250,0.18) 0%, rgba(249,115,22,0.18) 140%);color:#fff;border:1px solid rgba(167,139,250,0.4);font-family:inherit;font-size:12px;font-weight:700;letter-spacing:0.02em;cursor:pointer;">${logoUrl ? 'Regenerate with AI' : 'Generate with AI'}</button>
+            </div>
+            <input type="file" accept="image/*" id="brand-logo-input" style="display:none;" />
+          </div>
+
           <div>
             <label style="${STYLE_LABEL}">Palette</label>
             <div id="f-palette" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
@@ -1168,6 +1203,30 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           card.querySelectorAll('#f-palette input[type=color]').forEach(el => { el.value = next[el.dataset.pal]; });
           queueSave({ palette: next });
         });
+      });
+
+      // ── Logo affordances (Brand step) ──────────────────
+      const fileInput = card.querySelector('#brand-logo-input');
+      card.querySelector('#brand-logo-replace')?.addEventListener('click', () => fileInput.click());
+      fileInput?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        markDirty();
+        try {
+          const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+          const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+          STATE.assets = { ...(STATE.assets || {}), logo: blob.url, logo_svg: undefined };
+          await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });
+          markSaved();
+          renderBrand(card);
+        } catch (err) { console.error(err); saveState.textContent = 'Upload failed'; }
+      });
+      card.querySelector('#brand-logo-ai')?.addEventListener('click', () => {
+        LG.returnTo = 'brand';
+        needsLogoGen = true;
+        rebuildSteps('logo-type');
+        renderProgress();
+        renderStep();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
       wireFontCombos(card);
