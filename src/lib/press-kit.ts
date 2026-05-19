@@ -69,6 +69,8 @@ export interface PressKit {
     cover_portrait?: string;     // dominant cover photo
     spread_portraits?: string[]; // left-half portraits cycled through spreads
     signature?: string;          // transparent PNG of user signature (optional)
+    // Brand Book additions
+    mascot?: string;             // optional mascot illustration / element
   };
   press: { name: string; url?: string; year?: string; quote?: string; role?: string; title?: string }[];
   awards: { name: string; year?: string; issuer?: string }[];
@@ -90,6 +92,15 @@ export interface PressKit {
     press_link?: string;
     instagram?: string;
   };
+
+  // ── Brand Book structured fields (PR 3) ────────────────────────────────
+  industry?: string | null;
+  voice_keywords?: string | null;
+  voice_paragraph?: string | null;
+  palette_named?: { hex: string; label?: string; role?: string }[];
+  applications?: string[]; // MockupId[] but kept loose to avoid cross-import
+  donts?: string[];
+  // Optional mascot asset lives in assets.mascot (typed below).
 
   template_version: number;
   stripe_session_id: string | null;

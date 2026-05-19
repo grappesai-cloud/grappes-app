@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <filter id="sh" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a09c93"/>
+      <stop offset="1" stop-color="#6f6c66"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#wall)"/>
+  <line x1="0" y1="340" x2="1024" y2="340" stroke="#5a5751" stroke-width="2"/>
+  <line x1="0" y1="700" x2="1024" y2="700" stroke="#5a5751" stroke-width="2"/>
+  <g filter="url(#sh)">
+    <rect x="120" y="380" width="784" height="280" fill="#f8f6ef"/>
+    <rect x="120" y="380" width="784" height="280" fill="none" stroke="#1d1d1f" stroke-width="3"/>
+    <rect x="170" y="430" width="684" height="180" fill="none" stroke="#bdb6a0" stroke-width="2" stroke-dasharray="8 8"/>
+  </g>
+  <rect x="200" y="660" width="10" height="46" fill="#3a3833"/>
+  <rect x="814" y="660" width="10" height="46" fill="#3a3833"/>
+  <text x="512" y="970" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#2c2a26" letter-spacing="5">STOREFRONT SIGNAGE</text>
+</svg>

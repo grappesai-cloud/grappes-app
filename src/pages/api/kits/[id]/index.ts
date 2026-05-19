@@ -14,6 +14,9 @@ const UPDATABLE_FIELDS = new Set([
   // DENY-style additions (PR 2)
   "role", "overview_intro", "key_highlights", "shared_stage",
   "career", "big_stats", "booking",
+  // Brand Book additions (PR 3)
+  "industry", "voice_keywords", "voice_paragraph",
+  "palette_named", "applications", "donts",
 ]);
 
 const VALID_MODES = new Set(["press_kit", "brand_book"]);

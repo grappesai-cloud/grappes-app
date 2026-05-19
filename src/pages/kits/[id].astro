@@ -31,73 +31,739 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
 
 <Dashboard title={`Edit — ${k.name}`}>
   {kitMode === 'brand_book' ? (
-    <>
-      <style is:global>{`main { padding-top: 56px !important; padding-bottom: 80px !important; max-width: 760px !important; }`}</style>
+    <Fragment>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link rel="stylesheet" href={fontsCss} />
+      <link rel="stylesheet" href={previewFontsCss} />
 
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap;">
+      <style is:global>{`main { padding-top: 28px !important; padding-bottom: 80px !important; max-width: 1180px !important; }`}</style>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
         <a href="/kits" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          <span>Back to dashboard</span>
+          <span>Brand books</span>
         </a>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span id="bb-save-state" style="font-size:11.5px;color:rgba(255,255,255,0.5);transition:opacity .2s;"></span>
+          {k.status === 'published' && k.slug ? (
+            <a href={`/kit/${k.slug}`} target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:rgba(110,231,163,0.1);color:#6ee7a3;border:1px solid rgba(110,231,163,0.3);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;text-decoration:none;">View live →</a>
+          ) : null}
+        </div>
       </div>
 
-      <section style="background:linear-gradient(180deg,rgba(167,139,250,0.1) 0%, rgba(167,139,250,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(167,139,250,0.24);border-radius:24px;padding:56px 48px;text-align:left;">
-        <span style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#a78bfa;padding:6px 14px;border-radius:999px;background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.36);margin-bottom:18px;">
-          <span style="width:6px;height:6px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px rgba(167,139,250,0.7);"></span>
-          Brand Book
-        </span>
-        <h1 style="font-family:'Inter',sans-serif;font-size:clamp(32px,4.6vw,46px);font-weight:300;letter-spacing:-0.035em;line-height:1.05;color:#fff;margin:0 0 18px;">
-          Your brand book studio is coming next.
-        </h1>
-        <p style="font-size:15px;color:rgba(255,255,255,0.65);line-height:1.6;margin:0 0 14px;max-width:580px;">
-          We're building a flow that produces a polished brand book, not just a doc. Expect: a logo system spread (primary, mono, lockups, clear space), a color palette with hex codes, typography specimens powered by Google Fonts, and AI-generated mockup applications — packaging, signage, social.
-        </p>
-        <p style="font-size:14px;color:rgba(255,255,255,0.5);line-height:1.6;margin:0 0 36px;max-width:580px;">
-          The kit "{k.name}" is saved and waiting in Brand Book mode. You'll be able to pick this up once the flow ships. In the meantime you can keep working in Press Kit mode.
-        </p>
-
-        <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <button type="button" id="switch-to-press-kit" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;cursor:pointer;font-family:inherit;">
-            Switch to Press Kit instead →
-          </button>
-          <a href="/dashboard" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.15);border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">
-            Back to dashboard
-          </a>
+      {justPublished && (
+        <div style="background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:14px 18px;color:#6ee7a3;font-size:13.5px;margin-bottom:22px;text-align:center;">
+          Published — your shareable link is grappes.dev/kit/{k.slug ?? '…'}
         </div>
-        <p id="switch-error" style="display:none;font-size:12px;color:#ff8a8a;margin:14px 0 0;"></p>
-      </section>
+      )}
+
+      <div id="bb-progress" style="max-width:680px;margin:0 auto 28px;"></div>
+
+      <script id="bb-bootstrap" type="application/json" set:html={JSON.stringify({
+        id: k.id, name: k.name, tagline: k.tagline,
+        palette: k.palette, fonts: k.fonts,
+        assets: k.assets ?? {},
+        industry: (k as any).industry ?? '',
+        voice_keywords: (k as any).voice_keywords ?? '',
+        voice_paragraph: (k as any).voice_paragraph ?? '',
+        palette_named: (k as any).palette_named ?? [],
+        applications: (k as any).applications ?? ['business_card','tote_bag','signage','phone_case'],
+        donts: (k as any).donts ?? [],
+        status: k.status, slug: k.slug,
+      })} />
+      <script id="bb-font-bootstrap" type="application/json" set:html={JSON.stringify(GOOGLE_FONTS)} />
+
+      <div id="bb-wiz-stage"></div>
+
+      <div id="bb-review-stage" hidden style="grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:18px;align-items:start;margin-top:6px;">
+        <aside id="bb-review-recap" style="background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:24px;max-height:calc(100vh - 140px);overflow-y:auto;position:sticky;top:90px;"></aside>
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:20px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.55);font-weight:700;">
+            <span>Live preview</span>
+            {k.status === 'published' && k.slug ? (
+              <a href={`/kit/${k.slug}?print=1`} target="_blank" style="color:#a78bfa;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:0.08em;">Print / PDF →</a>
+            ) : (
+              <span style="font-size:10.5px;color:rgba(255,255,255,0.4);letter-spacing:0.06em;">PDF after publish</span>
+            )}
+          </div>
+          <iframe id="bb-preview" src={`/kit/preview/${k.id}`} title="Brand book preview" style="width:100%;height:calc(100vh - 200px);min-height:640px;border:0;background:#fafafa;display:block;"></iframe>
+        </div>
+      </div>
+
+      <style>
+        .bbw-input:focus, .bbw-textarea:focus { border-color:#a78bfa !important; box-shadow:0 0 0 3px rgba(167,139,250,0.18) !important; }
+        .bbw-chip:hover { border-color:rgba(255,255,255,0.28); color:#fff; }
+        .bbw-chip.is-active { background:rgba(167,139,250,0.14) !important; border-color:#a78bfa !important; color:#fff !important; box-shadow:0 0 0 3px rgba(167,139,250,0.14); }
+        .bbw-tile:hover { border-color:rgba(255,255,255,0.28); transform:translateY(-1px); }
+        .bbw-tile.is-active { background:rgba(167,139,250,0.1) !important; border-color:#a78bfa !important; box-shadow:0 0 0 3px rgba(167,139,250,0.14); }
+        .bbw-fadein { animation: bbwFade .28s ease both; }
+        @keyframes bbwFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        .bbw-rm { width:36px;height:36px;border-radius:10px;border:0;background:rgba(239,68,68,0.1);color:#ff8a8a;cursor:pointer;font-size:16px;font-family:inherit; }
+        .bbw-rm:hover { background:rgba(239,68,68,0.18); }
+        .bbw-add:hover { background:rgba(255,255,255,0.07); color:#fff; }
+        .bbw-font-opt:hover, .bbw-font-opt.is-active { background:rgba(167,139,250,0.14); color:#fff; }
+        .bbw-secondary:hover { background:rgba(255,255,255,0.05); color:#fff; }
+        .bbw-primary:hover:not(:disabled) { background:#c4b5fd; }
+        .bbw-primary:disabled { opacity:.6;cursor:wait; }
+        .bbw-recap-edit:hover { color:#c4b5fd; }
+      </style>
 
       <script is:inline define:vars={{ kitId: k.id }}>
-        document.getElementById('switch-to-press-kit').addEventListener('click', async () => {
-          const btn = document.getElementById('switch-to-press-kit');
-          const err = document.getElementById('switch-error');
-          err.style.display = 'none';
-          btn.disabled = true;
-          btn.textContent = 'Switching…';
+        const STATE = JSON.parse(document.getElementById('bb-bootstrap').textContent);
+        const FONTS = JSON.parse(document.getElementById('bb-font-bootstrap').textContent);
+
+        const STEPS = [
+          { key: 'identity',     chapter: 'Identity',     title: 'Tell us about the brand.' },
+          { key: 'logo-upload',  chapter: 'Logo',         title: 'Upload your primary logo.' },
+          { key: 'mascot',       chapter: 'Mascot',       title: 'A mascot or symbol?' },
+          { key: 'palette',      chapter: 'Color',        title: 'Lock in your color palette.' },
+          { key: 'typography',   chapter: 'Typography',   title: 'Pick your two fonts.' },
+          { key: 'voice',        chapter: 'Voice',        title: 'How does the brand speak?' },
+          { key: 'applications', chapter: 'Applications', title: 'Where will the brand show up?' },
+          { key: 'donts',        chapter: "Don'ts",       title: 'Set a few rules.' },
+          { key: 'review',       chapter: 'Review',       title: 'Review & publish' },
+        ];
+        let stepIdx = 0;
+
+        // ── Save plumbing ──────────────────────────────────────
+        let saveTimer = null;
+        let pendingUpdate = {};
+        const saveState = document.getElementById('bb-save-state');
+        function markDirty() { saveState.textContent = 'Saving…'; saveState.style.opacity = '1'; }
+        function markSaved() { saveState.textContent = 'Saved'; setTimeout(() => { if (saveState.textContent === 'Saved') saveState.style.opacity = '0'; }, 1400); }
+        async function flushSave() {
+          if (Object.keys(pendingUpdate).length === 0) return;
+          const body = pendingUpdate; pendingUpdate = {};
           try {
-            const r = await fetch(`/api/kits/${kitId}`, {
-              method: 'PATCH',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ mode: 'press_kit' }),
+            const r = await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+            if (r.ok) markSaved(); else { saveState.textContent = 'Save failed'; saveState.style.opacity = '1'; }
+          } catch { saveState.textContent = 'Save failed'; saveState.style.opacity = '1'; }
+        }
+        function queueSave(patch) {
+          Object.assign(pendingUpdate, patch);
+          Object.assign(STATE, patch);
+          markDirty();
+          clearTimeout(saveTimer);
+          saveTimer = setTimeout(flushSave, 500);
+        }
+
+        // ── Styles ─────────────────────────────────────────────
+        const STYLE_CARD = 'background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:36px 40px 28px;max-width:680px;margin:0 auto;box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 18px 40px -22px rgba(0,0,0,0.55);';
+        const STYLE_EYEBROW = 'display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#a78bfa;padding:5px 12px;border-radius:999px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.36);';
+        const STYLE_EYEBROW_DOT = 'width:6px;height:6px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px rgba(167,139,250,0.7);';
+        const STYLE_TITLE = "font-family:'Inter',sans-serif;font-size:clamp(26px,3.4vw,34px);font-weight:300;letter-spacing:-0.028em;line-height:1.1;color:#fff;margin:18px 0 10px;";
+        const STYLE_HELPER = 'font-size:13.5px;color:rgba(255,255,255,0.55);margin:0 0 26px;line-height:1.55;max-width:580px;';
+        const STYLE_LABEL = 'font-size:11px;font-weight:700;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.1em;display:block;margin-bottom:8px;';
+        const STYLE_INPUT = 'width:100%;height:48px;padding:0 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;outline:none;transition:border-color .15s, box-shadow .15s;';
+        const STYLE_TEXTAREA = 'width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:15px;line-height:1.6;outline:none;resize:vertical;min-height:120px;transition:border-color .15s, box-shadow .15s;';
+        const STYLE_BTN_PRIMARY = 'height:48px;padding:0 26px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:13.5px;font-weight:700;letter-spacing:0.04em;cursor:pointer;transition:background .15s;';
+        const STYLE_BTN_GHOST = 'height:44px;padding:0 18px;background:transparent;color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;transition:all .15s;';
+        const STYLE_BTN_LINK  = 'height:44px;padding:0 14px;background:transparent;color:rgba(255,255,255,0.5);border:0;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;letter-spacing:0.02em;';
+        const STYLE_ADD = 'width:100%;padding:13px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.2);border-radius:12px;color:rgba(255,255,255,0.7);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;';
+        const STYLE_CHIP = 'padding:9px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:999px;color:rgba(255,255,255,0.78);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;';
+
+        function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function escapeAttr(s) { return escapeHtml(s); }
+
+        function eyebrowHTML() {
+          const step = STEPS[stepIdx];
+          return `<span style="${STYLE_EYEBROW}"><span style="${STYLE_EYEBROW_DOT}"></span>Step ${stepIdx + 1} of ${STEPS.length} · ${step.chapter}</span>`;
+        }
+        function footerHTML({ skipText = 'Skip', nextText = 'Continue →', hideNext = false, hideSkip = false } = {}) {
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:32px;padding-top:22px;border-top:1px solid rgba(255,255,255,0.06);gap:10px;flex-wrap:wrap;">
+              <button type="button" data-act="back" class="bbw-secondary" style="${STYLE_BTN_LINK}" ${stepIdx === 0 ? 'disabled style="visibility:hidden"' : ''}>← Back</button>
+              <div style="display:flex;gap:8px;align-items:center;margin-left:auto;">
+                ${hideSkip ? '' : `<button type="button" data-act="skip" class="bbw-secondary" style="${STYLE_BTN_GHOST}">${skipText}</button>`}
+                ${hideNext ? '' : `<button type="button" data-act="next" class="bbw-primary" style="${STYLE_BTN_PRIMARY}">${nextText}</button>`}
+              </div>
+            </div>
+          `;
+        }
+        function wireFooter(card, { onNext } = {}) {
+          card.querySelector('[data-act=back]')?.addEventListener('click', back);
+          card.querySelector('[data-act=skip]')?.addEventListener('click', next);
+          card.querySelector('[data-act=next]')?.addEventListener('click', async () => {
+            if (onNext) { const ok = await onNext(); if (ok === false) return; }
+            await flushSave(); next();
+          });
+        }
+
+        function renderProgress() {
+          const wrap = document.getElementById('bb-progress');
+          const total = STEPS.length;
+          const pct = Math.round(((stepIdx + 1) / total) * 100);
+          const step = STEPS[stepIdx];
+          wrap.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span style="display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.55);font-variant-numeric:tabular-nums;">
+                <span style="color:#a78bfa;">${String(stepIdx + 1).padStart(2,'0')}</span>
+                <span style="opacity:.5;">/ ${String(total).padStart(2,'0')}</span>
+                <span style="width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,0.3);margin:0 2px;"></span>
+                <span>${step.chapter}</span>
+              </span>
+              <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);letter-spacing:0.06em;font-variant-numeric:tabular-nums;">${pct}%</span>
+            </div>
+            <div style="height:3px;width:100%;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#a78bfa,#c4b5fd);border-radius:999px;transition:width .35s cubic-bezier(.4,0,.2,1);"></div>
+            </div>
+          `;
+        }
+
+        function goTo(i, { skipSave = false } = {}) {
+          if (i < 0 || i >= STEPS.length) return;
+          if (!skipSave) flushSave();
+          stepIdx = i;
+          window.location.hash = `step=${STEPS[i].key}`;
+          renderProgress();
+          const review = STEPS[i].key === 'review';
+          const wiz = document.getElementById('bb-wiz-stage');
+          const rev = document.getElementById('bb-review-stage');
+          wiz.hidden = review;
+          wiz.style.display = review ? 'none' : '';
+          rev.hidden = !review;
+          rev.style.display = review ? 'grid' : 'none';
+          if (review) { renderReview(); reloadPreview(); }
+          else { renderStep(); }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        function next() { goTo(stepIdx + 1); }
+        function back() { goTo(stepIdx - 1); }
+        function reloadPreview() {
+          const iframe = document.getElementById('bb-preview');
+          if (iframe) iframe.contentWindow.location.reload();
+        }
+
+        function renderStep() {
+          const step = STEPS[stepIdx];
+          const stage = document.getElementById('bb-wiz-stage');
+          stage.innerHTML = '';
+          const card = document.createElement('section');
+          card.className = 'bbw-fadein';
+          card.setAttribute('style', STYLE_CARD);
+          stage.appendChild(card);
+          const map = {
+            'identity':     renderIdentity,
+            'logo-upload':  renderLogoUpload,
+            'mascot':       renderMascot,
+            'palette':      renderPalette,
+            'typography':   renderTypography,
+            'voice':        renderVoice,
+            'applications': renderApplications,
+            'donts':        renderDonts,
+          };
+          const fn = map[step.key];
+          if (fn) fn(card);
+        }
+
+        // ── Step: identity ─────────────────────────────────────
+        function renderIdentity(card) {
+          const INDUSTRIES = ['Café','Restaurant','Fashion','Tech','Music','Studio','Athlete','Other'];
+          const cur = STATE.industry || '';
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Tell us about the brand.</h2>
+            <p style="${STYLE_HELPER}">Name, tagline, industry, and a few words that describe the voice. We'll use all of this across the book.</p>
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              <div>
+                <label style="${STYLE_LABEL}">Brand name</label>
+                <input id="f-name" type="text" maxlength="80" class="bbw-input" value="${escapeAttr(STATE.name)}" placeholder="e.g. Santai" style="${STYLE_INPUT}" />
+              </div>
+              <div>
+                <label style="${STYLE_LABEL}">Tagline</label>
+                <input id="f-tagline" type="text" maxlength="120" class="bbw-input" value="${escapeAttr(STATE.tagline ?? '')}" placeholder="e.g. The art of slow mornings" style="${STYLE_INPUT}" />
+              </div>
+              <div>
+                <label style="${STYLE_LABEL}">Industry</label>
+                <div id="f-industry" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                  ${INDUSTRIES.map(v => `<button type="button" data-pill="${escapeAttr(v)}" class="bbw-chip ${cur === v ? 'is-active' : ''}" style="${STYLE_CHIP}">${escapeHtml(v)}</button>`).join('')}
+                </div>
+                <input id="f-industry-other" type="text" maxlength="40" class="bbw-input" value="${escapeAttr(cur && !INDUSTRIES.includes(cur) ? cur : '')}" placeholder="If other, type your industry" style="${STYLE_INPUT};margin-top:10px;display:${cur === 'Other' || (cur && !INDUSTRIES.includes(cur)) ? 'block' : 'none'};" />
+              </div>
+              <div>
+                <label style="${STYLE_LABEL}">Voice keywords (comma-separated)</label>
+                <input id="f-kwds" type="text" maxlength="200" class="bbw-input" value="${escapeAttr(STATE.voice_keywords ?? '')}" placeholder="playful, warm, confident" style="${STYLE_INPUT}" />
+              </div>
+            </div>
+            ${footerHTML({ hideSkip: true })}
+          `;
+          card.querySelector('#f-name').addEventListener('input', e => queueSave({ name: e.target.value }));
+          card.querySelector('#f-tagline').addEventListener('input', e => queueSave({ tagline: e.target.value }));
+          card.querySelector('#f-kwds').addEventListener('input', e => queueSave({ voice_keywords: e.target.value }));
+          card.querySelector('#f-industry').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-pill]'); if (!b) return;
+            STATE.industry = b.dataset.pill;
+            queueSave({ industry: STATE.industry });
+            renderIdentity(card);
+          });
+          card.querySelector('#f-industry-other')?.addEventListener('input', e => {
+            if (e.target.value.trim()) queueSave({ industry: e.target.value.trim() });
+          });
+          wireFooter(card);
+        }
+
+        // ── Step: logo upload (required) ───────────────────────
+        function renderLogoUpload(card) {
+          const logo = STATE.assets?.logo;
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Upload your primary logo.</h2>
+            <p style="${STYLE_HELPER}">PNG, SVG, or JPG. We'll extract your color palette automatically. No logo yet? Generate one in Logo Lab — it opens in a new tab so you can come back.</p>
+            ${logo ? `
+              <div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;margin-bottom:14px;">
+                <img src="${escapeAttr(logo)}" alt="" style="width:64px;height:64px;object-fit:contain;background:#fafafa;border-radius:10px;padding:6px;" />
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;"><strong style="font-size:13.5px;color:#fff;font-weight:600;">Logo uploaded</strong><span style="font-size:11.5px;color:rgba(255,255,255,0.45);">Palette extracted automatically</span></div>
+                <button type="button" id="bb-logo-replace" style="height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Replace</button>
+              </div>` : `
+              <div id="bb-logo-drop" style="position:relative;padding:36px 24px;text-align:center;background:rgba(255,255,255,0.025);border:1px dashed rgba(255,255,255,0.2);border-radius:14px;cursor:pointer;transition:all .15s;margin-bottom:14px;">
+                <input type="file" accept="image/*" id="bb-logo-input" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+                <div style="font-size:24px;margin-bottom:6px;">↑</div>
+                <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;">Drag a logo or click to upload</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);">PNG, SVG, or JPG · palette will be extracted</div>
+              </div>`}
+            <a href="/logo/new" target="_blank" rel="noopener" style="display:block;text-align:center;padding:14px;background:rgba(167,139,250,0.1);color:#c4b5fd;border:1px solid rgba(167,139,250,0.32);border-radius:12px;text-decoration:none;font-size:13px;font-weight:600;letter-spacing:0.02em;">No logo yet? Generate one in Logo Lab →</a>
+            ${footerHTML({ hideSkip: true })}
+          `;
+          function bind() {
+            const input = card.querySelector('#bb-logo-input');
+            if (input) input.addEventListener('change', async (e) => {
+              const file = e.target.files?.[0]; if (!file) return;
+              markDirty();
+              try {
+                const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+                const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+                STATE.assets = { ...(STATE.assets || {}), logo: blob.url };
+                await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assets: STATE.assets }) });
+                // Re-fetch kit to pick up auto-extracted palette
+                const r = await fetch(`/api/kits/${kitId}`);
+                // re-render to show the replace UI
+                markSaved();
+                renderLogoUpload(card);
+              } catch (e) { console.error(e); saveState.textContent = 'Upload failed'; }
             });
-            if (!r.ok) {
-              const data = await r.json().catch(() => ({}));
-              err.textContent = data.error || 'Could not switch.';
-              err.style.display = 'block';
-              btn.disabled = false;
-              btn.textContent = 'Switch to Press Kit instead →';
-              return;
-            }
-            window.location.reload();
-          } catch {
-            err.textContent = 'Network error.';
-            err.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Switch to Press Kit instead →';
+            card.querySelector('#bb-logo-replace')?.addEventListener('click', () => {
+              STATE.assets = { ...(STATE.assets || {}), logo: undefined };
+              queueSave({ assets: STATE.assets });
+              renderLogoUpload(card);
+            });
           }
+          bind();
+          wireFooter(card, { onNext: async () => {
+            if (!STATE.assets?.logo) { alert('Upload a logo first (or generate one in Logo Lab).'); return false; }
+            return true;
+          }});
+        }
+
+        // ── Step: mascot (optional) ────────────────────────────
+        function renderMascot(card) {
+          const m = STATE.assets?.mascot;
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">A mascot or symbol?</h2>
+            <p style="${STYLE_HELPER}">Some brands have a character or shape that shows up everywhere (Santai has a capybara, So Matcha has its character). Optional — skip if you don't have one yet.</p>
+            ${m ? `
+              <div style="display:flex;align-items:center;gap:14px;padding:14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;">
+                <img src="${escapeAttr(m)}" alt="" style="width:96px;height:96px;object-fit:contain;background:#fafafa;border-radius:10px;padding:6px;" />
+                <div style="flex:1;font-size:13.5px;color:#fff;">Mascot uploaded.</div>
+                <button type="button" id="bb-m-replace" style="height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">Replace</button>
+              </div>` : `
+              <div style="position:relative;padding:36px 24px;text-align:center;background:rgba(255,255,255,0.025);border:1px dashed rgba(255,255,255,0.2);border-radius:14px;cursor:pointer;">
+                <input type="file" accept="image/*" id="bb-m-input" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+                <div style="font-size:24px;margin-bottom:6px;">★</div>
+                <div style="font-size:14px;font-weight:600;color:#fff;margin-bottom:4px;">Drag a mascot illustration</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.5);">PNG with transparency works best</div>
+              </div>`}
+            ${footerHTML({ skipText: 'Skip — no mascot' })}
+          `;
+          const input = card.querySelector('#bb-m-input');
+          if (input) input.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            markDirty();
+            try {
+              const { upload } = await import('https://esm.sh/@vercel/blob@2.3.3/client');
+              const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/kits/${kitId}/sign-upload` });
+              STATE.assets = { ...(STATE.assets || {}), mascot: blob.url };
+              queueSave({ assets: STATE.assets });
+              renderMascot(card);
+            } catch (e) { console.error(e); saveState.textContent = 'Upload failed'; }
+          });
+          card.querySelector('#bb-m-replace')?.addEventListener('click', () => {
+            STATE.assets = { ...(STATE.assets || {}), mascot: undefined };
+            queueSave({ assets: STATE.assets });
+            renderMascot(card);
+          });
+          wireFooter(card);
+        }
+
+        // ── Step: palette ──────────────────────────────────────
+        function renderPalette(card) {
+          // Seed from palette_named or kit.palette
+          let pn = Array.isArray(STATE.palette_named) ? STATE.palette_named.slice() : [];
+          if (pn.length === 0) {
+            const p = STATE.palette || {};
+            const roles = [['primary','Primary'],['secondary','Secondary'],['accent','Accent'],['bg','Background'],['text','Text']];
+            for (const [k, label] of roles) {
+              if (p[k]) pn.push({ hex: p[k], label, role: k });
+            }
+            pn = pn.slice(0, 5);
+            if (pn.length === 0) pn = [{ hex: '#0F5132', label: 'Primary', role: 'primary' }];
+          }
+          STATE.palette_named = pn;
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Lock in your color palette.</h2>
+            <p style="${STYLE_HELPER}">3-5 colors with names. We auto-filled from your logo — adjust as needed. Each row appears as a labelled swatch in the book.</p>
+            <div id="f-pal" style="display:flex;flex-direction:column;gap:12px;"></div>
+            ${pn.length < 5 ? `<button type="button" id="bb-add-color" class="bbw-add" style="${STYLE_ADD};margin-top:12px;">+ Add color (${pn.length}/5)</button>` : ''}
+            ${footerHTML({ hideSkip: true })}
+          `;
+          function renderRows() {
+            const wrap = card.querySelector('#f-pal');
+            wrap.innerHTML = STATE.palette_named.map((c, i) => `
+              <div data-row="${i}" style="display:grid;grid-template-columns:64px 1fr 130px 40px;gap:10px;align-items:center;">
+                <input type="color" data-k="hex" value="${escapeAttr(c.hex)}" style="width:64px;height:48px;border:1px solid rgba(255,255,255,0.14);border-radius:12px;background:transparent;cursor:pointer;padding:2px;" />
+                <input type="text" data-k="label" placeholder="Tea Green" value="${escapeAttr(c.label ?? '')}" style="${STYLE_INPUT};height:48px;" />
+                <select data-k="role" style="height:48px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:12px;color:#fff;font-family:inherit;font-size:13px;">
+                  ${['primary','secondary','accent','background','text'].map(r => `<option value="${r}" ${(c.role||'').toLowerCase()===r?'selected':''}>${r}</option>`).join('')}
+                </select>
+                <button type="button" class="bbw-rm" data-rm="${i}">×</button>
+              </div>
+            `).join('');
+            wrap.querySelectorAll('[data-row]').forEach((row, i) => {
+              row.querySelectorAll('[data-k]').forEach(el => el.addEventListener('input', () => {
+                STATE.palette_named[i] = {
+                  hex:   row.querySelector('[data-k=hex]').value,
+                  label: row.querySelector('[data-k=label]').value,
+                  role:  row.querySelector('[data-k=role]').value,
+                };
+                queueSave({ palette_named: STATE.palette_named });
+              }));
+              row.querySelector('[data-rm]')?.addEventListener('click', () => {
+                STATE.palette_named.splice(i, 1);
+                queueSave({ palette_named: STATE.palette_named });
+                renderPalette(card);
+              });
+            });
+          }
+          renderRows();
+          card.querySelector('#bb-add-color')?.addEventListener('click', () => {
+            if (STATE.palette_named.length >= 5) return;
+            STATE.palette_named.push({ hex: '#888888', label: 'New', role: 'accent' });
+            queueSave({ palette_named: STATE.palette_named });
+            renderPalette(card);
+          });
+          wireFooter(card);
+        }
+
+        // ── Step: typography ───────────────────────────────────
+        function renderTypography(card) {
+          const heading = (STATE.fonts && STATE.fonts.heading) || 'Inter';
+          const body    = (STATE.fonts && STATE.fonts.body)    || 'Inter';
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Pick your two fonts.</h2>
+            <p style="${STYLE_HELPER}">One for headings, one for body. Type to search ~150 Google Fonts. Each preview renders in the picked family.</p>
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              ${fontPickerHTML('heading', 'Heading font', heading)}
+              ${fontPickerHTML('body', 'Body font', body)}
+            </div>
+            ${footerHTML({ hideSkip: true })}
+          `;
+          wireFontPicker(card, 'heading');
+          wireFontPicker(card, 'body');
+          wireFooter(card);
+        }
+        function fontPickerHTML(slot, label, current) {
+          return `
+            <div data-fp="${slot}">
+              <label style="${STYLE_LABEL}">${label}</label>
+              <div style="position:relative;">
+                <input type="text" data-fp-q value="${escapeAttr(current)}" placeholder="Search…" style="${STYLE_INPUT}" autocomplete="off" />
+                <div data-fp-list style="display:none;position:absolute;top:54px;left:0;right:0;max-height:280px;overflow-y:auto;background:rgba(18,18,22,0.98);border:1px solid rgba(255,255,255,0.14);border-radius:12px;z-index:30;padding:6px;"></div>
+              </div>
+              <div data-fp-preview style="margin-top:10px;padding:18px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;text-align:center;">
+                <span style="font-family:'${escapeAttr(current)}',sans-serif;font-size:64px;line-height:1;font-weight:700;color:#fff;">Aa</span>
+                <div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:8px;font-weight:700;">${escapeHtml(current)}</div>
+              </div>
+            </div>
+          `;
+        }
+        function wireFontPicker(card, slot) {
+          const root = card.querySelector(`[data-fp="${slot}"]`);
+          const q = root.querySelector('[data-fp-q]');
+          const list = root.querySelector('[data-fp-list]');
+          const preview = root.querySelector('[data-fp-preview]');
+          function applyFont(family) {
+            STATE.fonts = { ...(STATE.fonts || {}), [slot]: family };
+            queueSave({ fonts: STATE.fonts });
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g,'+')}:wght@400;700&display=swap`;
+            document.head.appendChild(link);
+            preview.innerHTML = `<span style="font-family:'${family}',sans-serif;font-size:64px;line-height:1;font-weight:700;color:#fff;">Aa</span><div style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:8px;font-weight:700;">${family}</div>`;
+            q.value = family;
+            list.style.display = 'none';
+          }
+          function refresh() {
+            const term = q.value.trim().toLowerCase();
+            const items = FONTS.filter(f => !term || f.family.toLowerCase().includes(term)).slice(0, 60);
+            list.innerHTML = items.map(f => `<div class="bbw-font-opt" data-pick="${escapeAttr(f.family)}" style="padding:8px 12px;border-radius:8px;font-family:'${escapeAttr(f.family)}',sans-serif;font-size:15px;color:rgba(255,255,255,0.78);cursor:pointer;">${escapeHtml(f.family)}</div>`).join('') || '<div style="padding:10px;font-size:12px;color:rgba(255,255,255,0.45);">No match.</div>';
+            list.style.display = 'block';
+          }
+          q.addEventListener('focus', refresh);
+          q.addEventListener('input', refresh);
+          list.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-pick]'); if (!b) return;
+            applyFont(b.dataset.pick);
+          });
+          document.addEventListener('click', (e) => {
+            if (!root.contains(e.target)) list.style.display = 'none';
+          });
+        }
+
+        // ── Step: voice ────────────────────────────────────────
+        function renderVoice(card) {
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">How does the brand speak?</h2>
+            <p style="${STYLE_HELPER}">A short paragraph (max 280 chars) describing voice and tone. Examples: "We're approachable, never corporate. We use lowercase. We don't say 'leverage'."</p>
+            <textarea id="f-voice" class="bbw-textarea" maxlength="280" placeholder="We're approachable, never corporate…" style="${STYLE_TEXTAREA};min-height:120px;">${escapeHtml(STATE.voice_paragraph ?? '')}</textarea>
+            <div style="display:flex;justify-content:flex-end;font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:6px;font-variant-numeric:tabular-nums;" id="f-voice-count">${(STATE.voice_paragraph ?? '').length} / 280</div>
+            ${footerHTML({ skipText: 'Skip' })}
+          `;
+          const ta = card.querySelector('#f-voice');
+          const ct = card.querySelector('#f-voice-count');
+          ta.addEventListener('input', e => { queueSave({ voice_paragraph: e.target.value }); ct.textContent = `${e.target.value.length} / 280`; });
+          wireFooter(card);
+        }
+
+        // ── Step: applications ─────────────────────────────────
+        function renderApplications(card) {
+          const ALL = [
+            ['business_card','Business Card'],
+            ['billboard','Billboard'],
+            ['tote_bag','Tote Bag'],
+            ['t_shirt','T-Shirt'],
+            ['phone_case','Phone Case'],
+            ['coffee_cup','Coffee Cup'],
+            ['signage','Signage'],
+            ['vehicle','Delivery Vehicle'],
+          ];
+          const sel = new Set(STATE.applications || []);
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Where will the brand show up?</h2>
+            <p style="${STYLE_HELPER}">Pick up to 8 mockups. Your logo will be composited onto each one in the book. Default 4 are pre-selected.</p>
+            <div id="f-apps" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+              ${ALL.map(([id, label]) => `
+                <button type="button" data-app="${id}" class="bbw-tile ${sel.has(id) ? 'is-active' : ''}" style="text-align:left;padding:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);border-radius:14px;color:#fff;font-family:inherit;cursor:pointer;display:flex;gap:12px;align-items:center;">
+                  <img src="/mockups/${id}.svg" alt="" style="width:56px;height:56px;object-fit:contain;background:#fafafa;border-radius:8px;padding:4px;flex-shrink:0;" />
+                  <div style="flex:1;">
+                    <div style="font-size:14px;font-weight:600;">${label}</div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">${sel.has(id) ? 'Selected' : 'Tap to add'}</div>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+            <p id="f-apps-count" style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:12px;text-align:center;">${sel.size} / 8 selected</p>
+            ${footerHTML()}
+          `;
+          card.querySelector('#f-apps').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-app]'); if (!b) return;
+            const id = b.dataset.app;
+            const arr = new Set(STATE.applications || []);
+            if (arr.has(id)) arr.delete(id);
+            else if (arr.size < 8) arr.add(id);
+            STATE.applications = Array.from(arr);
+            queueSave({ applications: STATE.applications });
+            renderApplications(card);
+          });
+          wireFooter(card);
+        }
+
+        // ── Step: don'ts ───────────────────────────────────────
+        function renderDonts(card) {
+          const list = (STATE.donts || []).slice();
+          if (list.length === 0) list.push('');
+          card.innerHTML = `
+            ${eyebrowHTML()}
+            <h2 style="${STYLE_TITLE}">Set a few rules.</h2>
+            <p style="${STYLE_HELPER}">3-5 rules of thumb. e.g. "Don't stretch the logo", "Don't recolor outside the palette", "Don't use shadows or gradients."</p>
+            <div id="f-donts" style="display:flex;flex-direction:column;gap:10px;"></div>
+            <button type="button" id="bb-add-dont" class="bbw-add" style="${STYLE_ADD};margin-top:12px;">+ Add rule</button>
+            ${footerHTML({ skipText: "Skip — no don'ts", nextText: 'Review →' })}
+          `;
+          function render() {
+            const wrap = card.querySelector('#f-donts');
+            wrap.innerHTML = list.map((d, i) => `
+              <div data-row="${i}" style="display:grid;grid-template-columns:1fr 40px;gap:10px;align-items:center;">
+                <input type="text" data-k="text" value="${escapeAttr(d)}" placeholder="Don't stretch the logo" style="${STYLE_INPUT};height:42px;" />
+                <button type="button" class="bbw-rm" data-rm="${i}">×</button>
+              </div>
+            `).join('');
+            wrap.querySelectorAll('[data-row]').forEach((row, i) => {
+              row.querySelector('[data-k=text]').addEventListener('input', e => {
+                list[i] = e.target.value;
+                STATE.donts = list.filter(s => s && s.trim()).slice(0, 5);
+                queueSave({ donts: STATE.donts });
+              });
+              row.querySelector('[data-rm]').addEventListener('click', () => {
+                list.splice(i, 1);
+                STATE.donts = list.filter(s => s && s.trim()).slice(0, 5);
+                queueSave({ donts: STATE.donts });
+                render();
+              });
+            });
+          }
+          render();
+          card.querySelector('#bb-add-dont').addEventListener('click', () => {
+            if (list.length >= 5) return;
+            list.push('');
+            render();
+          });
+          wireFooter(card);
+        }
+
+        // ── Review ─────────────────────────────────────────────
+        function renderReview() {
+          const recap = document.getElementById('bb-review-recap');
+          const published = STATE.status === 'published';
+          const idxOf = (key) => STEPS.findIndex(s => s.key === key);
+          const SECTIONS = [
+            { title: 'Identity', step: idxOf('identity'), rows: [
+              ['Name', STATE.name || '—'],
+              ['Tagline', STATE.tagline || '—'],
+              ['Industry', STATE.industry || '—'],
+              ['Voice keywords', STATE.voice_keywords || '—'],
+            ]},
+            { title: 'Logo', step: idxOf('logo-upload'), rows: [
+              ['Primary logo', STATE.assets?.logo ? 'Uploaded' : 'Missing'],
+              ['Mascot', STATE.assets?.mascot ? 'Uploaded' : '—'],
+            ]},
+            { title: 'Color', step: idxOf('palette'), rows: [
+              ['Colors', String((STATE.palette_named || []).length)],
+            ]},
+            { title: 'Typography', step: idxOf('typography'), rows: [
+              ['Heading', STATE.fonts?.heading || 'Inter'],
+              ['Body', STATE.fonts?.body || 'Inter'],
+            ]},
+            { title: 'Voice', step: idxOf('voice'), rows: [
+              ['Paragraph', STATE.voice_paragraph ? escapeHtml(STATE.voice_paragraph.slice(0, 80)) + (STATE.voice_paragraph.length > 80 ? '…' : '') : '—'],
+            ]},
+            { title: 'Applications', step: idxOf('applications'), rows: [
+              ['Mockups', String((STATE.applications || []).length)],
+            ]},
+            { title: "Don'ts", step: idxOf('donts'), rows: [
+              ['Rules', String((STATE.donts || []).length)],
+            ]},
+          ];
+          recap.innerHTML = `
+            <div>
+              <span style="${STYLE_EYEBROW}"><span style="${STYLE_EYEBROW_DOT}"></span>Review</span>
+              <h2 style="font-family:'Inter',sans-serif;font-size:24px;font-weight:300;letter-spacing:-0.025em;color:#fff;margin:14px 0 4px;">Your brand book</h2>
+              <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0 0 8px;line-height:1.5;">Tap any section to edit. Preview updates live.</p>
+              <button type="button" id="bb-use-sample" style="display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;background:rgba(167,139,250,0.12);color:#c4b5fd;border:1px solid rgba(167,139,250,0.36);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;">Use sample content</button>
+            </div>
+          ` + SECTIONS.map(sec => `
+            <div style="margin-top:18px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.08);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h3 style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:rgba(255,255,255,0.55);margin:0;">${sec.title}</h3>
+                <button type="button" class="bbw-recap-edit" data-go="${sec.step}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;background:none;border:0;font-family:inherit;padding:0;">Edit →</button>
+              </div>
+              ${sec.rows.map(([l, v]) => `
+                <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;">
+                  <span style="color:rgba(255,255,255,0.55);font-weight:500;">${l}</span>
+                  <span style="color:#fff;text-align:right;max-width:60%;word-break:break-word;">${v}</span>
+                </div>
+              `).join('')}
+            </div>
+          `).join('') + `
+            <div style="margin-top:22px;display:flex;flex-direction:column;gap:10px;">
+              ${published
+                ? `<a href="/kit/${STATE.slug}" target="_blank" style="height:48px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:0.02em;">View live book ↗</a>
+                   <a href="/kit/${STATE.slug}?print=1" target="_blank" style="height:52px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;background:#a78bfa;color:#0a0a0a;border-radius:999px;font-family:inherit;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:0.04em;">Download PDF ↓</a>`
+                : `<button type="button" id="bb-publish-btn" class="bbw-primary" style="height:54px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0.04em;cursor:pointer;">Publish for €15 →</button>
+                   <p style="font-size:11.5px;color:rgba(255,255,255,0.4);text-align:center;margin:0;line-height:1.5;">You'll be charged once. Shareable link + PDF unlock immediately after.</p>`
+              }
+            </div>
+          `;
+          recap.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goTo(+b.dataset.go)));
+          recap.querySelector('#bb-publish-btn')?.addEventListener('click', publishFlow);
+          recap.querySelector('#bb-use-sample')?.addEventListener('click', loadSampleContent);
+        }
+
+        async function loadSampleContent() {
+          const btn = document.getElementById('bb-use-sample');
+          if (btn) { btn.disabled = true; btn.textContent = 'Filling…'; }
+          const sample = {
+            name: STATE.name || 'Santai',
+            tagline: 'The art of slow mornings — Indonesian coffee, ritual not rush.',
+            industry: 'Café',
+            voice_keywords: 'warm, playful, grounded, lowercase',
+            voice_paragraph: "we're warm, never corporate. we use lowercase. we talk about coffee like a friend would — never like a barista trying to impress you.",
+            palette_named: [
+              { hex: '#0F5132', label: 'Tea Green', role: 'primary' },
+              { hex: '#F3EBD3', label: 'Vanilla',   role: 'secondary' },
+              { hex: '#E25822', label: 'Sunrise',   role: 'accent' },
+              { hex: '#1F1F1F', label: 'Ink',       role: 'text' },
+              { hex: '#FFFFFF', label: 'Paper',     role: 'background' },
+            ],
+            fonts: { heading: 'Fraunces', body: 'Inter' },
+            applications: ['business_card','tote_bag','coffee_cup','signage','phone_case','vehicle'],
+            donts: [
+              "Don't stretch or skew the logo",
+              "Don't recolor outside the palette",
+              "Don't add shadows, gradients, or strokes",
+              "Don't place the logo on busy photos without the safe zone",
+            ],
+          };
+          Object.assign(STATE, sample);
+          try {
+            await fetch(`/api/kits/${kitId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(sample) });
+            renderReview(); reloadPreview();
+          } catch { alert('Could not load sample.'); }
+          if (btn) { btn.disabled = false; btn.textContent = 'Use sample content'; }
+        }
+
+        async function publishFlow() {
+          const btn = document.getElementById('bb-publish-btn');
+          btn.disabled = true; btn.textContent = 'Opening checkout…';
+          await flushSave();
+          try {
+            const r = await fetch(`/api/kits/${kitId}/publish`, { method: 'POST' });
+            const data = await r.json();
+            if (data.url) { window.location.href = data.url; return; }
+            alert(data.error || 'Payment error.');
+          } catch { alert('Network error.'); }
+          btn.disabled = false; btn.textContent = 'Publish for €15 →';
+        }
+
+        function initialStepFromHash() {
+          const m = (window.location.hash || '').match(/step=([\w-]+)/);
+          if (!m) return 0;
+          const idx = STEPS.findIndex(s => s.key === m[1]);
+          return idx >= 0 ? idx : 0;
+        }
+
+        stepIdx = initialStepFromHash();
+        renderProgress();
+        if (STEPS[stepIdx].key === 'review') {
+          const wiz = document.getElementById('bb-wiz-stage');
+          const rev = document.getElementById('bb-review-stage');
+          wiz.hidden = true; wiz.style.display = 'none';
+          rev.hidden = false; rev.style.display = 'grid';
+          renderReview(); reloadPreview();
+        } else {
+          renderStep();
+        }
+        window.addEventListener('beforeunload', () => { flushSave(); });
+        window.addEventListener('hashchange', () => {
+          const idx = initialStepFromHash();
+          if (idx !== stepIdx) goTo(idx, { skipSave: true });
         });
       </script>
-    </>
+    </Fragment>
   ) : (
   <Fragment>
   <link rel="preconnect" href="https://fonts.googleapis.com" />

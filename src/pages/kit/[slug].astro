@@ -1,8 +1,10 @@
 ---
-// Public press kit page — accessible to anyone with the slug, no auth required.
-// `?print=1` query param triggers the print dialog on load for one-click PDF.
+// Public press kit / brand book page — anyone with the slug, no auth required.
+// `?print=1` triggers print on load. Renders BrandBookTemplate when mode==='brand_book',
+// PressKitTemplate otherwise.
 
 import PressKitTemplate from '../../components/PressKitTemplate.astro';
+import BrandBookTemplate from '../../components/BrandBookTemplate.astro';
 import { createAdminClient } from '../../lib/supabase';
 import type { PressKit } from '../../lib/press-kit';
 
@@ -18,7 +20,12 @@ const { data } = await client
   .maybeSingle();
 
 if (!data) {
-  return new Response('Press kit not found', { status: 404 });
+  return new Response('Not found', { status: 404 });
 }
+
+const kit = data as unknown as PressKit;
+const isBrandBook = (kit as any).mode === 'brand_book';
 ---
-<PressKitTemplate kit={data as unknown as PressKit} printMode={printMode} />
+{isBrandBook
+  ? <BrandBookTemplate kit={kit} printMode={printMode} />
+  : <PressKitTemplate kit={kit} printMode={printMode} />}

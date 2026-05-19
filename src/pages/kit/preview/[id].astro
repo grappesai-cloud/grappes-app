@@ -1,8 +1,9 @@
 ---
-// Owner-only live preview of a press kit (used in the editor iframe).
-// No <Dashboard> chrome — full-page render of the template alone.
+// Owner-only live preview (used in the editor iframe). No <Dashboard> chrome.
+// Branches on kit.mode → BrandBookTemplate vs PressKitTemplate.
 
 import PressKitTemplate from '../../../components/PressKitTemplate.astro';
+import BrandBookTemplate from '../../../components/BrandBookTemplate.astro';
 import { createAdminClient } from '../../../lib/supabase';
 import type { PressKit } from '../../../lib/press-kit';
 
@@ -16,5 +17,10 @@ const { data } = await client
   .eq('user_id', authUser.id)
   .maybeSingle();
 if (!data) return Astro.redirect('/kits');
+
+const kit = data as unknown as PressKit;
+const isBrandBook = (kit as any).mode === 'brand_book';
 ---
-<PressKitTemplate kit={data as unknown as PressKit} />
+{isBrandBook
+  ? <BrandBookTemplate kit={kit} />
+  : <PressKitTemplate kit={kit} />}
