@@ -141,7 +141,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
     await setProgress(id, {
       step: "detecting_niche",
       pct: 68,
-      message: "Detecting niche (Haiku)",
+      message: "Detecting niche",
     });
     const hookFrames = frames
       .filter((f) => f.zone === "hook")
@@ -160,7 +160,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
         await setProgress(id, {
           step: "detecting_niche",
           pct: 70,
-          message: "Generating intake questions (Haiku)",
+          message: "Generating intake questions",
         });
         intakeContext = await generateIntake({
           durationSec: meta.duration_sec,
@@ -172,7 +172,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
         await setProgress(id, {
           step: "awaiting_intake",
           pct: 72,
-          message: "Awaiting your answers — Sonnet pauses until you submit",
+          message: "Awaiting your answers before AI analysis",
           intake: intakeContext,
         });
         intakeAnswers = await waitForIntakeAnswers(id);
