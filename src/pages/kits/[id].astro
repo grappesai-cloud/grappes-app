@@ -3,6 +3,7 @@ import Dashboard from '../../layouts/Dashboard.astro';
 import { createAdminClient } from '../../lib/supabase';
 import { googleFontsUrl, type PressKit } from '../../lib/press-kit';
 import { GOOGLE_FONTS } from '../../lib/google-fonts';
+import GOOGLE_FONTS_ALL from '../../lib/google-fonts-all.json';
 
 const { id } = Astro.params;
 const authUser = Astro.locals.user!;
@@ -72,7 +73,7 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         donts: (k as any).donts ?? [],
         status: k.status, slug: k.slug,
       })} />
-      <script id="bb-font-bootstrap" type="application/json" set:html={JSON.stringify(GOOGLE_FONTS)} />
+      <script id="bb-font-bootstrap" type="application/json" set:html={JSON.stringify(GOOGLE_FONTS_ALL)} />
 
       <div id="bb-wiz-stage"></div>
 
@@ -627,10 +628,19 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
         function renderTypography(card) {
           const heading = (STATE.fonts && STATE.fonts.heading) || 'Inter';
           const body    = (STATE.fonts && STATE.fonts.body)    || 'Inter';
+          const isStaleDefault = heading === 'Inter' && body === 'Inter';
+
           card.innerHTML = `
             ${eyebrowHTML()}
             <h2 style="${STYLE_TITLE}">Pick your two fonts.</h2>
-            <p style="${STYLE_HELPER}">One for headings, one for body. Type to search ~150 Google Fonts. Each preview renders in the picked family.</p>
+            <p style="${STYLE_HELPER}">One for headings, one for body. We picked a pair based on your brand — adjust freely. Search across all ${FONTS.length} Google Fonts.</p>
+            <div id="bb-fonts-banner" style="display:none;background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.28);border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:13px;color:rgba(255,255,255,0.85);line-height:1.5;display:flex;align-items:flex-start;gap:10px;">
+              <span style="font-size:10.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#a78bfa;padding:3px 10px;border-radius:999px;background:rgba(167,139,250,0.16);border:1px solid rgba(167,139,250,0.32);flex-shrink:0;">AI</span>
+              <span id="bb-fonts-banner-text">Suggesting a pairing based on your brand…</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+              <button type="button" id="bb-fonts-resuggest" class="pkw-secondary" style="${STYLE_BTN_GHOST};height:36px;font-size:11.5px;border-color:rgba(167,139,250,0.4);color:#c4b5fd;">↻ Re-suggest with AI</button>
+            </div>
             <div style="display:flex;flex-direction:column;gap:18px;">
               ${fontPickerHTML('heading', 'Heading font', heading)}
               ${fontPickerHTML('body', 'Body font', body)}
@@ -639,7 +649,53 @@ const previewFontsCss = `https://fonts.googleapis.com/css2?${_uniq.map(f => `fam
           `;
           wireFontPicker(card, 'heading');
           wireFontPicker(card, 'body');
+          // Make sure the current pair is actually loaded so the Aa previews
+          // render in the right family (not in fallback sans).
+          loadFontCss(heading);
+          loadFontCss(body);
+
+          async function runSuggestFonts(force) {
+            const banner = card.querySelector('#bb-fonts-banner');
+            const bannerText = card.querySelector('#bb-fonts-banner-text');
+            const btn = card.querySelector('#bb-fonts-resuggest');
+            banner.style.display = 'flex';
+            bannerText.textContent = 'Suggesting a pairing based on your brand…';
+            if (btn) { btn.disabled = true; btn.textContent = 'Thinking…'; }
+            try {
+              const r = await fetch(`/api/kits/${kitId}/suggest-fonts`, { method: 'POST' });
+              const data = await r.json();
+              if (!r.ok) throw new Error(data.error || 'Suggestion failed');
+              STATE.fonts = { heading: data.heading, body: data.body, auto: true };
+              bannerText.innerHTML = `<b style="color:#fff;">${data.heading} + ${data.body}</b> — ${escapeHtml(data.rationale || '')}`;
+              // Re-render the pickers with the new values + load the actual font CSS
+              renderTypography(card);
+              loadFontCss(data.heading);
+              loadFontCss(data.body);
+              return data;
+            } catch (e) {
+              bannerText.textContent = 'Could not auto-suggest. Pick manually below.';
+              if (btn) { btn.disabled = false; btn.textContent = '↻ Re-suggest with AI'; }
+              return null;
+            }
+          }
+          // Auto-suggest on first entry when fonts are the stale Inter/Inter default.
+          if (isStaleDefault && !window.__BB_AUTO_FONTS__) {
+            window.__BB_AUTO_FONTS__ = true;
+            runSuggestFonts(false);
+          }
+          card.querySelector('#bb-fonts-resuggest')?.addEventListener('click', () => runSuggestFonts(true));
+
           wireFooter(card);
+        }
+        function loadFontCss(family) {
+          if (!family) return;
+          const id = `gf-${family.replace(/\s+/g,'-').toLowerCase()}`;
+          if (document.getElementById(id)) return;
+          const link = document.createElement('link');
+          link.id = id;
+          link.rel = 'stylesheet';
+          link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g,'+')}:wght@400;700&display=swap`;
+          document.head.appendChild(link);
         }
         function fontPickerHTML(slot, label, current) {
           return `
