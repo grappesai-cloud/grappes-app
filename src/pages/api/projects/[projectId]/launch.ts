@@ -141,11 +141,12 @@ export const POST: APIRoute = async ({ params, locals }) => {
   const { createAdminClient } = await import('../../../../lib/supabase');
   const supabase = createAdminClient();
   const wasLive = project.status === 'live';
+  const LAUNCHABLE = ['onboarding', 'brief_ready', 'generated', 'failed', 'live'];
   const { data: locked } = await supabase
     .from('projects')
     .update({ status: 'generating', substatus: 'confirming_brief', updated_at: new Date().toISOString() })
     .eq('id', params.projectId!)
-    .in('status', ['onboarding', 'brief_ready', 'generated', 'failed', 'live'])
+    .in('status', LAUNCHABLE)
     .select('id')
     .maybeSingle();
 
@@ -153,7 +154,24 @@ export const POST: APIRoute = async ({ params, locals }) => {
     // Re-read current status — original `project.status` may be stale
     const current = await db.projects.findById(params.projectId!);
     if (current?.status === 'generating') return json({ started: true, alreadyRunning: true });
-    return json({ error: `Cannot launch from status "${current?.status || project.status}"` }, 409);
+
+    // Defensive fallback: the atomic IN-filter update returned no row, but the
+    // re-read shows the project IS in a launchable status. This happens on a
+    // tight race where /confirm just flipped the row but the conditional UPDATE
+    // raced against it (rare but observed in prod). Retry once with a direct
+    // updateStatus — at this point we KNOW the row is launchable.
+    if (current?.status && LAUNCHABLE.includes(current.status)) {
+      try {
+        await db.projects.updateStatus(params.projectId!, 'generating');
+        await db.projects.updateSubstatus(params.projectId!, 'confirming_brief');
+        console.warn(`[launch] Atomic IN-filter update missed but status was "${current.status}" — forced transition to generating`);
+      } catch (e) {
+        console.error('[launch] Forced transition failed:', e);
+        return json({ error: `Cannot launch from status "${current?.status || project.status}"` }, 409);
+      }
+    } else {
+      return json({ error: `Cannot launch from status "${current?.status || project.status}"` }, 409);
+    }
   }
 
   // ── Run pipeline synchronously (Vercel Fluid Compute — up to 800s) ──────

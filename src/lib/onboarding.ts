@@ -48,10 +48,47 @@ function hasValue(val: any): boolean {
   return true; // boolean, number, etc.
 }
 
+// A field counts as SATISFIED when either:
+//   (a) it has a real value, OR
+//   (b) the user explicitly opted out of the parent section (e.g. media.no_photos=true
+//       satisfies media.has_logo + branding.logo + media.heroImage).
+// Without this, opting out of a section penalised completeness — the user could not
+// reach the launch threshold even though every question had been answered.
+function isFieldSatisfied(data: Record<string, any>, dotPath: string): boolean {
+  if (hasValue(getNestedValue(data, dotPath))) return true;
+
+  // No-photos opt-out satisfies every media/logo/hero asset field.
+  if (getNestedValue(data, 'media.no_photos') === true) {
+    if (dotPath === 'media.has_logo' || dotPath === 'branding.logo' || dotPath === 'media.heroImage') {
+      return true;
+    }
+  }
+
+  // Section-level opt-outs satisfy their content.* fields.
+  const OPT_OUT_MAP: Record<string, string[]> = {
+    'content.no_testimonials': ['content.testimonials'],
+    'content.no_team': ['content.team'],
+    'content.no_stats': ['content.stats'],
+    'content.no_portfolio': ['content.portfolio'],
+    'content.no_pricing': ['content.pricing_mode', 'content.pricing_items'],
+  };
+  for (const [flag, satisfies] of Object.entries(OPT_OUT_MAP)) {
+    if (getNestedValue(data, flag) === true && satisfies.includes(dotPath)) return true;
+  }
+
+  // pricing_mode === "none" / "inquire" satisfies pricing_items
+  if (dotPath === 'content.pricing_items') {
+    const mode = getNestedValue(data, 'content.pricing_mode');
+    if (mode === 'none' || mode === 'inquire') return true;
+  }
+
+  return false;
+}
+
 export function calculateCompleteness(data: Record<string, any>): number {
-  const p0 = P0_FIELDS.filter(f => hasValue(getNestedValue(data, f))).length / P0_FIELDS.length;
-  const p1 = P1_FIELDS.filter(f => hasValue(getNestedValue(data, f))).length / P1_FIELDS.length;
-  const p2 = P2_FIELDS.filter(f => hasValue(getNestedValue(data, f))).length / P2_FIELDS.length;
+  const p0 = P0_FIELDS.filter(f => isFieldSatisfied(data, f)).length / P0_FIELDS.length;
+  const p1 = P1_FIELDS.filter(f => isFieldSatisfied(data, f)).length / P1_FIELDS.length;
+  const p2 = P2_FIELDS.filter(f => isFieldSatisfied(data, f)).length / P2_FIELDS.length;
   return p0 * 0.6 + p1 * 0.25 + p2 * 0.15;
 }
 
