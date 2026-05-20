@@ -1,31 +1,41 @@
 ---
-// Public press kit / brand book page — anyone with the slug, no auth required.
-// `?print=1` triggers print on load. Renders BrandBookTemplate when mode==='brand_book',
-// PressKitTemplate otherwise.
-
-import PressKitTemplate from '../../components/PressKitTemplate.astro';
-import BrandBookTemplate from '../../components/BrandBookTemplate.astro';
-import { createAdminClient } from '../../lib/supabase';
-import type { PressKit } from '../../lib/press-kit';
-
-const { slug } = Astro.params;
-const printMode = Astro.url.searchParams.get('print') === '1';
-
-const client = createAdminClient();
-const { data } = await client
-  .from('press_kits')
-  .select('*')
-  .eq('slug', slug!)
-  .eq('status', 'published')
-  .maybeSingle();
-
-if (!data) {
-  return new Response('Not found', { status: 404 });
-}
-
-const kit = data as unknown as PressKit;
-const isBrandBook = (kit as any).mode === 'brand_book';
+// Public Soon stub — press kit / brand book product is shelved.
+const slug = Astro.params.slug;
 ---
-{isBrandBook
-  ? <BrandBookTemplate kit={kit} printMode={printMode} />
-  : <PressKitTemplate kit={kit} printMode={printMode} />}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Soon — Grappes</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" />
+  <style>
+    html, body { margin: 0; background: #0B0B0F; color: #F4F0E6; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    main { min-height: 100vh; display: grid; place-items: center; padding: 64px 24px; }
+    .wrap { text-align: center; max-width: 520px; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.5; margin-bottom: 18px; }
+    h1 { font-family: 'Fraunces', Georgia, serif; font-size: clamp(56px, 12vw, 110px); line-height: 0.95; letter-spacing: -2px; margin: 0; font-weight: 700; }
+    p { margin: 22px auto 0; max-width: 380px; font-family: 'Fraunces', serif; font-size: 17px; line-height: 1.5; opacity: 0.75; }
+    .row { margin-top: 36px; display: inline-flex; gap: 8px; }
+    a.pill { padding: 10px 16px; border: 1px solid #F4F0E6; border-radius: 999px; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; text-decoration: none; color: #F4F0E6; }
+    a.pill:hover { background: #F4F0E6; color: #0B0B0F; }
+    .meta { position: fixed; bottom: 18px; left: 0; right: 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; opacity: 0.3; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="wrap">
+      <div class="eyebrow">Press Kit · Brand Book</div>
+      <h1>Soon.</h1>
+      <p>This page is offline while we rebuild it.</p>
+      <div class="row">
+        <a class="pill" href="https://grappes.ai">↗ Grappes</a>
+        <a class="pill" href="/audit">↗ Audit</a>
+        <a class="pill" href="/reels">↗ Reels</a>
+      </div>
+    </div>
+  </main>
+  <div class="meta">{slug ? `· ${slug} ·` : '·'}</div>
+</body>
+</html>

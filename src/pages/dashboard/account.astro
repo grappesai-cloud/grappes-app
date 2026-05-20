@@ -23,15 +23,9 @@ const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
 const reelCredits  = dbUser?.reel_credits  ?? 0;
 const auditCredits = dbUser?.audit_credits ?? 0;
 
-// Press kits count (drafts + published) — direct count, lightweight
-let kitsTotal = 0;
-let kitsPublished = 0;
-try {
-  const c = createAdminClient();
-  const { data } = await c.from('press_kits').select('id, status').eq('user_id', authUser.id);
-  kitsTotal = data?.length ?? 0;
-  kitsPublished = data?.filter((k: { status: string }) => k.status === 'published').length ?? 0;
-} catch {}
+// Press Kit Lab is shelved — counts zeroed for the account usage strip.
+const kitsTotal = 0;
+const kitsPublished = 0;
 
 const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
 ---
@@ -92,7 +86,7 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
           </div>
           <div class="acc-usage-item" style="--u-accent:#f97316;">
             <span class="acc-usage-name">Press Kits</span>
-            <span class="acc-usage-value">{kitsTotal} <span class="acc-usage-unit">{kitsTotal === 1 ? 'kit' : 'kits'}{kitsPublished > 0 ? ` · ${kitsPublished} live` : ''}</span></span>
+            <span class="acc-usage-value">— <span class="acc-usage-unit">soon</span></span>
           </div>
         </div>
         <div class="acc-help acc-help--top">Need more? Top up below.</div>
@@ -100,7 +94,6 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
           <button id="buy-edits-btn" class="acc-chip" style="--c-accent:#06bfdd;">+10 AI edits, €5</button>
           <a href="/dashboard/reels" class="acc-chip" style="--c-accent:#a78bfa;">+10 reel credits, €50</a>
           <a href="/audit" class="acc-chip" style="--c-accent:#22d3ee;">+10 audit credits, €20</a>
-          <a href="/kits/new" class="acc-chip" style="--c-accent:#f97316;">New press kit, €15</a>
         </div>
         <div id="edits-msg" class="acc-msg" hidden></div>
       </section>
