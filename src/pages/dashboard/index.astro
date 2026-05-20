@@ -33,20 +33,9 @@ const sitesLimit = dbUser?.projects_limit ?? 1;
 const reelCredits = dbUser?.reel_credits ?? 0;
 const auditCredits = dbUser?.audit_credits ?? 0;
 
-// Press Kit Lab — count drafts + published per user (no credits, per-kit billing)
+// Press Kit Lab — shelved. Counts kept at 0 so the tile reads as Soon.
 let kitCount = 0;
 let publishedKits = 0;
-try {
-  const adminClient = createAdminClient();
-  const { data: kitRows } = await adminClient
-    .from('press_kits')
-    .select('id, status')
-    .eq('user_id', authUser.id);
-  kitCount = kitRows?.length ?? 0;
-  publishedKits = kitRows?.filter(k => k.status === 'published').length ?? 0;
-} catch (e) {
-  console.error('[studio] press_kits count error:', e);
-}
 
 const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
 
@@ -125,12 +114,10 @@ try {
         <ProductTile
           name="Press Kit Lab"
           tagline="Press kits & brand books, AI-built. Editorial documents for journalists or visual guidelines for your team."
-          href="/kits"
+          href="#"
           icon={kitIcon}
-          meter={kitCount === 0 ? 'No kits yet' : `${kitCount} kit${kitCount === 1 ? '' : 's'}${publishedKits > 0 ? ` · ${publishedKits} live` : ''}`}
-          cta={kitCount > 0 ? 'Open kits' : 'New kit'}
           accent="#f97316"
-          isNew={true}
+          comingSoon={true}
         />
         <ProductTile
           name="Logo Lab"
