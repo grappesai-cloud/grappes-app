@@ -1006,9 +1006,7 @@ if (hasPreview) {
             <div class="profile-menu-email" title={authUser.email ?? ''}>{authUser.email}</div>
             <a href="/dashboard/account" class="profile-menu-item" role="menuitem">Account</a>
             <a href="/dashboard/referrals" class="profile-menu-item" role="menuitem">Referrals</a>
-            <form method="POST" action="/api/auth/signout" style="margin:0;">
-              <button type="submit" class="profile-menu-item profile-menu-item--danger" role="menuitem">Sign out</button>
-            </form>
+            <button type="button" data-signout class="profile-menu-item profile-menu-item--danger" role="menuitem">Sign out</button>
           </div>
         </div>
       </div>
@@ -3095,6 +3093,24 @@ if (hasPreview) {
       // Initial: chat visible on mobile
       if (window.matchMedia('(max-width: 768px)').matches) show('chat');
     })();
+  </script>
+
+  {/* Sign-out: Better-Auth needs JSON body, not form-urlencoded */}
+  <script is:inline>
+    document.querySelectorAll('[data-signout]').forEach(function(btn){
+      btn.addEventListener('click', async function(e){
+        e.preventDefault();
+        try {
+          await fetch('/api/auth/sign-out', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+            credentials: 'same-origin',
+          });
+        } catch {}
+        window.location.href = '/sign-in';
+      });
+    });
   </script>
 
   {/* Topbar chat delegates to SupportChatWidget */}
