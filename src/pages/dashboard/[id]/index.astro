@@ -2904,98 +2904,105 @@ if (hasPreview) {
 
           // Helper: full-page iterate (used as primary or fallback)
           const runIterate = async (message) => {
-            res = await fetch(`/api/projects/${projectId}/iterate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message }),
-            });
-            data = await res.json();
+            try {
+              res = await fetch(`/api/projects/${projectId}/iterate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message }),
+              });
+              data = await res.json().catch(() => ({}));
+            } catch (err) {
+              console.error('[edit/iterate] fetch failed:', err);
+              removePlaceholder();
+              addEditMessage('system', 'Network error. Try again.');
+              return;
+            }
             removePlaceholder();
             if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) { showLimitError(data); return; }
+            if (!res.ok) {
+              addEditMessage('system', data.error || 'Edit failed. Try rephrasing the request.');
+              return;
+            }
             if (data.reply) addEditMessage('assistant', data.reply);
+            else addEditMessage('assistant', 'Done.');
             if (data.newHtml) iframe.src = `${previewUrl}?edit&t=${Date.now()}`;
             await loadQuota();
           };
 
-          if (activeElement) {
-            // Element-level edit
-            res = await fetch(`/api/projects/${projectId}/edit-element`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sectionId: activeSectionId,
-                selector: activeElement.selector,
-                outerHTML: activeElement.outerHTML,
-                instruction: msg,
-              }),
-            });
-            data = await res.json();
-            removePlaceholder();
-
-            if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) {
-              showLimitError(data);
-            } else if (!res.ok && activeSectionId) {
-              // Fallback: route to section edit instead of full-site iterate
-              res = await fetch(`/api/projects/${projectId}/edit-section`, {
+          // Try element → section → iterate, in order of specificity.
+          // Any 5xx/4xx (other than quota) falls through to the next, so the
+          // user always gets *some* edit, regardless of what's selected.
+          const tryFetch = async (url, payload) => {
+            try {
+              const r = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sectionId: activeSectionId, instruction: msg }),
+                body: JSON.stringify(payload),
               });
-              data = await res.json();
+              const d = await r.json().catch(() => ({}));
+              return { res: r, data: d };
+            } catch (err) {
+              console.error('[edit] fetch failed:', url, err);
+              return { res: { ok: false, status: 0 }, data: { error: 'Network error' } };
+            }
+          };
+
+          const applySectionEdit = (d, sid) => {
+            if (d.sectionHtml) iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: d.sectionId || sid, html: d.sectionHtml }, '*');
+            if (d.css) iframe?.contentWindow?.postMessage({ type: 'update-style', css: d.css }, '*');
+          };
+
+          let handled = false;
+
+          // 1. Element scope (only when both an element AND a section are known)
+          if (activeElement && activeSectionId) {
+            ({ res, data } = await tryFetch(`/api/projects/${projectId}/edit-element`, {
+              sectionId: activeSectionId,
+              selector: activeElement.selector,
+              outerHTML: activeElement.outerHTML,
+              instruction: msg,
+            }));
+            if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) {
+              removePlaceholder(); showLimitError(data); handled = true;
+            } else if (res.ok) {
               removePlaceholder();
-              if (!res.ok) {
-                addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');
-              } else {
-                addEditMessage('assistant', 'Done.');
-                if (data.sectionHtml) iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: data.sectionId || activeSectionId, html: data.sectionHtml }, '*');
-                if (data.css) iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
-                activeElement = null;
-                await loadQuota();
-              }
-            } else if (!res.ok) {
-              removePlaceholder();
-              addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');
-            } else {
               addEditMessage('assistant', 'Done.');
-              if (data.sectionHtml) {
-                iframe?.contentWindow?.postMessage({
-                  type: 'update-section', sectionId: data.sectionId, html: data.sectionHtml
-                }, '*');
-              }
-              if (data.css) {
-                iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
-              }
+              applySectionEdit(data, activeSectionId);
               activeElement = null;
               await loadQuota();
+              handled = true;
             }
-          } else if (activeSectionId) {
-            // Section-level edit
-            res = await fetch(`/api/projects/${projectId}/edit-section`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sectionId: activeSectionId, instruction: msg }),
-            });
-            data = await res.json();
-            removePlaceholder();
+            // else: fall through to section/iterate
+          }
+
+          // 2. Section scope
+          if (!handled && activeSectionId) {
+            ({ res, data } = await tryFetch(`/api/projects/${projectId}/edit-section`, {
+              sectionId: activeSectionId,
+              instruction: msg,
+            }));
             if (['edit_limit_reached','iteration_limit_reached'].includes(data.error)) {
-              showLimitError(data);
-            } else if (!res.ok) {
-              addEditMessage('system', data.error || 'Edit failed. Try rephrasing.');
-            } else {
+              removePlaceholder(); showLimitError(data); handled = true;
+            } else if (res.ok) {
+              removePlaceholder();
               addEditMessage('assistant', 'Done.');
-              if (data.sectionHtml) {
-                iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: data.sectionId || activeSectionId, html: data.sectionHtml }, '*');
-              }
-              if (data.css) {
-                iframe?.contentWindow?.postMessage({ type: 'update-style', css: data.css }, '*');
-              }
+              applySectionEdit(data, activeSectionId);
               await loadQuota();
+              handled = true;
             }
-          } else {
-            // No section selected — edit the whole site via /iterate
+            // else: fall through to iterate
+          }
+
+          // 3. Whole-site iterate (final fallback)
+          if (!handled) {
             await runIterate(msg);
           }
-        } catch {
+        } catch (err) {
+          console.error('[edit] handler error:', err);
+          // Inline removePlaceholder — function-scoped above
+          const _msgs = document.getElementById('edit-messages');
+          const _last = _msgs?.lastElementChild;
+          if (_last?.classList?.contains('system') && _last.textContent === 'Thinking...') _last.remove();
           addEditMessage('system', 'Error. Try again.');
         }
 
