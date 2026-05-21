@@ -2948,8 +2948,12 @@ if (hasPreview) {
           };
 
           const applySectionEdit = (d, sid) => {
+            // Optimistic in-place patch first (instant visual feedback)
             if (d.sectionHtml) iframe?.contentWindow?.postMessage({ type: 'update-section', sectionId: d.sectionId || sid, html: d.sectionHtml }, '*');
             if (d.css) iframe?.contentWindow?.postMessage({ type: 'update-style', css: d.css }, '*');
+            // Authoritative refresh: the API has already persisted the updated HTML
+            // to the DB; reload the iframe so the preview matches the saved state.
+            if (iframe) iframe.src = `${previewUrl}?edit&t=${Date.now()}`;
           };
 
           let handled = false;
