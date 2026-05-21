@@ -130,6 +130,15 @@ export const auth = betterAuth({
   advanced: {
     cookiePrefix: 'grappes',
     useSecureCookies: (e('PUBLIC_APP_URL') || '').startsWith('https://'),
+    // Skip origin check for sign-out only. Some browsers strip Origin/Referer
+    // on cross-origin redirects (e.g. apex → www on Vercel) and Better-Auth
+    // then rejects sign-out with MISSING_OR_NULL_ORIGIN. Sign-out is a
+    // low-risk operation (the worst a CSRF attacker can do is log the user
+    // out) so skipping the check here is safe.
+    // Note: Better-Auth's runtime accepts string[] for path-prefix skipping
+    // (see api/middlewares/origin-check.mjs) but the published type only
+    // declares boolean — hence the cast.
+    disableOriginCheck: ['/sign-out'] as unknown as boolean,
     // Force UUID v4 for all Better-Auth ids. The drizzle schema uses
     // Postgres `uuid` columns, so the default nanoid-style generator fails
     // with "invalid input syntax for type uuid".
