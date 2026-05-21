@@ -147,7 +147,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
 
     const response = await createMessage({
       model: SONNET_MODEL,
-      max_tokens: 8000,
+      max_tokens: 32000,
       system: `You are editing a single HTML element inside a website section. You receive:
 1. The full <style> block of the page
 2. The section HTML containing the element
@@ -162,7 +162,11 @@ Rules:
 - Keep all other elements, animations, and structure intact
 - Understand and apply instructions written in any language (Romanian, English, etc.)
 - QUOTED TEXT RULE: if the user puts text inside quotes (e.g. "Descoperă natura"), use that text EXACTLY as written — character for character, no rewording. Text without quotes can be freely reworded to fit the design.
-- Output ONLY the two blocks below, no explanations:
+
+CRITICAL OUTPUT FORMAT — your ENTIRE response must be these two blocks and nothing else:
+- NO prose before the blocks. NO explanations. NO numbered lists. NO markdown headings.
+- Your very first character must be \`<\` (the opening of <UPDATED_STYLE>).
+- Both closing tags </UPDATED_STYLE> and </UPDATED_SECTION> MUST appear.
 
 <UPDATED_STYLE>
 ...complete updated <style>...</style> block here...

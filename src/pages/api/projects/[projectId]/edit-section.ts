@@ -133,7 +133,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // ── Send to Sonnet ────────────────────────────────────────────────────────
     const response = await createMessage({
       model: SONNET_MODEL,
-      max_tokens: 8000,
+      max_tokens: 32000,
       system: `You are editing a single section of a website. You receive:
 1. The current <style> block (full page CSS)
 2. The current section HTML
@@ -147,7 +147,11 @@ Rules:
 - Keep comment markers (<!-- SECTION:... --> / <!-- /SECTION:... -->) if present
 - Understand and apply instructions written in any language (Romanian, English, etc.)
 - QUOTED TEXT RULE: if the user puts text inside quotes (e.g. "Descoperă natura"), use that text EXACTLY as written — character for character, no rewording. Text without quotes can be freely reworded to fit the design.
-- Output ONLY the two blocks below, no explanations:
+
+CRITICAL OUTPUT FORMAT — your ENTIRE response must be these two blocks and nothing else:
+- NO prose before the blocks. NO explanations. NO numbered lists. NO markdown headings.
+- Your very first character must be \`<\` (the opening of <UPDATED_STYLE>).
+- Both closing tags </UPDATED_STYLE> and </UPDATED_SECTION> MUST appear.
 
 <UPDATED_STYLE>
 ...complete updated <style>...</style> block here...
