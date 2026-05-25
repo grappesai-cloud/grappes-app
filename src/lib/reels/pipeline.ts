@@ -28,6 +28,7 @@ import type {
   IntakeContext,
   ProcessingProgress,
 } from "./types";
+import { ensureCompleteDimensions } from "./normalize";
 
 const setProgress = dbSetProgress;
 const setDone = dbSetDone;
@@ -269,6 +270,9 @@ export async function runAnalysis(id: string, blobUrl: string) {
       pct: 97,
       message: "Saving",
     });
+    // Never persist a result with missing sub-dimensions (recover from the
+    // first pass, else synthesize) so the analysis page can always render.
+    ensureCompleteDimensions(result, initial);
     const finalResult: AnalysisResult = {
       ...result,
       signals: {
