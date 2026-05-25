@@ -225,14 +225,23 @@ function nicheFit(result: AnalysisResult): {
 } {
   const conf = result.niche?.confidence ?? 0;
   const dims = result.dimensions;
-  const dimAvg = dims
-    ? (dims.voice_impact.score +
-        dims.visual_pull.score +
-        dims.emotional_hit.score +
-        dims.cognitive_grip.score +
-        dims.memorability.score) /
-      5
-    : result.overall.score;
+  // Older/partial analyses can have a `dimensions` object that's missing some
+  // sub-dimensions, so guard every access — a single missing field here used
+  // to throw during SSR and blank the whole analysis page.
+  const dimScores = dims
+    ? [
+        dims.voice_impact,
+        dims.visual_pull,
+        dims.emotional_hit,
+        dims.cognitive_grip,
+        dims.memorability,
+      ]
+        .map((d) => d?.score)
+        .filter((s): s is number => typeof s === "number")
+    : [];
+  const dimAvg = dimScores.length
+    ? dimScores.reduce((a, b) => a + b, 0) / dimScores.length
+    : (result.overall?.score ?? 0);
   const combined = (conf / 100) * 0.5 + (dimAvg / 100) * 0.5;
   return {
     score: clamp100(combined * 100),
@@ -254,7 +263,7 @@ function ctaWeight(result: AnalysisResult): {
       source: "model",
     };
   }
-  const dur = result.meta.duration_sec || 1;
+  const dur = result.meta?.duration_sec || 1;
   const timing = cta.timing_sec ?? dur;
   const tailBonus = clamp01(timing / dur);
   const score = clamp100(cta.strength * 0.7 + tailBonus * 30);
@@ -270,7 +279,7 @@ function memorability(result: AnalysisResult): {
   detail: string;
   source: XSignal["source"];
 } {
-  const score = result.dimensions?.memorability?.score ?? result.overall.score;
+  const score = result.dimensions?.memorability?.score ?? result.overall?.score ?? 0;
   return {
     score: clamp100(score),
     detail: result.dimensions?.memorability?.summary ?? "from overall score",
@@ -283,7 +292,7 @@ function engagementVelocity(result: AnalysisResult): {
   detail: string;
   source: XSignal["source"];
 } {
-  const dur = result.meta.duration_sec || 1;
+  const dur = result.meta?.duration_sec || 1;
   const cutoff = dur * 0.3;
   const eng = result.engagement;
   const peak = peakInWindow(eng?.timeline, eng?.moments, 0, cutoff);
@@ -298,7 +307,7 @@ function engagementVelocity(result: AnalysisResult): {
     (p) => p.sec >= cutoff,
   )?.retention_pct;
   return {
-    score: clamp100(retentionAt ?? result.overall.score * 0.8),
+    score: clamp100(retentionAt ?? (result.overall?.score ?? 0) * 0.8),
     detail: `retention proxy @ ${round(cutoff, 1)}s = ${round(retentionAt ?? 0)}`,
     source: "estimated",
   };
