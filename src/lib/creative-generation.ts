@@ -101,6 +101,21 @@ These runtime functions are auto-injected if you call them. Using zero is fine �
 - Anchor navigation uses native CSS smooth scroll (html { scroll-behavior: smooth }) — do NOT load Lenis or any smooth-scroll JS library.
 - For icons use inline SVGs or Unicode — no external icon library needed.
 - Sections must not visually bleed into each other by accident. If you use position:absolute or oversized elements, ensure they stay within their section's bounds (overflow:hidden or clip). Intentional overlap between sections is fine — accidental overlap is a bug.
+- Full-bleed canvas / generated animated backgrounds MUST be sized explicitly, or they render as a tiny 300×150 box in the top-left corner — a <canvas>'s drawing buffer defaults to 300×150 and is completely independent of its CSS size. For ANY canvas (or WebGL) background:
+  - Put it inside a \`position: relative\` parent (the hero/section). Style the canvas \`position:absolute; inset:0; width:100%; height:100%; display:block;\` and layer the real content above it with \`z-index\`.
+  - In JS, set the drawing buffer to the rendered size × devicePixelRatio, and re-fit on \`resize\` — never leave width/height unset. Canonical pattern (adapt the draw loop to the concept):
+\`\`\`
+const c = document.querySelector('#hero-canvas');
+const x = c.getContext('2d');
+function fit() {
+  const r = c.parentElement.getBoundingClientRect();
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = r.width * d; c.height = r.height * d;
+  x.setTransform(d, 0, 0, d, 0, 0); // draw in CSS pixels: r.width × r.height
+}
+fit(); window.addEventListener('resize', fit);
+\`\`\`
+  - For a full-viewport hero, the parent should establish height (e.g. \`min-height:100vh\`) BEFORE fit() runs so the canvas measures a real size, not 0.
 
 ## Images — NEVER CROP USER-UPLOADED PHOTOS
 
