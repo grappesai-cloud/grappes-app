@@ -229,6 +229,9 @@ export function Dashboard({
   const [tab, setTab] = useState<"summary" | "in_depth">("in_depth");
   const [videoTime, setVideoTime] = useState(0);
 
+  // Performance-weighted headline + heavy-ranker, computed once and reused.
+  const xRanking = result.x_signals ?? computeXRankingSignals(result);
+
   const seek = (sec: number, reason?: string) => {
     playerRef.current?.seek(sec);
     if (reason) {
@@ -524,7 +527,7 @@ export function Dashboard({
           </div>
 
           <div className="flex flex-col items-stretch gap-3 lg:items-end">
-            <ScoreBadge score={result.overall.score} />
+            <ScoreBadge score={xRanking.performance_score ?? result.overall.score} />
             <div className="flex flex-wrap items-center gap-2 lg:justify-end" data-print-hide="true">
               <button
                 type="button"
@@ -608,14 +611,9 @@ export function Dashboard({
         </Reveal>
       )}
 
-      {(() => {
-        const xs = result.x_signals ?? computeXRankingSignals(result);
-        return (
-          <Reveal>
-            <XSignalsCard data={xs} />
-          </Reveal>
-        );
-      })()}
+      <Reveal>
+        <XSignalsCard data={xRanking} />
+      </Reveal>
 
       <div className="flex items-center justify-between gap-4 border-b border-zinc-900 pb-3">
         <div className="flex items-center rounded-full border border-zinc-800 bg-zinc-900/60 p-1">
@@ -1021,10 +1019,12 @@ function MetaItem({ k, v, truncate }: { k: string; v: string; truncate?: boolean
 }
 
 function ScoreBadge({ score }: { score: number }) {
+  // Bands track the heavy-ranker cutoffs (boosted ≥62 / neutral ≥46) since this
+  // is now the performance composite, not the model's craft gestalt.
   const tone =
-    score >= 75
+    score >= 62
       ? { label: "Strong", accent: "#34d399", glow: "rgba(52,211,153,0.16)" }
-      : score >= 50
+      : score >= 46
         ? { label: "Mid", accent: "#fbbf24", glow: "rgba(251,191,36,0.16)" }
         : { label: "Weak", accent: "#fb7185", glow: "rgba(251,113,133,0.18)" };
   return (
@@ -1037,7 +1037,7 @@ function ScoreBadge({ score }: { score: number }) {
     >
       <div className="flex flex-col">
         <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-white/40">
-          Overall
+          Performance
         </span>
         <span
           className="mt-0.5 inline-flex items-center gap-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.16em]"

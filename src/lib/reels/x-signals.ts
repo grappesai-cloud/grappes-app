@@ -390,25 +390,57 @@ export function computeXRankingSignals(
   const heavy = Math.round(
     signals.reduce((a, s) => a + s.score * s.weight, 0),
   );
+  // Band cutoffs anchored to real outcomes: a reel that did 666k views scored
+  // 66 here and was clearly boosted, so the old ≥72 boost line sat above the
+  // realistic ceiling of the (deliberately ruthless) signal scores. Lowered to
+  // match. TODO: re-fit once we have a labelled set of reels with view data.
   const band: XRankingSignals["band"] =
-    heavy >= 72 ? "boosted" : heavy >= 50 ? "neutral" : "throttled";
+    heavy >= 62 ? "boosted" : heavy >= 46 ? "neutral" : "throttled";
 
-  const sortedDown = [...signals].sort((a, b) => a.score - b.score);
-  const worst = sortedDown.slice(0, 2);
-  const sortedUp = [...signals].sort((a, b) => b.score - a.score);
-  const best = sortedUp[0];
+  // Rank fixes by LEVERAGE — how many points each signal can still add to the
+  // weighted score = (100 − score) × weight — not by lowest raw score. The old
+  // logic told users to "fix" CTA (weight 0.03: maxing it adds ~2 pts) while
+  // ignoring hook/retention (weight 0.18/0.14) where the real headroom is.
+  const leverage = (s: XSignal) => ((100 - s.score) * s.weight);
+  const byLeverage = [...signals].sort((a, b) => leverage(b) - leverage(a));
+  const worst = byLeverage.slice(0, 2);
+  const best = [...signals].sort((a, b) => b.contribution - a.contribution)[0];
 
   const rationale =
     band === "boosted"
-      ? `Heavy-ranker would BOOST this reel. ${best.label} (${best.score}) carries it; weakest is ${worst[0].label} (${worst[0].score}).`
+      ? `Heavy-ranker would BOOST this reel. ${best.label} (${best.score}) carries it. Biggest remaining levers: ${worst[0].label} (${worst[0].score}), ${worst[1].label} (${worst[1].score}).`
       : band === "neutral"
-        ? `Heavy-ranker treats this NEUTRAL. ${best.label} is strong (${best.score}); fix ${worst[0].label} (${worst[0].score}) and ${worst[1].label} (${worst[1].score}) to cross the boost line.`
-        : `Heavy-ranker would THROTTLE this reel. ${worst[0].label} (${worst[0].score}) and ${worst[1].label} (${worst[1].score}) are the bleeders.`;
+        ? `Heavy-ranker treats this NEUTRAL. ${best.label} (${best.score}) is the engine. Highest-leverage fixes to cross the boost line: ${worst[0].label} (${worst[0].score}) and ${worst[1].label} (${worst[1].score}).`
+        : `Heavy-ranker would THROTTLE this reel. Highest-leverage fixes: ${worst[0].label} (${worst[0].score}) and ${worst[1].label} (${worst[1].score}).`;
 
   return {
     heavy_ranker_score: heavy,
+    performance_score: performanceScore(result, heavy),
     band,
     signals,
     rationale,
   };
+}
+
+/**
+ * Performance-potential headline. The model's gestalt `overall.score` averages
+ * the five dimensions equally, so pure visual craft (visual_pull) drags down
+ * reels that win on script/retention — a 666k-view talking-head reel read as
+ * "Mid 54". This blends the heavy-ranker composite (which captures hook,
+ * retention and engagement) with the cognitive dimensions while down-weighting
+ * visual_pull. Heuristic — calibrate against real outcomes when data exists.
+ */
+export function performanceScore(result: AnalysisResult, heavy: number): number {
+  const fallback = result.overall?.score ?? heavy;
+  const d = result.dimensions;
+  const s = (x: { score?: number } | undefined) =>
+    typeof x?.score === "number" ? x.score : fallback;
+  const dimPerf = d
+    ? s(d.voice_impact) * 0.28 +
+      s(d.emotional_hit) * 0.22 +
+      s(d.memorability) * 0.22 +
+      s(d.cognitive_grip) * 0.16 +
+      s(d.visual_pull) * 0.12
+    : fallback;
+  return clamp100(0.55 * heavy + 0.45 * dimPerf);
 }

@@ -133,6 +133,9 @@ export type XSignal = {
 
 export type XRankingSignals = {
   heavy_ranker_score: number;
+  /** Performance-potential headline: heavy-ranker blended with the cognitive
+   *  dimensions, down-weighting visual craft. See performanceScore(). */
+  performance_score: number;
   band: "throttled" | "neutral" | "boosted";
   signals: XSignal[];
   rationale: string;
