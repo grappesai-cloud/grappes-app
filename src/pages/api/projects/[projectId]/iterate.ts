@@ -4,7 +4,7 @@
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
-import { FULL_PAGE_KEY, extractHtml, injectAnalytics, injectBacklink, injectFormHandler } from '../../../../lib/creative-generation';
+import { FULL_PAGE_KEY, extractHtml, injectCanvasFit, injectAnalytics, injectBacklink, injectFormHandler } from '../../../../lib/creative-generation';
 import { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST } from '../../../../lib/generation';
 import { createMessage } from '../../../../lib/anthropic';
 import { runStructuralQA } from '../../../../lib/structural-qa';
@@ -172,6 +172,9 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       try { await admin.rpc('refund_project_iteration', { p_project_id: params.projectId! }); } catch { /* best-effort */ }
       return json({ reply: 'Edit failed — the change was too complex. Try a more specific instruction (e.g. "change the heading text to X").', newHtml: null });
     }
+
+    // Safety net: fill any broken full-bleed background canvas
+    newHtml = injectCanvasFit(newHtml);
 
     // Inject analytics beacon
     const brief = await db.briefs.findByProjectId(params.projectId!);

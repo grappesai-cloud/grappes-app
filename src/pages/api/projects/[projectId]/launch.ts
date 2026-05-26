@@ -6,6 +6,7 @@ import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
   injectEffectRuntimes,
+  injectCanvasFit,
   injectAnalytics,
   injectBookingWidget,
   injectBacklink,
@@ -414,6 +415,7 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
           const pageBriefResult = applyBriefContent(pageHtml, freshBrief.data);
           pageHtml = pageBriefResult.html;
           pageHtml = injectEffectRuntimes(pageHtml);
+          pageHtml = injectCanvasFit(pageHtml);
           pageHtml = injectAnalytics(pageHtml, freshBrief.data, projectId);
           pageHtml = injectBookingWidget(pageHtml, freshBrief.data);
           pageHtml = injectBacklink(pageHtml, { brandingRemoved });
@@ -484,6 +486,7 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
       console.log(`[launch] Brief content applied: ${briefContentResult.fixes.join(', ')}`);
     }
     html = injectEffectRuntimes(html);
+    html = injectCanvasFit(html);
     html = injectAnalytics(html, freshBrief.data, projectId);
     html = injectBookingWidget(html, freshBrief.data);
     html = injectBacklink(html, { brandingRemoved });

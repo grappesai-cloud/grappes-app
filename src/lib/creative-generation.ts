@@ -752,6 +752,58 @@ export function injectBacklink(html: string, opts?: { brandingRemoved?: boolean 
   return result + backlink;
 }
 
+// ─── Inject Canvas-Fit Safety Net ────────────────────────────────────────────
+// Deterministic backstop for generated full-bleed <canvas> backgrounds. The
+// model sometimes emits a bare <canvas> with the default 300×150 drawing buffer
+// and no fill styling, so an animated hero background renders as a tiny box in
+// the top-left corner. This stretches such canvases to fill their parent, sizes
+// the buffer to rendered-size × DPR, re-fits on resize, and nudges resize-aware
+// draw loops to recompute. Conservative: only acts on a canvas whose buffer is
+// still EXACTLY 300×150 (never sized by the author) AND sits at the top-left of
+// a large container — the precise signature of the bug — so intentional small
+// or already-sized canvases are left untouched.
+export function injectCanvasFit(html: string): string {
+  if (!/<canvas[\s>]/i.test(html)) return html;
+  const snippet = `
+<!-- grappes: full-bleed canvas safety net -->
+<script>(function(){
+  function fit(c){
+    var p=c.parentElement; if(!p) return false;
+    if(getComputedStyle(p).position==='static') p.style.position='relative';
+    c.style.position='absolute'; c.style.top='0'; c.style.left='0';
+    c.style.width='100%'; c.style.height='100%'; c.style.display='block';
+    if(!c.style.zIndex) c.style.zIndex='0';
+    var d=Math.min(window.devicePixelRatio||1,2);
+    var w=Math.round(p.clientWidth*d), h=Math.round(p.clientHeight*d);
+    if(w>0&&h>0){ c.width=w; c.height=h; return true; } return false;
+  }
+  function scan(){
+    var cs=document.getElementsByTagName('canvas'), fixed=false;
+    for(var i=0;i<cs.length;i++){
+      var c=cs[i], p=c.parentElement; if(!p) continue;
+      if(c.getAttribute('data-bgfit')){ fit(c); continue; }
+      var pr=p.getBoundingClientRect(), cr=c.getBoundingClientRect();
+      var topLeft=(cr.left-pr.left)<6 && (cr.top-pr.top)<6;
+      if(c.width===300 && c.height===150 && pr.height>=360 && pr.width>=320 && topLeft){
+        if(fit(c)){ c.setAttribute('data-bgfit','1'); fixed=true; }
+      }
+    }
+    if(fixed) window.dispatchEvent(new Event('resize'));
+  }
+  function boot(){ try{ scan(); }catch(e){} }
+  if(document.readyState==='complete') setTimeout(boot,80);
+  else window.addEventListener('load', function(){ setTimeout(boot,80); });
+  window.addEventListener('resize', function(){
+    try{ var cs=document.querySelectorAll('canvas[data-bgfit]'); for(var i=0;i<cs.length;i++) fit(cs[i]); }catch(e){}
+  });
+})();</script>`;
+  const bodyClose = html.lastIndexOf('</body>');
+  if (bodyClose !== -1) {
+    return html.slice(0, bodyClose) + snippet + '\n' + html.slice(bodyClose);
+  }
+  return html + snippet;
+}
+
 // Strip the injected grappes.dev backlink in-place from any HTML that already had it.
 // Used by the webhook after a successful "remove branding" purchase to clean up
 // already-deployed HTML before re-deploying it.

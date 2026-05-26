@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../../../lib/db';
 import {
   injectEffectRuntimes,
+  injectCanvasFit,
   injectAnalytics,
   injectBacklink,
   injectFormHandler,
@@ -91,6 +92,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
     html = autoFix(html, params.projectId!).html;
   } catch {}
   html = injectEffectRuntimes(html);
+  html = injectCanvasFit(html);
   html = injectAnalytics(html, brief.data, params.projectId!);
   html = injectBacklink(html, { brandingRemoved: !!(project as any).branding_removed });
   html = injectFormHandler(html, params.projectId!);
