@@ -1,7 +1,7 @@
 ---
 import Dashboard from '../../layouts/Dashboard.astro';
 import { createAdminClient } from '../../lib/supabase';
-import type { AuditReport, PerfReport, ContentReport } from '../../lib/audit';
+import type { AuditReport, PerfReport, ContentReport, AttentionReport } from '../../lib/audit';
 import type { AuditCheck } from '../../lib/audit-html-checks';
 
 const { id } = Astro.params;
@@ -41,6 +41,7 @@ const contentScore = row.content_score ?? null;
 
 const perf = report?.perf as PerfReport | undefined;
 const content = report?.content as ContentReport | undefined;
+const attention = report?.attention as AttentionReport | undefined;
 const onpageChecks = (report?.onpage ?? []) as AuditCheck[];
 const technicalChecks = (report?.technical ?? []) as AuditCheck[];
 
@@ -126,6 +127,63 @@ function metricFormat(value: number, unit: string): string {
             </div>
           ))}
         </div>
+
+        {/* Attention / first impression — per page */}
+        {attention && (() => {
+          const pages = attention.pages && attention.pages.length > 0
+            ? attention.pages
+            : [{ url: row.url, score: attention.score, verdict: attention.verdict, checks: attention.checks, screenshot: perf?.screenshot }];
+          const siteScore = attention.siteScore ?? attention.score;
+          return (
+            <section style="margin-bottom:28px;">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+                <h2 class="section-h" style="margin-bottom:0;">First impression — attention</h2>
+                <span style="font-size:12px;color:rgba(255,255,255,0.5);">
+                  Site avg <strong style={`color:${scoreColor(siteScore)};`}>{siteScore}</strong> · {pages.length} page{pages.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:14px;margin-top:12px;">
+                {pages.map(pg => {
+                  let pagePath = pg.url;
+                  try { pagePath = new URL(pg.url).pathname || '/'; } catch {}
+                  return (
+                    <div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.18);border-radius:16px;padding:16px;">
+                      <div style="display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:start;">
+                        {pg.screenshot && (
+                          <img src={pg.screenshot} alt={`Screenshot of ${pagePath}`} style="width:140px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);display:block;" />
+                        )}
+                        <div>
+                          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+                            <span style={`font-family:'Inter',sans-serif;font-size:32px;font-weight:300;line-height:1;color:${scoreColor(pg.score)};`}>{pg.score}</span>
+                            <code style="font-size:12px;color:rgba(255,255,255,0.55);">{pagePath}</code>
+                          </div>
+                          <p style="font-size:13.5px;color:rgba(255,255,255,0.8);margin:8px 0 0;line-height:1.45;">{pg.verdict}</p>
+                          {pg.checks.length > 0 && (
+                            <ul class="check-list" style="margin-top:12px;">
+                              {pg.checks.map(c => {
+                                const s = statusBg(c.status);
+                                return (
+                                  <li class="check-item" style={`background:${s.bg};border-color:${s.border};`}>
+                                    <span class="check-pill" style={`background:${s.color};color:#0a0a0a;`}>{statusIcon(c.status)}</span>
+                                    <div class="check-body">
+                                      <div class="check-label">{c.label}</div>
+                                      {c.detail && <div class="check-detail">{c.detail}</div>}
+                                      {c.status !== 'ok' && c.fix && <div class="check-detail" style="color:rgba(167,139,250,0.85);margin-top:3px;">Fix: {c.fix}</div>}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })()}
 
         {/* Performance */}
         {perf && (

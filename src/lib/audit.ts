@@ -34,6 +34,8 @@ export interface PerfReport {
   bestPracticesScore: number;
   /** Lighthouse's own SEO score — we DO surface this, but our HTML checks are more granular */
   lhSeoScore: number;
+  /** Mobile viewport screenshot (data URI) from Lighthouse — reused for the Attention lens */
+  screenshot?: string;
 }
 
 /**
@@ -68,6 +70,31 @@ export interface ContentReport {
   nicheCoherence?: NicheCoherence;
 }
 
+/**
+ * First-impression / attention lens — judges the above-the-fold screenshot the
+ * way a human (or the X heavy-ranker's dwell signal) reacts in the first ~3s:
+ * does it grab attention, is the value-prop clear, does the eye reach the CTA.
+ * Distinct from SEO/perf, so surfaced as its own score (not folded into overall).
+ */
+export interface PageAttention {
+  url: string;
+  score: number; // 0-100
+  verdict: string;
+  checks: AuditCheck[];
+  screenshot?: string; // data URI (above-the-fold)
+}
+
+export interface AttentionReport {
+  /** Primary (submitted) page — kept top-level for backward compat. */
+  score: number; // 0-100
+  verdict: string;
+  checks: AuditCheck[];
+  /** Per-page breakdown when a multi-page crawl ran (includes the primary page). */
+  pages?: PageAttention[];
+  /** Site-level average across crawled pages. */
+  siteScore?: number;
+}
+
 export interface AuditReport {
   url: string;
   fetchedAt: string;
@@ -75,6 +102,7 @@ export interface AuditReport {
   onpage: AuditCheck[];
   technical: AuditCheck[];
   content?: ContentReport;
+  attention?: AttentionReport;
   /** Errors per category if a sub-pipeline failed */
   errors: Record<string, string>;
   scores: {
@@ -83,6 +111,7 @@ export interface AuditReport {
     onpage: number;
     technical: number;
     content: number;
+    attention?: number;
   };
 }
 
@@ -146,6 +175,9 @@ async function runPSI(url: string): Promise<PerfReport> {
     accessibilityScore: Math.round((cats.accessibility?.score ?? 0) * 100),
     bestPracticesScore: Math.round((cats["best-practices"]?.score ?? 0) * 100),
     lhSeoScore: Math.round((cats.seo?.score ?? 0) * 100),
+    screenshot:
+      (audits["final-screenshot"]?.details?.data as string | undefined) ??
+      undefined,
   };
 }
 
@@ -334,6 +366,158 @@ function deriveNicheCoherence(raw: unknown): NicheCoherence | undefined {
   };
 }
 
+// ── Attention / first-impression (Claude vision on the screenshot) ──────────
+function dataUriToImageBlock(dataUri: string) {
+  const m = dataUri.match(/^data:(image\/\w+);base64,(.+)$/s);
+  const media_type = (m?.[1] ?? "image/jpeg") as
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp";
+  const data = m?.[2] ?? dataUri.replace(/^data:[^,]+,/, "");
+  return { type: "image" as const, source: { type: "base64" as const, media_type, data } };
+}
+
+async function runAttentionAnalysis(params: {
+  url: string;
+  title?: string;
+  heroText?: string;
+  screenshot: string;
+}): Promise<PageAttention> {
+  const system = `You are a senior conversion + landing-page designer. You are shown the ABOVE-THE-FOLD mobile screenshot of a web page (what a visitor sees in the first ~3 seconds before scrolling). Judge the FIRST IMPRESSION only — not SEO, not performance.
+
+Return ONLY a JSON object, nothing else:
+{
+  "score": 0-100,
+  "verdict": "one punchy sentence on the first impression",
+  "checks": [
+    { "id": "attention-grab", "label": "Attention grab", "status": "ok"|"warn"|"fail", "detail": "what the eye lands on first", "fix": "one concrete change" },
+    { "id": "clarity-5s", "label": "5-second clarity", "status": "ok"|"warn"|"fail", "detail": "can a stranger tell what this is/does instantly?", "fix": "..." },
+    { "id": "visual-hierarchy", "label": "Visual hierarchy", "status": "ok"|"warn"|"fail", "detail": "is the eye guided in a clear order toward the action?", "fix": "..." },
+    { "id": "cta", "label": "Primary CTA", "status": "ok"|"warn"|"fail", "detail": "is there a prominent, action-clear CTA above the fold?", "fix": "..." }
+  ]
+}
+
+Be specific and visual — reference what you actually see (headline, button, image, clutter, whitespace). 'score' reflects how well the fold captures attention AND communicates value in 3s. Calibrate: 50 = average, 75 = strong, 85+ = exceptional.`;
+
+  const user = `URL: ${params.url}
+Page title: ${params.title ?? "(unknown)"}
+Hero/visible text (for context): ${(params.heroText ?? "").slice(0, 600)}
+
+Judge the screenshot's first impression. Return the JSON now.`;
+
+  const r = await createMessage({
+    model: HAIKU_MODEL,
+    max_tokens: 900,
+    system,
+    messages: [
+      {
+        role: "user",
+        content: [dataUriToImageBlock(params.screenshot), { type: "text", text: user }],
+      },
+    ],
+  });
+  const text = r.content[0]?.type === "text" ? r.content[0].text : "{}";
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  let parsed: any = {};
+  try { parsed = JSON.parse(cleaned); } catch { /* fall through */ }
+
+  return {
+    url: params.url,
+    score: typeof parsed.score === "number" ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 50,
+    verdict: typeof parsed.verdict === "string" ? parsed.verdict : "Could not read the first impression.",
+    checks: Array.isArray(parsed.checks) ? parsed.checks.slice(0, 4) : [],
+    screenshot: params.screenshot,
+  };
+}
+
+/** Discover up to `max` key same-origin pages from the homepage nav links. */
+function discoverPages(homeUrl: string, html: string, max: number): string[] {
+  const origin = new URL(homeUrl).origin;
+  const found = new Map<string, number>(); // url -> priority (lower = better)
+  const linkRe = /<a\b[^>]*href=["']([^"'#?]+)[^"']*["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(html)) !== null) {
+    let href = m[1].trim();
+    if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) continue;
+    try {
+      const u = new URL(href, homeUrl);
+      if (u.origin !== origin) continue;
+      const path = u.pathname.replace(/\/$/, "") || "/";
+      if (path === "/") continue; // homepage handled separately
+      if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|mp4|css|js)$/i.test(path)) continue;
+      const depth = path.split("/").filter(Boolean).length;
+      // Prefer shallow, "key" pages (pricing/about/features/contact/product).
+      const keyBoost = /(pricing|about|feature|product|service|contact|how|use-case|solution)/i.test(path) ? -2 : 0;
+      const prio = depth + keyBoost;
+      const clean = `${origin}${path}`;
+      if (!found.has(clean) || found.get(clean)! > prio) found.set(clean, prio);
+    } catch {
+      /* skip bad href */
+    }
+  }
+  return [...found.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, max)
+    .map(([u]) => u);
+}
+
+/** Minimal PSI call that only extracts the Lighthouse screenshot for a URL. */
+async function getScreenshotOnly(url: string): Promise<string | undefined> {
+  try {
+    const apiKey = import.meta.env.PSI_API_KEY ?? process.env.PSI_API_KEY;
+    if (!apiKey) return undefined;
+    const params = new URLSearchParams({ url, strategy: "mobile", key: apiKey, category: "performance" });
+    const r = await fetch(`${PSI_ENDPOINT}?${params}`);
+    if (!r.ok) return undefined;
+    const data = (await r.json()) as any;
+    return (data.lighthouseResult?.audits?.["final-screenshot"]?.details?.data as string | undefined) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whole-site attention: the submitted page + a few key discovered pages, each
+ * screenshotted and judged. PSI screenshot fetches and vision calls run in
+ * PARALLEL so wall-time stays close to a single page (audit runs in-request).
+ */
+async function runSiteAttention(params: {
+  homeUrl: string;
+  homeScreenshot?: string;
+  homeTitle: string;
+  homeHeroText: string;
+  html: string;
+  maxPages?: number;
+}): Promise<AttentionReport | undefined> {
+  const max = params.maxPages ?? 4;
+  const subPaths = discoverPages(params.homeUrl, params.html, max - 1);
+
+  // Fetch sub-page screenshots in parallel; homepage reuses the perf screenshot.
+  const subShots = await Promise.all(subPaths.map((u) => getScreenshotOnly(u)));
+
+  const targets: { url: string; title?: string; heroText?: string; screenshot: string }[] = [];
+  if (params.homeScreenshot)
+    targets.push({ url: params.homeUrl, title: params.homeTitle, heroText: params.homeHeroText, screenshot: params.homeScreenshot });
+  subPaths.forEach((u, i) => {
+    const shot = subShots[i];
+    if (shot) targets.push({ url: u, screenshot: shot });
+  });
+
+  if (targets.length === 0) return undefined;
+
+  const pages = await Promise.all(targets.map((t) => runAttentionAnalysis(t)));
+  const primary = pages[0];
+  const siteScore = Math.round(pages.reduce((a, p) => a + p.score, 0) / pages.length);
+
+  return {
+    score: primary.score,
+    verdict: primary.verdict,
+    checks: primary.checks,
+    pages,
+    siteScore,
+  };
+}
+
 // ── Main orchestrator ───────────────────────────────────────────────────────
 export async function runAudit(rawUrl: string): Promise<AuditReport> {
   let url: URL;
@@ -385,6 +569,25 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
   if (contentResult.status === "fulfilled") content = contentResult.value;
   else errors.content = contentResult.reason instanceof Error ? contentResult.reason.message : String(contentResult.reason);
 
+  // Attention lens — submitted page + a few key pages (parallel), each judged
+  // on its above-the-fold screenshot. Needs the Lighthouse screenshot + HTML.
+  let attention: AttentionReport | undefined;
+  if (perf?.screenshot && html) {
+    try {
+      attention = await runSiteAttention({
+        homeUrl: url.toString(),
+        homeScreenshot: perf.screenshot,
+        homeTitle: htmlChecks.title,
+        homeHeroText: htmlChecks.mainText,
+        html,
+      });
+    } catch (e) {
+      errors.attention = e instanceof Error ? e.message : String(e);
+    }
+  } else if (!errors.perf) {
+    errors.attention = "No screenshot available from Lighthouse.";
+  }
+
   // Compute category scores
   const onpageScore = scoreChecks(htmlChecks.onpage);
   const technicalScore = scoreChecks(htmlChecks.technical);
@@ -402,6 +605,7 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
     onpage: htmlChecks.onpage,
     technical: htmlChecks.technical,
     content,
+    attention,
     errors,
     scores: {
       overall,
@@ -409,6 +613,7 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
       onpage: onpageScore,
       technical: technicalScore,
       content: contentScore,
+      attention: attention?.score,
     },
   };
 }
