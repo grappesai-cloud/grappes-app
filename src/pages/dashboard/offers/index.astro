@@ -1,0 +1,373 @@
+---
+// ── Offer Lab ─────────────────────────────────────────────────────────────────
+// Build a client offer / proposal and export it as a Grappes-branded PDF.
+// Croffer-style: form + live preview, draft saved locally in the browser.
+import Dashboard from '../../../layouts/Dashboard.astro';
+
+const authUser = Astro.locals.user!;
+---
+
+<Dashboard title="Offer Lab">
+  <style is:global>
+    main { padding-top: 40px !important; padding-bottom: 60px !important; }
+  </style>
+
+  <div class="ol-head">
+    <span class="ol-eyebrow">Offer Lab</span>
+    <h2 class="ol-title">Construiește o ofertă</h2>
+    <p class="ol-sub">Completează detaliile, vezi oferta în timp real, descarc-o ca PDF în brandul Grappes. Ciorna se salvează local în browser.</p>
+  </div>
+
+  <div class="ol-grid">
+    <!-- ── Form panel ─────────────────────────────────────────────────── -->
+    <section class="ol-form" id="ol-form">
+      <!-- Client -->
+      <div class="ol-block">
+        <h3 class="ol-block-title">Client</h3>
+        <label class="ol-field">
+          <span>Nume client / brand</span>
+          <input type="text" data-bind="client" placeholder="ex. adelina.delia.dragos" />
+        </label>
+        <label class="ol-field">
+          <span>Titlul ofertei</span>
+          <input type="text" data-bind="title" placeholder="ex. Ofertă website + branding" />
+        </label>
+        <div class="ol-row">
+          <label class="ol-field">
+            <span>Data</span>
+            <input type="text" data-bind="date" placeholder="ex. 31 mai 2026" />
+          </label>
+          <label class="ol-field">
+            <span>Valabilă până</span>
+            <input type="text" data-bind="validUntil" placeholder="opțional" />
+          </label>
+        </div>
+        <label class="ol-field">
+          <span>Intro</span>
+          <textarea data-bind="intro" rows="3" placeholder="Un paragraf scurt de context."></textarea>
+        </label>
+      </div>
+
+      <!-- Services -->
+      <div class="ol-block">
+        <div class="ol-block-head">
+          <h3 class="ol-block-title">Ce includem</h3>
+          <button type="button" class="ol-add" data-add="service">+ Serviciu</button>
+        </div>
+        <div id="ol-services"></div>
+      </div>
+
+      <!-- Pricing -->
+      <div class="ol-block">
+        <div class="ol-block-head">
+          <h3 class="ol-block-title">Investiție</h3>
+          <button type="button" class="ol-add" data-add="price">+ Linie</button>
+        </div>
+        <div id="ol-pricing"></div>
+      </div>
+
+      <!-- Installments -->
+      <div class="ol-block">
+        <div class="ol-block-head">
+          <h3 class="ol-block-title">Plata în tranșe</h3>
+          <button type="button" class="ol-add" data-add="installment">+ Tranșă</button>
+        </div>
+        <div id="ol-installments"></div>
+      </div>
+
+      <!-- Notes -->
+      <div class="ol-block">
+        <div class="ol-block-head">
+          <h3 class="ol-block-title">Mențiuni</h3>
+          <button type="button" class="ol-add" data-add="note">+ Mențiune</button>
+        </div>
+        <div id="ol-notes"></div>
+      </div>
+    </section>
+
+    <!-- ── Preview panel ──────────────────────────────────────────────── -->
+    <section class="ol-preview">
+      <div class="ol-actions">
+        <button type="button" class="btn-primary" id="ol-download">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span id="ol-download-label">Descarcă PDF</span>
+        </button>
+        <button type="button" class="btn-ghost" id="ol-print">Print</button>
+        <button type="button" class="btn-ghost" id="ol-reset">Reset</button>
+      </div>
+      <div class="ol-frame-wrap">
+        <iframe id="ol-frame" title="Preview ofertă"></iframe>
+      </div>
+    </section>
+  </div>
+
+  <style>
+    .ol-head { margin-bottom: 28px; }
+    .ol-eyebrow {
+      display: inline-block; font-size: 12px; font-weight: 700;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-aqua-100);
+      margin-bottom: 10px;
+    }
+    .ol-title { font-size: 30px; font-weight: 300; letter-spacing: -0.03em; margin: 0 0 8px; }
+    .ol-sub { color: var(--c-text-muted); font-size: 14px; max-width: 60ch; margin: 0; line-height: 1.6; }
+
+    .ol-grid {
+      display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+      gap: 28px; align-items: start;
+    }
+    @media (max-width: 1024px) { .ol-grid { grid-template-columns: 1fr; } }
+
+    /* Form */
+    .ol-form { display: flex; flex-direction: column; gap: 16px; }
+    .ol-block {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: 16px; padding: 18px 18px 20px;
+    }
+    .ol-block-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .ol-block-title { font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-text-muted); margin: 0; }
+    .ol-block > .ol-block-title { margin-bottom: 14px; }
+
+    .ol-add {
+      font-size: 12px; font-weight: 600; color: var(--c-aqua-100);
+      background: rgba(6,191,221,0.1); border: 1px solid rgba(6,191,221,0.25);
+      border-radius: 999px; padding: 5px 12px; cursor: pointer;
+      transition: background .2s ease;
+    }
+    .ol-add:hover { background: rgba(6,191,221,0.18); }
+
+    .ol-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .ol-field:last-child { margin-bottom: 0; }
+    .ol-field > span { font-size: 11.5px; font-weight: 600; color: var(--c-text-dim); letter-spacing: 0.02em; }
+    .ol-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .ol-form input, .ol-form textarea {
+      width: 100%; background: rgba(0,0,0,0.25); border: 1px solid var(--c-border);
+      border-radius: 10px; padding: 10px 12px; color: #fff;
+      font-family: var(--font-sans); font-size: 13.5px; resize: vertical;
+      transition: border-color .2s ease;
+    }
+    .ol-form input:focus, .ol-form textarea:focus { outline: none; border-color: var(--c-aqua-100); }
+    .ol-form input::placeholder, .ol-form textarea::placeholder { color: rgba(255,255,255,0.28); }
+
+    /* Repeatable item card */
+    .ol-item {
+      position: relative; border: 1px solid var(--c-border); border-radius: 12px;
+      padding: 14px; margin-bottom: 12px; background: rgba(255,255,255,0.02);
+    }
+    .ol-item:last-child { margin-bottom: 0; }
+    .ol-item-del {
+      position: absolute; top: 10px; right: 10px;
+      width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+      background: rgba(255,51,52,0.12); border: 1px solid rgba(255,51,52,0.25);
+      color: #ff6b6b; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .ol-item-del:hover { background: rgba(255,51,52,0.22); }
+    .ol-mini { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+
+    /* Preview */
+    .ol-preview { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 14px; }
+    .ol-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .ol-actions .btn-primary, .ol-actions .btn-ghost { font-size: 13.5px; padding: 10px 18px; }
+    .ol-frame-wrap {
+      border: 1px solid var(--c-border); border-radius: 14px; overflow: hidden;
+      background: #050507; height: 78vh; min-height: 520px;
+    }
+    #ol-frame { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+
+  <script>
+    import { renderOfferHTML, SAMPLE_OFFER } from '../../../lib/offer-template';
+    import type { Offer } from '../../../lib/offer-template';
+
+    const STORE_KEY = 'grappes:offer-draft:v1';
+
+    function load(): Offer {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) return JSON.parse(raw) as Offer;
+      } catch {}
+      return structuredClone(SAMPLE_OFFER);
+    }
+
+    let state: Offer = load();
+
+    const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector(sel) as T;
+    const frame = $('#ol-frame') as HTMLIFrameElement;
+
+    function save() {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+    }
+
+    function renderPreview() {
+      frame.srcdoc = renderOfferHTML(state);
+    }
+
+    function syncTop() {
+      // top-level text inputs
+      document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-bind]').forEach((el) => {
+        const key = el.dataset.bind as keyof Offer;
+        (el as any).value = (state as any)[key] ?? '';
+      });
+    }
+
+    // ── List renderers ──────────────────────────────────────────────────
+    function el(tag: string, cls?: string, html?: string): HTMLElement {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (html != null) n.innerHTML = html;
+      return n;
+    }
+
+    function delBtn(onClick: () => void): HTMLElement {
+      const b = el('button', 'ol-item-del', '&times;');
+      b.setAttribute('type', 'button');
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function field(label: string, value: string, oninput: (v: string) => void, opts: { textarea?: boolean; placeholder?: string } = {}): HTMLElement {
+      const wrap = el('label', 'ol-field');
+      wrap.appendChild(el('span', undefined, label));
+      const input = document.createElement(opts.textarea ? 'textarea' : 'input') as HTMLInputElement | HTMLTextAreaElement;
+      if (opts.textarea) (input as HTMLTextAreaElement).rows = 3;
+      input.value = value ?? '';
+      if (opts.placeholder) input.placeholder = opts.placeholder;
+      input.addEventListener('input', () => { oninput((input as any).value); save(); renderPreview(); });
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function numField(label: string, value: number, oninput: (v: number) => void): HTMLElement {
+      const wrap = el('label', 'ol-field');
+      wrap.appendChild(el('span', undefined, label));
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = String(value ?? 0);
+      input.addEventListener('input', () => { oninput(Number(input.value) || 0); save(); renderPreview(); });
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function renderServices() {
+      const host = $('#ol-services'); host.innerHTML = '';
+      state.services = state.services || [];
+      state.services.forEach((svc, i) => {
+        const card = el('div', 'ol-item');
+        card.appendChild(delBtn(() => { state.services.splice(i, 1); save(); renderServices(); renderPreview(); }));
+        card.appendChild(field('Titlu', svc.title, (v) => svc.title = v, { placeholder: 'ex. Website' }));
+        card.appendChild(field('Subtitlu', svc.subtitle ?? '', (v) => svc.subtitle = v, { placeholder: 'opțional' }));
+        card.appendChild(field('Puncte (câte unul pe linie)', (svc.items || []).join('\n'),
+          (v) => svc.items = v.split('\n').map((s) => s.trim()).filter(Boolean), { textarea: true }));
+        host.appendChild(card);
+      });
+    }
+
+    function renderPricing() {
+      const host = $('#ol-pricing'); host.innerHTML = '';
+      state.pricing = state.pricing || [];
+      state.pricing.forEach((p, i) => {
+        const card = el('div', 'ol-item');
+        card.appendChild(delBtn(() => { state.pricing.splice(i, 1); save(); renderPricing(); renderPreview(); }));
+        card.appendChild(field('Etichetă', p.label, (v) => p.label = v, { placeholder: 'ex. Branding' }));
+        card.appendChild(field('Notă', p.note ?? '', (v) => p.note = v, { placeholder: 'opțional' }));
+        const mini = el('div', 'ol-mini');
+        mini.appendChild(numField('Sumă', p.amount, (v) => p.amount = v));
+        mini.appendChild(field('Monedă', p.currency ?? 'EUR', (v) => p.currency = v || 'EUR'));
+        card.appendChild(mini);
+        host.appendChild(card);
+      });
+    }
+
+    function renderInstallments() {
+      const host = $('#ol-installments'); host.innerHTML = '';
+      state.installments = state.installments || [];
+      state.installments.forEach((t, i) => {
+        const card = el('div', 'ol-item');
+        card.appendChild(delBtn(() => { state.installments.splice(i, 1); save(); renderInstallments(); renderPreview(); }));
+        card.appendChild(field('Etichetă', t.label, (v) => t.label = v, { placeholder: 'ex. Tranșa 1 · Branding' }));
+        card.appendChild(field('Detaliu', t.detail ?? '', (v) => t.detail = v, { placeholder: 'opțional' }));
+        const mini = el('div', 'ol-mini');
+        mini.appendChild(numField('Sumă', t.amount, (v) => t.amount = v));
+        mini.appendChild(field('Monedă', t.currency ?? 'EUR', (v) => t.currency = v || 'EUR'));
+        card.appendChild(mini);
+        host.appendChild(card);
+      });
+    }
+
+    function renderNotes() {
+      const host = $('#ol-notes'); host.innerHTML = '';
+      state.notes = state.notes || [];
+      state.notes.forEach((n, i) => {
+        const card = el('div', 'ol-item');
+        card.appendChild(delBtn(() => { state.notes!.splice(i, 1); save(); renderNotes(); renderPreview(); }));
+        card.appendChild(field('Mențiune', n, (v) => state.notes![i] = v, { textarea: true }));
+        host.appendChild(card);
+      });
+    }
+
+    function renderAllLists() { renderServices(); renderPricing(); renderInstallments(); renderNotes(); }
+
+    // ── Bind top-level inputs ────────────────────────────────────────────
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-bind]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const key = input.dataset.bind as keyof Offer;
+        (state as any)[key] = (input as any).value;
+        save(); renderPreview();
+      });
+    });
+
+    // ── Add buttons ──────────────────────────────────────────────────────
+    document.querySelectorAll<HTMLButtonElement>('[data-add]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const kind = btn.dataset.add;
+        if (kind === 'service') { state.services.push({ title: '', subtitle: '', items: [] }); renderServices(); }
+        else if (kind === 'price') { state.pricing.push({ label: '', note: '', amount: 0, currency: 'EUR' }); renderPricing(); }
+        else if (kind === 'installment') { state.installments.push({ label: '', detail: '', amount: 0, currency: 'EUR' }); renderInstallments(); }
+        else if (kind === 'note') { (state.notes ||= []).push(''); renderNotes(); }
+        save(); renderPreview();
+      });
+    });
+
+    // ── Actions ──────────────────────────────────────────────────────────
+    $('#ol-download').addEventListener('click', async () => {
+      const btn = $('#ol-download') as HTMLButtonElement;
+      const label = $('#ol-download-label');
+      btn.disabled = true; label.textContent = 'Se generează…';
+      try {
+        const res = await fetch('/api/offers/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(state),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Eroare la generare');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const slug = (state.client || 'oferta').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        a.href = url; a.download = `oferta-${slug || 'client'}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Nu am putut genera PDF-ul: ' + (e as Error).message + '\nÎncearcă butonul Print (Save as PDF).');
+      } finally {
+        btn.disabled = false; label.textContent = 'Descarcă PDF';
+      }
+    });
+
+    $('#ol-print').addEventListener('click', () => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    });
+
+    $('#ol-reset').addEventListener('click', () => {
+      if (!confirm('Resetezi ciorna la exemplul implicit?')) return;
+      state = structuredClone(SAMPLE_OFFER);
+      save(); syncTop(); renderAllLists(); renderPreview();
+    });
+
+    // ── Init ─────────────────────────────────────────────────────────────
+    syncTop();
+    renderAllLists();
+    renderPreview();
+  </script>
+</Dashboard>
