@@ -97,7 +97,7 @@ function timeAgo(dateStr: string): string {
         Paste a snippet or link a public repo. Static review for hardcoded secrets, vulnerable dependencies, weak access control, encryption and logging gaps. No setup, zero risk. <strong style="color:rgba(255,255,255,0.7);">1 credit.</strong>
       </p>
       <button type="button" id="open-code-audit" class="mode-cta" style={`height:44px;border-radius:10px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>
-        {soc2Credits > 0 ? 'Start code audit' : 'Get credits'}
+        {soc2Credits > 0 ? 'Start code audit' : 'No credits'}
       </button>
     </div>
 
@@ -135,19 +135,16 @@ function timeAgo(dateStr: string): string {
     </div>
   </div>
 
-  {/* Get credits */}
-  <div style="max-width:760px;margin:0 auto 30px;">
-    <div style={`background:${ACCENT}10;border:1px solid ${ACCENT}38;border-radius:14px;padding:22px;text-align:center;`}>
-      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 12px;line-height:1.5;">
-        {soc2Credits > 0
-          ? 'Top up your balance for more assessments.'
-          : 'Out of credits? Grab a pack to start assessing.'}
-      </p>
-      <button type="button" id="buy-soc2-credits-btn" style={`display:inline-flex;align-items:center;gap:8px;background:${ACCENT};color:#0a0a0a;border:none;border-radius:999px;padding:10px 22px;font-size:13px;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:inherit;`}>
-        <span>Buy 10 credits, €20</span>
-      </button>
+  {/* Out of credits — white-label: credits are provisioned by your administrator */}
+  {soc2Credits <= 0 && (
+    <div id="soc2-no-credits" style="max-width:760px;margin:0 auto 30px;">
+      <div style={`background:${ACCENT}10;border:1px solid ${ACCENT}38;border-radius:14px;padding:18px;text-align:center;`}>
+        <p style="font-size:13.5px;color:rgba(255,255,255,0.7);margin:0;line-height:1.5;">
+          You're out of credits. Contact your administrator to top up your balance.
+        </p>
+      </div>
     </div>
-  </div>
+  )}
 
   {/* Recent assessments */}
   <div style="max-width:760px;margin:0 auto;">
@@ -302,43 +299,22 @@ function timeAgo(dateStr: string): string {
 
   <style>
     @media (max-width: 640px) { .soc2-modes { grid-template-columns: 1fr !important; } }
-    #buy-soc2-credits-btn:hover { box-shadow: 0 6px 20px -6px rgba(52,211,153,0.5); transform: translateY(-1px); }
     #code-audit-modal #ca-code:focus, #code-audit-modal #ca-repo:focus { border-color: #34d399; }
     .ca-spin { display:inline-block;width:15px;height:15px;border:2px solid rgba(0,0,0,0.25);border-top-color:#0a0a0a;border-radius:50%;animation:caspin 0.8s linear infinite; }
     @keyframes caspin { to { transform: rotate(360deg); } }
   </style>
 
   <script is:inline define:vars={{ hasCredits: soc2Credits > 0 }}>
-    // ── Buy credits ──
-    document.getElementById('buy-soc2-credits-btn')?.addEventListener('click', async function () {
-      this.disabled = true;
-      try {
-        const r = await fetch('/api/billing/buy-soc2-credits', { method: 'POST' });
-        const data = await r.json();
-        if (data.url) { window.location.href = data.url; return; }
-        alert(data.error || 'Payment error.');
-      } catch { alert('Network error.'); }
-      this.disabled = false;
-    });
-
     // ── Code Audit modal ──
     const modal = document.getElementById('code-audit-modal');
     const openBtn = document.getElementById('open-code-audit');
     const errEl = document.getElementById('ca-error');
 
-    async function buyCredits(btn) {
-      btn.disabled = true;
-      try {
-        const r = await fetch('/api/billing/buy-soc2-credits', { method: 'POST' });
-        const data = await r.json();
-        if (data.url) { window.location.href = data.url; return; }
-        alert(data.error || 'Payment error.');
-      } catch { alert('Network error.'); }
-      btn.disabled = false;
-    }
-
     openBtn?.addEventListener('click', function () {
-      if (!hasCredits) { buyCredits(this); return; }
+      if (!hasCredits) {
+        document.getElementById('soc2-no-credits')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
       modal.style.display = 'flex';
     });
     document.getElementById('close-code-audit')?.addEventListener('click', () => { modal.style.display = 'none'; });

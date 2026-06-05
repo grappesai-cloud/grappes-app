@@ -733,6 +733,7 @@ function fmt(dateStr: string | null | undefined): string {
           + '<div class="kv-row"><span class="k">Projects limit</span><span>' + u.projects_limit + '</span></div>'
           + '<div class="kv-row"><span class="k">Edits used</span><span>' + (u.edits_used ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">Extra edits</span><span>' + (u.extra_edits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">SOC 2 credits</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">Referral balance</span><span>€' + Number(u.referral_balance ?? 0).toFixed(2) + '</span></div>'
           + '<div class="kv-row"><span class="k">Multipage lifetime</span><span>' + (u.multipage_addon_lifetime ? 'Yes' : 'No') + '</span></div>'
         + '</div>'
@@ -740,6 +741,8 @@ function fmt(dateStr: string | null | undefined): string {
           + '<div class="drawer-actions">'
             + '<button onclick="grantEdits(\\''+userId+'\\', 10)">+10 edits</button>'
             + '<button onclick="grantEdits(\\''+userId+'\\', 50)">+50 edits</button>'
+            + '<button onclick="grantSoc2(\\''+userId+'\\', 10)">+10 SOC 2</button>'
+            + '<button onclick="grantSoc2(\\''+userId+'\\', 100)">+100 SOC 2</button>'
             + '<button onclick="extendTrial(\\''+userId+'\\', 7)">+7 days trial</button>'
             + '<button onclick="extendTrial(\\''+userId+'\\', 30)">+30 days trial</button>'
             + '<button onclick="impersonate(\\''+userId+'\\')">Send password reset</button>'
@@ -778,6 +781,16 @@ function fmt(dateStr: string | null | undefined): string {
     });
     var d = await res.json();
     if (res.ok) drawerMsg('✓ Edits updated → ' + d.extra_edits + ' extra', 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
+
+  window.grantSoc2 = async function (userId, amount) {
+    var res = await fetch('/api/admin/users/' + userId + '/grant-soc2-credits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: amount }),
+    });
+    var d = await res.json();
+    if (res.ok) drawerMsg('✓ SOC 2 credits → ' + d.soc2_credits, 'success');
     else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
   };
 
