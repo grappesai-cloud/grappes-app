@@ -4,7 +4,7 @@ import type { APIRoute } from 'astro';
 import { json } from '../../../../../lib/api-utils';
 import { getReel, updateReel } from '../../../../../lib/studio/db';
 import { submitImage } from '../../../../../lib/studio/providers';
-import { GIRAFFE_MASTER_IMAGE } from '../../../../../lib/studio/config';
+import { GIRAFFE_MASTER_IMAGE, GIRAFFE_POSES } from '../../../../../lib/studio/config';
 
 const ALLOWED = new Set(['draft', 'image_ready', 'image_failed']); // image_ready = regenerate before approval
 
@@ -20,10 +20,17 @@ export const POST: APIRoute = async ({ locals, params, url }) => {
 
   try {
     const withGiraffe = reel.mode === 'giraffe';
+    const pose = GIRAFFE_POSES.find(p => p.id === reel.pose);
+    const refImageUrls = withGiraffe
+      ? [
+          new URL(GIRAFFE_MASTER_IMAGE, url.origin).toString(),
+          ...(pose ? [new URL(pose.file, url.origin).toString()] : []),
+        ]
+      : undefined;
     const { jobId, provider } = await submitImage({
       scenePrompt: reel.scene_prompt,
       withGiraffe,
-      refImageUrl: withGiraffe ? new URL(GIRAFFE_MASTER_IMAGE, url.origin).toString() : undefined,
+      refImageUrls,
     });
     await updateReel(reel.id, {
       status: 'image_generating',
