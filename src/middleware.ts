@@ -82,7 +82,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
   }
 
-  if (context.url.pathname.startsWith('/dashboard') && !user) {
+  if (
+    (context.url.pathname.startsWith('/dashboard') || context.url.pathname.startsWith('/soc2')) &&
+    !user
+  ) {
     return context.redirect('/sign-in');
   }
 
