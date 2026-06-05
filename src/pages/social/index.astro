@@ -11,6 +11,8 @@ import {
 } from '../../db/schema/social';
 import { getProfile } from '../../lib/social/profile';
 import { zernioConfigured } from '../../lib/social/zernio';
+import { getLatestAudit } from '../../lib/social/audit';
+import { bestPostingHourUtc } from '../../lib/social/insights';
 
 const authUser = Astro.locals.user;
 if (!authUser) return Astro.redirect('/sign-in?next=/social');
@@ -79,6 +81,26 @@ function fmtWhen(d: Date | null): string {
 }
 
 const queuedCount = items.filter((i) => i.status === 'queued').length;
+
+// AI layer: latest cached audit + data-driven best posting hour (shown as a
+// hint next to the posting window; the scheduler targets it automatically).
+const audit = await getLatestAudit(authUser.id).catch(() => null);
+const bestHourUtc = await bestPostingHourUtc(authUser.id).catch(() => null);
+let bestHourLocal: number | null = null;
+if (bestHourUtc !== null) {
+  const probe = new Date();
+  probe.setUTCHours(bestHourUtc, 0, 0, 0);
+  bestHourLocal =
+    Number(
+      new Intl.DateTimeFormat('en-GB', { timeZone: queue.timezone, hour: 'numeric', hour12: false }).format(probe)
+    ) % 24;
+}
+
+const PRIORITY_COLOR: Record<string, string> = {
+  high: '#ff8a8a',
+  medium: '#f6c547',
+  low: 'rgba(255,255,255,0.5)',
+};
 ---
 
 <Dashboard title="Social Lab">
@@ -176,7 +198,7 @@ const queuedCount = items.filter((i) => i.status === 'queued').length;
           </select>
         </div>
         <div class="sl-field">
-          <span class="sl-label">Posting window</span>
+          <span class="sl-label">Posting window{bestHourLocal !== null && <span style="text-transform:none;letter-spacing:0;color:#f472b6;"> · AI: best hour {String(bestHourLocal).padStart(2, '0')}:00</span>}</span>
           <div class="sl-row">
             <select id="q-start" class="sl-input">
               {Array.from({ length: 24 }, (_, h) => <option value={h} selected={queue.windowStartHour === h}>{String(h).padStart(2, '0')}:00</option>)}
@@ -205,6 +227,34 @@ const queuedCount = items.filter((i) => i.status === 'queued').length;
         <span id="q-saved" class="sl-dim" style="display:none;">Saved ✓</span>
         <button class="sl-btn" id="q-save">Save settings</button>
       </div>
+    </section>
+
+    <!-- ── AI Insights ───────────────────────────────────────────────────── -->
+    <section class="sl-card">
+      <div class="sl-h-row">
+        <h3 class="sl-h">Insights {audit?.generatedAt && <span class="sl-dim" style="font-weight:400;">· {new Date(audit.generatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}</h3>
+        <button class="sl-btn sl-btn--ghost" id="sl-audit" disabled={!configured}>Run analysis</button>
+      </div>
+      {(!audit || audit.insights.length === 0) && (
+        <p class="sl-dim" style="text-align:center;padding:14px 0;">
+          Once your accounts sync some history, AI analyzes what works: formats, hooks, timing, voice drift. Refreshes weekly, or run it now.
+        </p>
+      )}
+      {audit && audit.insights.length > 0 && (
+        <div class="sl-insights">
+          {audit.insights.map((ins: any) => (
+            <div class="sl-insight">
+              <div class="sl-insight-top">
+                <span class="sl-pill" style={`color:${PRIORITY_COLOR[ins.priority] ?? PRIORITY_COLOR.low};border-color:${PRIORITY_COLOR[ins.priority] ?? PRIORITY_COLOR.low}33;`}>{ins.priority}</span>
+                {ins.platform && <span class="sl-dim">{ins.platform}</span>}
+              </div>
+              <p class="sl-insight-title">{ins.title}</p>
+              <p class="sl-caption">{ins.finding}</p>
+              <p class="sl-caption" style="color:#f472b6;">→ {ins.recommendation}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
 
     <!-- ── Drop zone + queue items ───────────────────────────────────────── -->
@@ -327,6 +377,14 @@ const queuedCount = items.filter((i) => i.status === 'queued').length;
     .sl-drop:hover, .sl-drop.sl-drop--over { border-color: #f472b6; background: rgba(244,114,182,0.05); }
     .sl-drop p { margin: 0; font-size: 13.5px; }
 
+    .sl-insights { display: flex; flex-direction: column; gap: 12px; }
+    .sl-insight {
+      padding: 14px; border-radius: 12px;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    }
+    .sl-insight-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .sl-insight-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #fff; }
+
     .sl-items { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
     .sl-item {
       display: flex; align-items: center; gap: 14px;
@@ -394,6 +452,21 @@ const queuedCount = items.filter((i) => i.status === 'queued').length;
         window.location.reload();
       } catch (err: any) {
         alert(err.message);
+      }
+    });
+
+    // ── Run audit ──
+    document.getElementById('sl-audit')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Analyzing…';
+      try {
+        await api('/api/social/audit', { method: 'POST', body: '{}' });
+        window.location.reload();
+      } catch (err: any) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Run analysis';
       }
     });
 

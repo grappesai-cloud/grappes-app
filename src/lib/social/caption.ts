@@ -126,6 +126,10 @@ export async function generateCaption(args: {
   }
   if (args.hashtags) {
     parts.push(`Hashtag pool (pick 3-6 that fit, no more): ${args.hashtags}`);
+  } else {
+    parts.push(
+      `No hashtag pool provided: generate 3-6 hashtags yourself. Mix one broad-reach tag, 2-3 niche tags matching the brand/media, and one geographic tag if the brand brief implies a location. Lowercase, no spaces, on the last line of the caption.`
+    );
   }
   parts.push(
     `Rules:

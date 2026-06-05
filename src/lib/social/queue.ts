@@ -4,6 +4,7 @@ import { socialQueueItems, socialQueues, type SocialQueueRow } from '../../db/sc
 import { getProfile } from './profile';
 import { listAccounts, publishPost } from './zernio';
 import { describeMedia, generateCaption, getVoiceSamples } from './caption';
+import { bestPostingHourUtc } from './insights';
 
 // ─── Autopost queue scheduler ────────────────────────────────────────────────
 // Runs hourly via cron. For each active queue with pending media:
@@ -46,9 +47,31 @@ export function nextSlotInWindow(from: Date, queue: Pick<SocialQueueRow, 'window
   return from;
 }
 
+// Snap a slot to the engagement-derived best hour when the data supports it.
+// The user's posting window always wins: we only move the slot if the best
+// hour falls INSIDE the window and is still in the future relative to `base`.
+export function snapToBestHour(slot: Date, bestHourUtc: number | null, queue: Pick<SocialQueueRow, 'windowStartHour' | 'windowEndHour' | 'timezone'>): Date {
+  if (bestHourUtc === null) return slot;
+  // Same calendar day as the slot, at bestHourUtc.
+  const candidate = new Date(slot);
+  candidate.setUTCHours(bestHourUtc, 0, 0, 0);
+  if (candidate < slot) candidate.setUTCDate(candidate.getUTCDate() + 1);
+  // Only accept if it stays inside the user's window and within 24h of the
+  // cadence-derived slot (don't silently drift the schedule).
+  const start = ((queue.windowStartHour % 24) + 24) % 24;
+  const end = ((queue.windowEndHour % 24) + 24) % 24;
+  const h = Number(
+    new Intl.DateTimeFormat('en-GB', { timeZone: queue.timezone, hour: 'numeric', hour12: false }).format(candidate)
+  ) % 24;
+  const inWindow = start === end ? true : start < end ? h >= start && h < end : h >= start || h < end;
+  if (!inWindow) return slot;
+  if (candidate.getTime() - slot.getTime() > 24 * 60 * 60 * 1000) return slot;
+  return candidate;
+}
+
 // Where the next post should land: at least `cadenceHours` after the last
 // scheduled/posted item (or ~10 min from now if the queue is fresh), clamped
-// into the posting window.
+// into the posting window, then snapped to the data-driven best hour.
 async function computeNextSlot(queue: SocialQueueRow, now: Date): Promise<Date> {
   const [last] = await db
     .select({ scheduledFor: socialQueueItems.scheduledFor })
@@ -67,7 +90,12 @@ async function computeNextSlot(queue: SocialQueueRow, now: Date): Promise<Date> 
     ? new Date(last.scheduledFor.getTime() + queue.cadenceHours * 60 * 60 * 1000)
     : earliest;
   const base = afterCadence > earliest ? afterCadence : earliest;
-  return nextSlotInWindow(base, queue);
+  const slot = nextSlotInWindow(base, queue);
+
+  // Data-driven refinement: if the analytics history identifies a best
+  // posting hour and it fits inside the user's window, aim for it.
+  const bestHour = await bestPostingHourUtc(queue.userId).catch(() => null);
+  return snapToBestHour(slot, bestHour, queue);
 }
 
 async function markItemFailed(itemId: string, error: string): Promise<void> {
