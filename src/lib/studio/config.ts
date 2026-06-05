@@ -18,6 +18,20 @@ export const STUDIO_MOCK = () => e('STUDIO_MOCK') === '1' || !e('HIGGSFIELD_API_
 
 export const GIRAFFE_MASTER_IMAGE = '/studio/girafa.jpg';
 
+// Sponsor-provided pose pack (distinct poses from the official asset set).
+// In giraffe mode the user can pick one; it rides along with the master image
+// as a second reference so the model copies the pose without drifting identity.
+export const GIRAFFE_POSES = [
+  { id: 'wave',     label: 'Salută',       file: '/studio/poses/wave.png' },
+  { id: 'sit',      label: 'Stă turcește', file: '/studio/poses/sit.png' },
+  { id: 'walk',     label: 'Se plimbă',    file: '/studio/poses/walk.png' },
+  { id: 'dance',    label: 'Dansează',     file: '/studio/poses/dance.png' },
+  { id: 'selfie',   label: 'Selfie',       file: '/studio/poses/selfie.png' },
+  { id: 'icecream', label: 'Cu înghețată', file: '/studio/poses/icecream.png' },
+  { id: 'back',     label: 'Din spate',    file: '/studio/poses/back.png' },
+] as const;
+export type GiraffePoseId = (typeof GIRAFFE_POSES)[number]['id'];
+
 export const GIRAFFE_IDENTITY_LOCK = `
 CHARACTER IDENTITY — LOCKED VISUAL ASSET, DO NOT REDESIGN:
 The cartoon giraffe "Domnul Girafă" must match the reference image EXACTLY:

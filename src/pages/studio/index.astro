@@ -1,6 +1,7 @@
 ---
 import Dashboard from '../../layouts/Dashboard.astro';
 import { listReels } from '../../lib/studio/db';
+import { GIRAFFE_POSES } from '../../lib/studio/config';
 
 const authUser = Astro.locals.user;
 if (!authUser) return Astro.redirect('/sign-in?next=/studio');
@@ -73,6 +74,16 @@ const STATUS_LABEL: Record<string, string> = {
       <div id="dialogue-row" hidden>
         <label class="st-label" for="dialogue">Ce spune Domnul Girafă <span class="st-hint">(română, max 400 caractere)</span></label>
         <textarea id="dialogue" class="st-input" rows="3" maxlength="400" placeholder="ex: Salutare! Vă aștept weekendul ăsta la Savoy Mamaia."></textarea>
+
+        <label class="st-label">Poza girafei <span class="st-hint">(opțional, ghidează poziția în imagine)</span></label>
+        <div class="st-poses" id="pose-grid">
+          {GIRAFFE_POSES.map(p => (
+            <button type="button" class="st-pose" data-pose={p.id} title={p.label}>
+              <img src={p.file} alt={p.label} loading="lazy" />
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <button class="st-btn st-btn-primary" id="btn-create" type="button">Generează imaginea</button>
@@ -165,6 +176,13 @@ const STATUS_LABEL: Record<string, string> = {
     .st-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #fff; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
     .st-input:focus { outline: none; border-color: #ffb300; }
 
+    .st-poses { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 8px; }
+    .st-pose { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 8px 4px 6px; cursor: pointer; text-align: center; transition: border-color 0.2s, background 0.2s; }
+    .st-pose img { width: 100%; height: 72px; object-fit: contain; display: block; margin-bottom: 4px; }
+    .st-pose span { font-size: 10.5px; color: rgba(255,255,255,0.55); }
+    .st-pose.active { border-color: #ffb300; background: rgba(255,179,0,0.1); }
+    .st-pose.active span { color: #ffd57a; }
+
     .st-library { margin-bottom: 4px; }
     .st-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .st-chip { font-size: 12.5px; padding: 7px 13px; border-radius: 999px; background: rgba(255,179,0,0.08); border: 1px solid rgba(255,179,0,0.25); color: #ffd57a; cursor: pointer; transition: background 0.2s; }
@@ -222,7 +240,18 @@ const STATUS_LABEL: Record<string, string> = {
 
     let mode: 'scene' | 'giraffe' = 'scene';
     let reelId: string | null = null;
+    let selectedPose: string | null = null;
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Pose picker (giraffe mode): click toggles selection
+    document.querySelectorAll<HTMLButtonElement>('.st-pose').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const next = btn.dataset.pose === selectedPose ? null : btn.dataset.pose!;
+        selectedPose = next;
+        document.querySelectorAll('.st-pose').forEach(b =>
+          b.classList.toggle('active', (b as HTMLElement).dataset.pose === next));
+      });
+    });
 
     // Mode switch
     document.querySelectorAll<HTMLButtonElement>('.st-mode').forEach(btn => {
@@ -280,6 +309,7 @@ const STATUS_LABEL: Record<string, string> = {
             title: ($('title') as HTMLInputElement).value,
             scenePrompt: ($('scene') as HTMLTextAreaElement).value,
             dialogue: mode === 'giraffe' ? ($('dialogue') as HTMLTextAreaElement).value : undefined,
+            pose: mode === 'giraffe' ? selectedPose : undefined,
           }),
         });
         const data = await res.json();

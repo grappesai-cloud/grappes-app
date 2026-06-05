@@ -64,14 +64,17 @@ const VIDEO_MODEL_SCENE = 'seedance-2.0';
 export async function submitImage(opts: {
   scenePrompt: string;
   withGiraffe: boolean;
-  refImageUrl?: string; // absolute URL to girafa.jpg master
+  refImageUrls?: string[]; // absolute URLs: [0] = girafa.jpg master, [1] = optional pose reference
 }): Promise<{ jobId: string; provider: string }> {
   if (STUDIO_MOCK()) {
     return { jobId: mockSubmit('image', 6_000), provider: 'mock' };
   }
 
+  const poseHint = opts.refImageUrls && opts.refImageUrls.length > 1
+    ? '\nThe second reference image shows the EXACT pose to use. Copy the pose from it; copy the identity (colors, hat, bow tie, proportions) from the first reference image.'
+    : '';
   const prompt = opts.withGiraffe
-    ? `${opts.scenePrompt}\n\n${GIRAFFE_IDENTITY_LOCK}`
+    ? `${opts.scenePrompt}\n\n${GIRAFFE_IDENTITY_LOCK}${poseHint}`
     : `${opts.scenePrompt}\n\nStyle: bright, premium hotel marketing photo-illustration, ${REEL_FORMAT.aspect} vertical composition.`;
 
   const res = await fetch(`${HIGGSFIELD_BASE}/images/generations`, {
@@ -84,8 +87,8 @@ export async function submitImage(opts: {
       model: opts.withGiraffe ? IMAGE_MODEL_GIRAFFE : IMAGE_MODEL_SCENE,
       prompt,
       aspect_ratio: REEL_FORMAT.aspect,
-      ...(opts.withGiraffe && opts.refImageUrl
-        ? { reference_images: [opts.refImageUrl], reference_strength: 0.85 }
+      ...(opts.withGiraffe && opts.refImageUrls?.length
+        ? { reference_images: opts.refImageUrls, reference_strength: 0.85 }
         : {}),
     }),
   });

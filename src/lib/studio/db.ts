@@ -18,6 +18,7 @@ export interface StudioReel {
   title: string;
   scene_prompt: string;
   dialogue: string | null;
+  pose: string | null;
   status: StudioStatus;
   error_message: string | null;
   image_url: string | null;
