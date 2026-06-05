@@ -45,6 +45,7 @@ const auditIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`;
 const logoIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>`;
 const offerIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`;
+const studioIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><polygon points="10 9 15 12 10 15 10 9"/></svg>`;
 
 // Logo Lab — count standalone logos owned by this user.
 let logoCount = 0;
@@ -100,6 +101,16 @@ try {
           meter={`${reelCredits} credit${reelCredits === 1 ? '' : 's'} remaining`}
           cta={reelCredits > 0 ? 'Open Reels' : 'Get credits'}
           accent="#a78bfa"
+          isNew={true}
+        />
+        <ProductTile
+          name="Content Studio"
+          tagline="Savoy Content Studio: write an idea, approve the image, get a finished 9:16 reel starring Domnul Girafă. No code, no editor."
+          href="/studio"
+          icon={studioIcon}
+          meter="Hackathon build"
+          cta="Open Studio"
+          accent="#ffb300"
           isNew={true}
         />
         <ProductTile

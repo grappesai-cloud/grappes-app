@@ -1,0 +1,417 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { listReels } from '../../lib/studio/db';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in?next=/studio');
+
+const recent = await listReels(authUser.id);
+
+function timeAgo(d: Date | string): string {
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), day = Math.floor(diff / 86400000);
+  if (m < 1) return 'acum';
+  if (h < 1) return `acum ${m} min`;
+  if (day < 1) return `acum ${h}h`;
+  return `acum ${day} zile`;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Ciornă',
+  image_generating: 'Generează imaginea',
+  image_ready: 'Așteaptă aprobare',
+  image_failed: 'Eroare imagine',
+  approved: 'Aprobat',
+  audio_generating: 'Generează vocea',
+  video_generating: 'Generează videoul',
+  video_failed: 'Eroare video',
+  complete: 'Gata',
+};
+---
+<Dashboard title="Savoy Content Studio">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+  </style>
+
+  <div class="st-wrap">
+    <header class="st-head">
+      <a href="/dashboard" class="st-back">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span>Studio</span>
+      </a>
+      <span class="st-eyebrow">Savoy Content Studio</span>
+      <h1 class="st-title">Scrie ideea. <strong>Domnul Girafă</strong> face restul.</h1>
+      <p class="st-sub">Din text în reel 9:16 gata de postat, fără nicio linie de cod. Imaginea se generează întâi, tu o aprobi, abia apoi pornește videoul. Niciun ban cheltuit fără OK-ul tău.</p>
+    </header>
+
+    <!-- Step 1: mode + brief -->
+    <section class="st-card" id="create-card">
+      <div class="st-modes">
+        <button class="st-mode active" data-mode="scene" type="button">
+          <span class="st-mode-icon">🏖️</span>
+          <span class="st-mode-name">Scenă de hotel</span>
+          <span class="st-mode-desc">Atmosferă Savoy, fără girafă. Imagine în mișcare, ~8s.</span>
+        </button>
+        <button class="st-mode" data-mode="giraffe" type="button">
+          <span class="st-mode-icon">🦒</span>
+          <span class="st-mode-name">Girafa vorbește</span>
+          <span class="st-mode-desc">Domnul Girafă spune replica ta, cu voce și lip-sync.</span>
+        </button>
+      </div>
+
+      <div class="st-library" id="library" hidden>
+        <span class="st-label">Din bibliotecă</span>
+        <div class="st-chips" id="library-chips"></div>
+      </div>
+
+      <label class="st-label" for="title">Nume reel</label>
+      <input id="title" class="st-input" type="text" placeholder="ex: Weekend la piscină" maxlength="80" />
+
+      <label class="st-label" for="scene">Descrie scena</label>
+      <textarea id="scene" class="st-input" rows="3" placeholder="ex: Piscina hotelului la apus, șezlonguri, lumina aurie peste mare"></textarea>
+
+      <div id="dialogue-row" hidden>
+        <label class="st-label" for="dialogue">Ce spune Domnul Girafă <span class="st-hint">(română, max 400 caractere)</span></label>
+        <textarea id="dialogue" class="st-input" rows="3" maxlength="400" placeholder="ex: Salutare! Vă aștept weekendul ăsta la Savoy Mamaia."></textarea>
+      </div>
+
+      <button class="st-btn st-btn-primary" id="btn-create" type="button">Generează imaginea</button>
+      <p class="st-error" id="create-error" hidden></p>
+    </section>
+
+    <!-- Pipeline view -->
+    <section class="st-card" id="pipeline-card" hidden>
+      <div class="st-steps">
+        <div class="st-step" data-step="image"><span class="st-step-dot"></span>Imagine</div>
+        <div class="st-step" data-step="approve"><span class="st-step-dot"></span>Aprobare</div>
+        <div class="st-step" data-step="audio" hidden><span class="st-step-dot"></span>Voce</div>
+        <div class="st-step" data-step="video"><span class="st-step-dot"></span>Video</div>
+      </div>
+
+      <div class="st-stage" id="stage-busy" hidden>
+        <div class="st-spinner"></div>
+        <p id="busy-label">Se generează…</p>
+      </div>
+
+      <div class="st-stage" id="stage-approve" hidden>
+        <img id="preview-image" class="st-preview-img" alt="Imagine generată" />
+        <p class="st-gate-note">Verifică girafa: pălărie, papion, culori. Videoul costă bani, pornește doar după aprobarea ta.</p>
+        <div class="st-row">
+          <button class="st-btn st-btn-primary" id="btn-approve" type="button">Aprobă și generează videoul</button>
+          <button class="st-btn st-btn-ghost" id="btn-regenerate" type="button">Regenerează imaginea</button>
+        </div>
+      </div>
+
+      <div class="st-stage" id="stage-done" hidden>
+        <video id="final-video" class="st-preview-video" controls playsinline></video>
+        <div class="st-row">
+          <a class="st-btn st-btn-primary" id="btn-download" download>Descarcă reel-ul</a>
+          <button class="st-btn st-btn-ghost" id="btn-new" type="button">Reel nou</button>
+        </div>
+      </div>
+
+      <div class="st-stage" id="stage-error" hidden>
+        <p class="st-error" id="pipeline-error"></p>
+        <button class="st-btn st-btn-ghost" id="btn-retry" type="button">Încearcă din nou</button>
+      </div>
+    </section>
+
+    {recent.length > 0 && (
+      <section class="st-history">
+        <span class="st-section-label">Reels recente</span>
+        <ul class="st-list">
+          {recent.map(r => (
+            <li>
+              <a href={`/studio?reel=${r.id}`} data-reel-id={r.id} class="st-list-item">
+                <div class="st-list-main">
+                  <span class="st-list-name">{r.mode === 'giraffe' ? '🦒' : '🏖️'} {r.title}</span>
+                  <span class="st-list-meta">{timeAgo(r.created_at)}</span>
+                </div>
+                <span class={`st-pill st-pill--${r.status}`}>{STATUS_LABEL[r.status] ?? r.status}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+
+  <style>
+    .st-wrap { max-width: 720px; margin: 0 auto; }
+    .st-head { text-align: center; margin-bottom: 28px; }
+    .st-back { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.45); text-decoration: none; margin-bottom: 14px; transition: color 0.2s; }
+    .st-back:hover { color: rgba(255,255,255,0.85); }
+    .st-eyebrow { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #ffb300; margin-bottom: 14px; padding: 6px 14px; border-radius: 999px; background: rgba(255,179,0,0.1); border: 1px solid rgba(255,179,0,0.28); }
+    .st-title { font-family: 'Inter', sans-serif; font-size: clamp(28px, 4.5vw, 44px); font-weight: 300; line-height: 1.05; letter-spacing: -0.045em; color: #fff; margin: 0 0 14px; }
+    .st-title strong { font-weight: 700; background: linear-gradient(135deg, #ffb300 0%, #e85d04 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .st-sub { font-size: 14px; color: rgba(255,255,255,0.55); margin: 0 auto; max-width: 560px; line-height: 1.55; }
+
+    .st-card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%), rgba(18,18,22,0.92);
+      backdrop-filter: blur(24px) saturate(1.3);
+      border: 1px solid rgba(255,179,0,0.18); border-radius: 20px;
+      padding: 28px; margin-bottom: 24px;
+    }
+
+    .st-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+    .st-mode { text-align: left; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s; color: #fff; }
+    .st-mode.active { border-color: #ffb300; background: rgba(255,179,0,0.08); }
+    .st-mode-icon { font-size: 22px; display: block; margin-bottom: 8px; }
+    .st-mode-name { display: block; font-size: 14.5px; font-weight: 700; margin-bottom: 4px; }
+    .st-mode-desc { display: block; font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.45; }
+
+    .st-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.55); margin: 16px 0 7px; }
+    .st-hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: rgba(255,255,255,0.35); }
+    .st-input { width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: #fff; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
+    .st-input:focus { outline: none; border-color: #ffb300; }
+
+    .st-library { margin-bottom: 4px; }
+    .st-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .st-chip { font-size: 12.5px; padding: 7px 13px; border-radius: 999px; background: rgba(255,179,0,0.08); border: 1px solid rgba(255,179,0,0.25); color: #ffd57a; cursor: pointer; transition: background 0.2s; }
+    .st-chip:hover { background: rgba(255,179,0,0.18); }
+
+    .st-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; padding: 13px 22px; border-radius: 12px; border: none; cursor: pointer; text-decoration: none; transition: opacity 0.2s, background 0.2s; }
+    .st-btn-primary { background: linear-gradient(135deg, #ffb300 0%, #e85d04 100%); color: #16110a; margin-top: 20px; }
+    .st-btn-primary:hover { opacity: 0.9; }
+    .st-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .st-btn-ghost { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); margin-top: 20px; }
+    .st-btn-ghost:hover { background: rgba(255,255,255,0.1); }
+    .st-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .st-steps { display: flex; gap: 4px; margin-bottom: 24px; }
+    .st-step { flex: 1; display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.35); padding: 8px 0; border-top: 2px solid rgba(255,255,255,0.1); }
+    .st-step-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .st-step.active { color: #ffb300; border-top-color: #ffb300; }
+    .st-step.active .st-step-dot { background: #ffb300; animation: st-pulse 1.2s ease-in-out infinite; }
+    .st-step.done { color: rgba(255,255,255,0.7); border-top-color: rgba(255,179,0,0.5); }
+    .st-step.done .st-step-dot { background: #6ee7a0; animation: none; }
+    @keyframes st-pulse { 50% { opacity: 0.4; } }
+
+    .st-stage { text-align: center; }
+    .st-spinner { width: 30px; height: 30px; margin: 18px auto 12px; border: 3px solid rgba(255,179,0,0.2); border-top-color: #ffb300; border-radius: 50%; animation: st-spin 0.8s linear infinite; }
+    @keyframes st-spin { to { transform: rotate(360deg); } }
+    #busy-label { font-size: 13.5px; color: rgba(255,255,255,0.6); }
+
+    .st-preview-img, .st-preview-video { width: 100%; max-width: 320px; aspect-ratio: 9/16; object-fit: cover; border-radius: 16px; border: 1px solid rgba(255,255,255,0.12); display: block; margin: 0 auto 16px; background: #0a0a0c; }
+    .st-gate-note { font-size: 12.5px; color: rgba(255,213,122,0.85); background: rgba(255,179,0,0.07); border: 1px solid rgba(255,179,0,0.2); border-radius: 10px; padding: 10px 14px; margin: 0 auto 4px; max-width: 420px; line-height: 1.5; }
+    .st-stage .st-row { justify-content: center; }
+
+    .st-error { font-size: 13px; color: #ff8a8a; margin: 14px 0 0; }
+
+    .st-history { margin-top: 8px; }
+    .st-section-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 12px; }
+    .st-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .st-list-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; border-radius: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); text-decoration: none; transition: background 0.2s; }
+    .st-list-item:hover { background: rgba(255,255,255,0.06); }
+    .st-list-name { display: block; font-size: 13.5px; font-weight: 600; color: #fff; }
+    .st-list-meta { display: block; font-size: 11.5px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .st-pill { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); white-space: nowrap; }
+    .st-pill--complete { background: rgba(110,231,160,0.12); color: #6ee7a0; }
+    .st-pill--image_ready { background: rgba(255,179,0,0.14); color: #ffd57a; }
+    .st-pill--image_failed, .st-pill--video_failed { background: rgba(255,138,138,0.12); color: #ff8a8a; }
+
+    @media (max-width: 540px) {
+      .st-modes { grid-template-columns: 1fr; }
+      .st-card { padding: 20px; }
+    }
+  </style>
+
+  <script>
+    // ── Savoy Content Studio wizard ──────────────────────────────────────────
+    const $ = (id: string) => document.getElementById(id)!;
+
+    let mode: 'scene' | 'giraffe' = 'scene';
+    let reelId: string | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Mode switch
+    document.querySelectorAll<HTMLButtonElement>('.st-mode').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.st-mode').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.mode as 'scene' | 'giraffe';
+        $('dialogue-row').hidden = mode !== 'giraffe';
+        renderLibrary();
+      });
+    });
+
+    // Prompt library
+    let prompts: Array<{ id: string; mode: string; label: string; scene_prompt: string; dialogue: string | null }> = [];
+    async function loadLibrary() {
+      try {
+        const res = await fetch('/api/studio/prompts');
+        if (!res.ok) return;
+        prompts = (await res.json()).prompts ?? [];
+        renderLibrary();
+      } catch {}
+    }
+    function renderLibrary() {
+      const mine = prompts.filter(p => p.mode === mode);
+      $('library').hidden = mine.length === 0;
+      const chips = $('library-chips');
+      chips.innerHTML = '';
+      mine.forEach(p => {
+        const c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'st-chip';
+        c.textContent = p.label;
+        c.addEventListener('click', () => {
+          ($('title') as HTMLInputElement).value = p.label;
+          ($('scene') as HTMLTextAreaElement).value = p.scene_prompt;
+          if (p.dialogue) ($('dialogue') as HTMLTextAreaElement).value = p.dialogue;
+        });
+        chips.appendChild(c);
+      });
+    }
+    loadLibrary();
+
+    // Create + kick off image generation
+    $('btn-create').addEventListener('click', async () => {
+      const btn = $('btn-create') as HTMLButtonElement;
+      const err = $('create-error');
+      err.hidden = true;
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/studio/reels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode,
+            title: ($('title') as HTMLInputElement).value,
+            scenePrompt: ($('scene') as HTMLTextAreaElement).value,
+            dialogue: mode === 'giraffe' ? ($('dialogue') as HTMLTextAreaElement).value : undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Eroare la creare.');
+        reelId = data.id;
+        await fetch(`/api/studio/reels/${reelId}/generate-image`, { method: 'POST' });
+        enterPipeline();
+      } catch (e: any) {
+        err.textContent = e.message;
+        err.hidden = false;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    function enterPipeline() {
+      $('create-card').hidden = true;
+      $('pipeline-card').hidden = false;
+      (document.querySelector('.st-step[data-step="audio"]') as HTMLElement).hidden = mode !== 'giraffe';
+      poll();
+    }
+
+    function setSteps(active: string, done: string[]) {
+      document.querySelectorAll<HTMLElement>('.st-step').forEach(s => {
+        s.classList.toggle('active', s.dataset.step === active);
+        s.classList.toggle('done', done.includes(s.dataset.step!));
+      });
+    }
+
+    function show(stage: string) {
+      ['stage-busy', 'stage-approve', 'stage-done', 'stage-error'].forEach(id => { $(id).hidden = id !== stage; });
+    }
+
+    async function poll() {
+      if (!reelId) return;
+      try {
+        const res = await fetch(`/api/studio/reels/${reelId}`);
+        const { reel } = await res.json();
+        if (!reel) return;
+        render(reel);
+        if (['image_generating', 'audio_generating', 'video_generating', 'approved', 'draft'].includes(reel.status)) {
+          pollTimer = setTimeout(poll, 2500);
+        }
+      } catch {
+        pollTimer = setTimeout(poll, 5000);
+      }
+    }
+
+    function render(reel: any) {
+      mode = reel.mode;
+      (document.querySelector('.st-step[data-step="audio"]') as HTMLElement).hidden = mode !== 'giraffe';
+      switch (reel.status) {
+        case 'draft':
+        case 'image_generating':
+          setSteps('image', []);
+          $('busy-label').textContent = mode === 'giraffe'
+            ? 'Domnul Girafă se pregătește… generăm imaginea cu identitatea blocată.'
+            : 'Generăm imaginea scenei…';
+          show('stage-busy');
+          break;
+        case 'image_ready':
+          setSteps('approve', ['image']);
+          ($('preview-image') as HTMLImageElement).src = reel.image_url;
+          show('stage-approve');
+          break;
+        case 'approved':
+        case 'audio_generating':
+          setSteps('audio', ['image', 'approve']);
+          $('busy-label').textContent = 'Generăm vocea în română (ElevenLabs)…';
+          show('stage-busy');
+          break;
+        case 'video_generating':
+          setSteps('video', ['image', 'approve', 'audio']);
+          $('busy-label').textContent = 'Generăm videoul. Durează câteva minute, nu închide pagina.';
+          show('stage-busy');
+          break;
+        case 'complete': {
+          setSteps('', ['image', 'approve', 'audio', 'video']);
+          const v = $('final-video') as HTMLVideoElement;
+          v.src = reel.video_url;
+          ($('btn-download') as HTMLAnchorElement).href = reel.video_url;
+          show('stage-done');
+          break;
+        }
+        case 'image_failed':
+        case 'video_failed':
+          $('pipeline-error').textContent = reel.error_message ?? 'A apărut o eroare.';
+          ($('btn-retry') as HTMLButtonElement).dataset.kind = reel.status === 'image_failed' ? 'image' : 'video';
+          show('stage-error');
+          break;
+      }
+    }
+
+    $('btn-approve').addEventListener('click', async () => {
+      if (!reelId) return;
+      const btn = $('btn-approve') as HTMLButtonElement;
+      btn.disabled = true;
+      try {
+        await fetch(`/api/studio/reels/${reelId}/approve`, { method: 'POST' });
+        await fetch(`/api/studio/reels/${reelId}/generate-video`, { method: 'POST' });
+        poll();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('btn-regenerate').addEventListener('click', async () => {
+      if (!reelId) return;
+      await fetch(`/api/studio/reels/${reelId}/generate-image`, { method: 'POST' });
+      poll();
+    });
+
+    $('btn-retry').addEventListener('click', async () => {
+      if (!reelId) return;
+      const kind = ($('btn-retry') as HTMLButtonElement).dataset.kind;
+      await fetch(`/api/studio/reels/${reelId}/generate-${kind}`, { method: 'POST' });
+      poll();
+    });
+
+    $('btn-new').addEventListener('click', () => {
+      if (pollTimer) clearTimeout(pollTimer);
+      reelId = null;
+      window.location.href = '/studio';
+    });
+
+    // Deep-link: /studio?reel=<id> resumes an existing reel
+    const resumeId = new URLSearchParams(window.location.search).get('reel');
+    if (resumeId) {
+      reelId = resumeId;
+      $('create-card').hidden = true;
+      $('pipeline-card').hidden = false;
+      poll();
+    }
+  </script>
+</Dashboard>
