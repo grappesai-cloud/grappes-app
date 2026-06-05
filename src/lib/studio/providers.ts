@@ -143,6 +143,7 @@ export async function generateSpeech(text: string, reelId: string): Promise<stri
     access: 'public',
     contentType: 'audio/mpeg',
     addRandomSuffix: true,
+    token: e('BLOB_READ_WRITE_TOKEN'),
   });
   return blob.url;
 }
@@ -231,6 +232,6 @@ export async function archiveToBlob(externalUrl: string, path: string, contentTy
   const res = await fetch(externalUrl);
   if (!res.ok) throw new Error(`Archive fetch failed: ${res.status}`);
   const bytes = Buffer.from(await res.arrayBuffer());
-  const blob = await put(path, bytes, { access: 'public', contentType, addRandomSuffix: true });
+  const blob = await put(path, bytes, { access: 'public', contentType, addRandomSuffix: true, token: e('BLOB_READ_WRITE_TOKEN') });
   return blob.url;
 }
