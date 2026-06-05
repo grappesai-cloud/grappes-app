@@ -30,6 +30,8 @@ const ENV_SPEC: Record<string, { group: string; required: boolean }> = {
   STRIPE_WEBHOOK_SECRET:     { group: 'Stripe',    required: false },
   // Sentry — optional, error tracking
   SENTRY_DSN:                { group: 'Sentry',    required: false },
+  // Zernio — optional, powers Social Lab (posting + analytics)
+  ZERNIO_API_KEY:            { group: 'Social Lab', required: false },
 };
 
 /**

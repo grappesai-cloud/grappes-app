@@ -1,0 +1,502 @@
+---
+// ─── Social Lab — connect accounts, configure the autopost queue, drop media ─
+import Dashboard from '../../layouts/Dashboard.astro';
+import { and, desc, eq, isNull } from 'drizzle-orm';
+import { db } from '../../db';
+import {
+  socialConnections,
+  socialMetricsDaily,
+  socialQueueItems,
+  socialQueues,
+} from '../../db/schema/social';
+import { getProfile } from '../../lib/social/profile';
+import { zernioConfigured } from '../../lib/social/zernio';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in?next=/social');
+
+const configured = zernioConfigured();
+const profile = await getProfile(authUser.id).catch(() => null);
+
+const connections = await db
+  .select()
+  .from(socialConnections)
+  .where(and(eq(socialConnections.userId, authUser.id), isNull(socialConnections.disconnectedAt)));
+
+const followersByConn = new Map<string, number | null>();
+for (const c of connections) {
+  const [m] = await db
+    .select({ followers: socialMetricsDaily.followers })
+    .from(socialMetricsDaily)
+    .where(eq(socialMetricsDaily.connectionId, c.id))
+    .orderBy(desc(socialMetricsDaily.day))
+    .limit(1);
+  followersByConn.set(c.id, m?.followers ?? null);
+}
+
+let [queue] = await db
+  .select()
+  .from(socialQueues)
+  .where(eq(socialQueues.userId, authUser.id))
+  .limit(1);
+if (!queue) {
+  [queue] = await db
+    .insert(socialQueues)
+    .values({ userId: authUser.id, active: false, platforms: ['instagram'] })
+    .returning();
+}
+
+const items = await db
+  .select()
+  .from(socialQueueItems)
+  .where(eq(socialQueueItems.userId, authUser.id))
+  .orderBy(desc(socialQueueItems.createdAt))
+  .limit(100);
+
+const PLATFORMS = [
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'tiktok', label: 'TikTok' },
+  { key: 'facebook', label: 'Facebook' },
+] as const;
+const connByPlatform = new Map(connections.map((c) => [c.platform, c]));
+
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  queued: { label: 'Queued', color: 'rgba(255,255,255,0.5)' },
+  scheduled: { label: 'Scheduled', color: '#f6c547' },
+  posted: { label: 'Posted', color: '#6ee7a3' },
+  failed: { label: 'Failed', color: '#ff8a8a' },
+};
+
+function fmtWhen(d: Date | null): string {
+  if (!d) return '';
+  return new Date(d).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: queue.timezone,
+  });
+}
+
+const queuedCount = items.filter((i) => i.status === 'queued').length;
+---
+
+<Dashboard title="Social Lab">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+    @media (max-width: 768px) {
+      main { padding-top: 40px !important; padding-bottom: 60px !important; }
+    }
+  </style>
+
+  <div style="text-align:center;margin-bottom:36px;">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Studio</span>
+    </a>
+    <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#f472b6;margin-bottom:10px;">Social Lab</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin-bottom:10px;">Post on autopilot</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.55);margin:0 auto;max-width:560px;line-height:1.5;">
+      Connect your accounts, drop photos and videos into the queue, set your voice. AI writes the captions and schedules everything at the right time. You never open Instagram again.
+    </p>
+  </div>
+
+  {!configured && (
+    <div class="sl-banner">
+      Social Lab is almost live. Account connections are being activated, check back soon.
+    </div>
+  )}
+
+  <div class="sl-wrap">
+    <!-- ── Accounts ──────────────────────────────────────────────────────── -->
+    <section class="sl-card">
+      <h3 class="sl-h">Accounts</h3>
+      <div class="sl-accounts">
+        {PLATFORMS.map((p) => {
+          const conn = connByPlatform.get(p.key as any);
+          return (
+            <div class="sl-account">
+              <div class="sl-account-main">
+                {conn?.avatarUrl
+                  ? <img class="sl-avatar" src={conn.avatarUrl} alt="" loading="lazy" />
+                  : <span class="sl-avatar sl-avatar--empty">{p.label[0]}</span>}
+                <div>
+                  <div class="sl-account-name">{p.label}</div>
+                  {conn
+                    ? <div class="sl-account-sub">@{conn.username ?? conn.displayName ?? 'connected'}{followersByConn.get(conn.id) != null ? ` · ${followersByConn.get(conn.id)!.toLocaleString('en-US')} followers` : ''}</div>
+                    : <div class="sl-account-sub sl-dim">Not connected</div>}
+                </div>
+              </div>
+              {conn
+                ? <span class="sl-pill sl-pill--ok">Connected</span>
+                : <button class="sl-btn sl-btn--ghost" data-connect={p.key} disabled={!configured}>Connect</button>}
+            </div>
+          );
+        })}
+      </div>
+      {profile && (
+        <div class="sl-row-end">
+          <button class="sl-btn sl-btn--ghost" id="sl-sync" disabled={!configured}>Sync now</button>
+          <button class="sl-btn sl-btn--danger" id="sl-disconnect">Disconnect all</button>
+        </div>
+      )}
+    </section>
+
+    <!-- ── Queue config ──────────────────────────────────────────────────── -->
+    <section class="sl-card">
+      <div class="sl-h-row">
+        <h3 class="sl-h">Autopost</h3>
+        <label class="sl-toggle">
+          <input type="checkbox" id="q-active" checked={queue.active} />
+          <span>{queue.active ? 'Active' : 'Paused'}</span>
+        </label>
+      </div>
+
+      <div class="sl-field">
+        <span class="sl-label">Post to</span>
+        <div class="sl-checks">
+          {PLATFORMS.map((p) => (
+            <label class="sl-check">
+              <input type="checkbox" name="q-platform" value={p.key} checked={queue.platforms.includes(p.key as any)} />
+              {p.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div class="sl-grid-3">
+        <div class="sl-field">
+          <span class="sl-label">Frequency</span>
+          <select id="q-cadence" class="sl-input">
+            <option value="12" selected={queue.cadenceHours === 12}>2 / day</option>
+            <option value="24" selected={queue.cadenceHours === 24}>1 / day</option>
+            <option value="48" selected={queue.cadenceHours === 48}>Every 2 days</option>
+            <option value="72" selected={queue.cadenceHours === 72}>Every 3 days</option>
+            <option value="168" selected={queue.cadenceHours === 168}>1 / week</option>
+          </select>
+        </div>
+        <div class="sl-field">
+          <span class="sl-label">Posting window</span>
+          <div class="sl-row">
+            <select id="q-start" class="sl-input">
+              {Array.from({ length: 24 }, (_, h) => <option value={h} selected={queue.windowStartHour === h}>{String(h).padStart(2, '0')}:00</option>)}
+            </select>
+            <span class="sl-dim">→</span>
+            <select id="q-end" class="sl-input">
+              {Array.from({ length: 24 }, (_, h) => <option value={h} selected={queue.windowEndHour === h}>{String(h).padStart(2, '0')}:00</option>)}
+            </select>
+          </div>
+        </div>
+        <div class="sl-field">
+          <span class="sl-label">Timezone</span>
+          <input id="q-tz" class="sl-input" value={queue.timezone} />
+        </div>
+      </div>
+
+      <div class="sl-field">
+        <span class="sl-label">Brand voice: who you are, tone, language, CTAs</span>
+        <textarea id="q-voice" class="sl-input" rows="4" placeholder="Ex: DJ din București, ton direct și cald, română, fără corporate. CTA: bilete în bio.">{queue.brandVoice ?? ''}</textarea>
+      </div>
+      <div class="sl-field">
+        <span class="sl-label">Hashtag pool (AI picks 3-6 per post)</span>
+        <input id="q-hashtags" class="sl-input" value={queue.hashtags ?? ''} placeholder="#djlife #bucuresti #housemusic ..." />
+      </div>
+      <div class="sl-row-end">
+        <span id="q-saved" class="sl-dim" style="display:none;">Saved ✓</span>
+        <button class="sl-btn" id="q-save">Save settings</button>
+      </div>
+    </section>
+
+    <!-- ── Drop zone + queue items ───────────────────────────────────────── -->
+    <section class="sl-card">
+      <h3 class="sl-h">Queue <span class="sl-dim" style="font-weight:400;">· {queuedCount} waiting</span></h3>
+
+      <div class="sl-drop" id="sl-drop">
+        <input type="file" id="sl-file" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none;" />
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Drop photos & videos here</strong> or click to browse</p>
+        <p class="sl-dim">They post themselves, oldest first, on your schedule.</p>
+      </div>
+      <div id="sl-progress" class="sl-dim" style="display:none;margin-top:10px;"></div>
+
+      <div class="sl-items">
+        {items.length === 0 && <p class="sl-dim" style="text-align:center;padding:18px 0;">The folder is empty. Drop something in.</p>}
+        {items.map((i) => (
+          <div class="sl-item">
+            {i.mediaType === 'image'
+              ? <img class="sl-thumb" src={i.blobUrl} alt="" loading="lazy" />
+              : <span class="sl-thumb sl-thumb--video">▶</span>}
+            <div class="sl-item-body">
+              <div class="sl-item-top">
+                <span class="sl-pill" style={`color:${STATUS_META[i.status]?.color};border-color:${STATUS_META[i.status]?.color}33;`}>{STATUS_META[i.status]?.label ?? i.status}</span>
+                {i.scheduledFor && <span class="sl-dim">{i.status === 'posted' ? 'posted' : 'goes out'} {fmtWhen(i.scheduledFor)}</span>}
+              </div>
+              {i.caption
+                ? <p class="sl-caption">{i.caption.slice(0, 160)}{i.caption.length > 160 ? '…' : ''}</p>
+                : <p class="sl-caption sl-dim">{i.fileName ?? 'media'}{i.status === 'queued' ? ' · caption gets written when its turn comes' : ''}</p>}
+              {i.error && <p class="sl-caption" style="color:#ff8a8a;">{i.error.slice(0, 140)}</p>}
+            </div>
+            {(i.status === 'queued' || i.status === 'failed') && (
+              <button class="sl-btn sl-btn--danger sl-btn--sm" data-delete={i.id} title="Remove">✕</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  </div>
+
+  <style>
+    .sl-wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .sl-banner {
+      max-width: 760px; margin: 0 auto 20px;
+      padding: 12px 16px; border-radius: 12px;
+      background: rgba(246,197,71,0.08); border: 1px solid rgba(246,197,71,0.25);
+      color: #f6c547; font-size: 13.5px; text-align: center;
+    }
+    .sl-card {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px; padding: 24px;
+    }
+    .sl-h { font-size: 16px; font-weight: 600; color: #fff; margin: 0 0 16px; letter-spacing: -0.01em; }
+    .sl-h-row { display: flex; align-items: center; justify-content: space-between; }
+    .sl-dim { color: rgba(255,255,255,0.42); font-size: 12.5px; }
+
+    .sl-accounts { display: flex; flex-direction: column; gap: 10px; }
+    .sl-account {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px; border-radius: 12px;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    }
+    .sl-account-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .sl-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .sl-avatar--empty {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+      font-size: 14px; font-weight: 600;
+    }
+    .sl-account-name { font-size: 14px; font-weight: 600; color: #fff; }
+    .sl-account-sub { font-size: 12.5px; color: rgba(255,255,255,0.55); }
+
+    .sl-pill {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6); white-space: nowrap;
+    }
+    .sl-pill--ok { color: #6ee7a3; border-color: rgba(110,231,163,0.3); }
+
+    .sl-btn {
+      font-size: 13px; font-weight: 600; color: #0a0a0a;
+      background: #f472b6; border: none; border-radius: 10px;
+      padding: 9px 16px; cursor: pointer; transition: opacity 0.15s;
+    }
+    .sl-btn:hover { opacity: 0.85; }
+    .sl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .sl-btn--ghost { background: rgba(255,255,255,0.07); color: #fff; }
+    .sl-btn--danger { background: rgba(255,138,138,0.12); color: #ff8a8a; }
+    .sl-btn--sm { padding: 6px 10px; border-radius: 8px; flex-shrink: 0; }
+
+    .sl-row { display: flex; align-items: center; gap: 8px; }
+    .sl-row-end { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+
+    .sl-toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.7); cursor: pointer; }
+    .sl-toggle input { accent-color: #f472b6; width: 16px; height: 16px; }
+
+    .sl-field { margin-top: 14px; }
+    .sl-label { display: block; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 7px; }
+    .sl-input {
+      width: 100%; font-size: 13.5px; color: #fff;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 9px 12px; outline: none; font-family: inherit;
+    }
+    .sl-input:focus { border-color: rgba(244,114,182,0.5); }
+    select.sl-input option { background: #16161a; }
+    .sl-checks { display: flex; gap: 16px; flex-wrap: wrap; }
+    .sl-check { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: rgba(255,255,255,0.8); cursor: pointer; }
+    .sl-check input { accent-color: #f472b6; width: 15px; height: 15px; }
+    .sl-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    @media (max-width: 640px) { .sl-grid-3 { grid-template-columns: 1fr; } }
+
+    .sl-drop {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 32px 20px; border-radius: 14px; cursor: pointer;
+      border: 1.5px dashed rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.7); text-align: center;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .sl-drop:hover, .sl-drop.sl-drop--over { border-color: #f472b6; background: rgba(244,114,182,0.05); }
+    .sl-drop p { margin: 0; font-size: 13.5px; }
+
+    .sl-items { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .sl-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px; border-radius: 12px;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+    }
+    .sl-thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+    .sl-thumb--video {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.6); font-size: 16px;
+    }
+    .sl-item-body { min-width: 0; flex: 1; }
+    .sl-item-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .sl-caption { margin: 0; font-size: 13px; color: rgba(255,255,255,0.75); line-height: 1.45; overflow-wrap: anywhere; }
+  </style>
+
+  <script>
+    import { upload } from '@vercel/blob/client';
+
+    async function api(path: string, init?: RequestInit) {
+      const res = await fetch(path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...init,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as any).error ?? `HTTP ${res.status}`);
+      return data as any;
+    }
+
+    // ── Connect ──
+    document.querySelectorAll<HTMLButtonElement>('[data-connect]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const { url } = await api('/api/social/connect', {
+            method: 'POST',
+            body: JSON.stringify({ platform: btn.dataset.connect }),
+          });
+          window.location.href = url;
+        } catch (e: any) {
+          alert(e.message);
+          btn.disabled = false;
+        }
+      });
+    });
+
+    // ── Sync / disconnect ──
+    document.getElementById('sl-sync')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Syncing…';
+      try {
+        await api('/api/social/sync', { method: 'POST', body: '{}' });
+        window.location.reload();
+      } catch (err: any) {
+        alert(err.message);
+        btn.disabled = false;
+        btn.textContent = 'Sync now';
+      }
+    });
+    document.getElementById('sl-disconnect')?.addEventListener('click', async () => {
+      if (!confirm('Disconnect all social accounts? Posting stops; history stays.')) return;
+      try {
+        await api('/api/social/disconnect', { method: 'POST', body: '{}' });
+        window.location.reload();
+      } catch (err: any) {
+        alert(err.message);
+      }
+    });
+
+    // ── Save queue config ──
+    document.getElementById('q-save')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const platforms = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input[name="q-platform"]:checked')
+      ).map((i) => i.value);
+      if (platforms.length === 0) return alert('Pick at least one platform.');
+      const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+      btn.disabled = true;
+      try {
+        await api('/api/social/queue', {
+          method: 'PUT',
+          body: JSON.stringify({
+            active: (document.getElementById('q-active') as HTMLInputElement).checked,
+            platforms,
+            cadenceHours: Number(val('q-cadence')),
+            windowStartHour: Number(val('q-start')),
+            windowEndHour: Number(val('q-end')),
+            timezone: val('q-tz').trim(),
+            brandVoice: val('q-voice').trim() || null,
+            hashtags: val('q-hashtags').trim() || null,
+          }),
+        });
+        const saved = document.getElementById('q-saved')!;
+        saved.style.display = 'inline';
+        setTimeout(() => (saved.style.display = 'none'), 2500);
+      } catch (err: any) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ── Upload ──
+    const drop = document.getElementById('sl-drop')!;
+    const fileInput = document.getElementById('sl-file') as HTMLInputElement;
+    const progress = document.getElementById('sl-progress')!;
+
+    drop.addEventListener('click', () => fileInput.click());
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('sl-drop--over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('sl-drop--over'));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('sl-drop--over');
+      if (e.dataTransfer?.files?.length) void handleFiles(Array.from(e.dataTransfer.files));
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.length) void handleFiles(Array.from(fileInput.files));
+    });
+
+    async function handleFiles(files: File[]) {
+      progress.style.display = 'block';
+      const registered: Array<{ blobUrl: string; blobPathname?: string; fileName: string; mediaType: 'image' | 'video' }> = [];
+      let n = 0;
+      for (const file of files) {
+        n++;
+        progress.textContent = `Uploading ${n}/${files.length}: ${file.name}…`;
+        try {
+          const blob = await upload(file.name, file, {
+            access: 'public',
+            handleUploadUrl: '/api/social/queue/upload',
+          });
+          registered.push({
+            blobUrl: blob.url,
+            blobPathname: blob.pathname,
+            fileName: file.name,
+            mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+          });
+        } catch (err: any) {
+          alert(`${file.name}: ${err.message}`);
+        }
+      }
+      if (registered.length > 0) {
+        progress.textContent = 'Adding to queue…';
+        try {
+          await api('/api/social/queue/items', {
+            method: 'POST',
+            body: JSON.stringify({ items: registered }),
+          });
+          window.location.reload();
+          return;
+        } catch (err: any) {
+          alert(err.message);
+        }
+      }
+      progress.style.display = 'none';
+    }
+
+    // ── Delete item ──
+    document.querySelectorAll<HTMLButtonElement>('[data-delete]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await api(`/api/social/queue/items/${btn.dataset.delete}`, { method: 'DELETE' });
+          window.location.reload();
+        } catch (err: any) {
+          alert(err.message);
+          btn.disabled = false;
+        }
+      });
+    });
+  </script>
+</Dashboard>

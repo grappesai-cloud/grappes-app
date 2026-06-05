@@ -45,6 +45,32 @@ const auditIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const kitIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`;
 const logoIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>`;
 const offerIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`;
+const socialIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>`;
+
+// Social Lab — autopost queue depth for the tile meter.
+let socialQueued = 0;
+let socialConnected = 0;
+try {
+  const adminClient = createAdminClient();
+  const { count: qc } = await adminClient
+    .from('social_queue_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', authUser.id)
+    .eq('status', 'queued');
+  socialQueued = qc ?? 0;
+  const { count: cc } = await adminClient
+    .from('social_connections')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', authUser.id)
+    .is('disconnected_at', null);
+  socialConnected = cc ?? 0;
+} catch (e) {
+  // social_* tables may not exist on environments where the migration hasn't
+  // been applied — fail silently rather than break the dashboard.
+}
+const socialMeter = socialConnected === 0
+  ? 'Connect your accounts'
+  : `${socialQueued} post${socialQueued === 1 ? '' : 's'} in queue`;
 
 // Logo Lab — count standalone logos owned by this user.
 let logoCount = 0;
@@ -100,6 +126,16 @@ try {
           meter={`${reelCredits} credit${reelCredits === 1 ? '' : 's'} remaining`}
           cta={reelCredits > 0 ? 'Open Reels' : 'Get credits'}
           accent="#a78bfa"
+          isNew={true}
+        />
+        <ProductTile
+          name="Social Lab"
+          tagline="Drop photos and videos into a folder. AI writes captions in your voice and posts them to Instagram, TikTok and Facebook on schedule."
+          href="/social"
+          icon={socialIcon}
+          meter={socialMeter}
+          cta="Open Social"
+          accent="#f472b6"
           isNew={true}
         />
         <ProductTile
