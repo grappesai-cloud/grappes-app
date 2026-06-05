@@ -53,11 +53,11 @@ const l = logo as {
         )}
 
         <div style="display:flex;flex-direction:column;gap:8px;">
-          <a href={l.png_url} download={`${l.name}.png`} style="display:flex;align-items:center;justify-content:center;gap:8px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
+          <a href={`/api/logo/${l.id}/download?format=png`} download style="display:flex;align-items:center;justify-content:center;gap:8px;background:#a78bfa;color:#0a0a0a;border:none;border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
             Download PNG
           </a>
           {l.svg_url ? (
-            <a href={l.svg_url} download={`${l.name}.svg`} style="display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(167,139,250,0.14);color:#c4b5fd;border:1px solid rgba(167,139,250,0.4);border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
+            <a href={`/api/logo/${l.id}/download?format=svg`} download style="display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(167,139,250,0.14);color:#c4b5fd;border:1px solid rgba(167,139,250,0.4);border-radius:999px;height:46px;padding:0 22px;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
               Download SVG
             </a>
           ) : (
