@@ -1,0 +1,559 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { db } from '../../lib/db';
+import { createAdminClient } from '../../lib/supabase';
+
+const authUser = Astro.locals.user!;
+const dbUser = await db.users.findById(authUser.id);
+const soc2Credits = dbUser?.soc2_credits ?? 0;
+const justPurchased = Astro.url.searchParams.get('credits_purchased') === '1';
+
+const ACCENT = '#34d399';
+
+// Last 8 assessments for this user
+const client = createAdminClient();
+const { data: recentRaw } = await client
+  .from('soc2_assessments')
+  .select('id, mode, target, status, overall_score, created_at')
+  .eq('user_id', authUser.id)
+  .order('created_at', { ascending: false })
+  .limit(8);
+const recent = recentRaw ?? [];
+
+// Verified / pending domains for live pentest mode
+const { data: verRaw } = await client
+  .from('soc2_domain_verifications')
+  .select('id, domain, method, status')
+  .eq('user_id', authUser.id)
+  .order('created_at', { ascending: false });
+const verifications = verRaw ?? [];
+const verifiedDomains = verifications.filter(v => v.status === 'verified');
+
+function scoreColor(score: number | null): string {
+  if (score === null || score === undefined) return 'rgba(255,255,255,0.4)';
+  if (score >= 80) return '#6ee7a3';
+  if (score >= 50) return '#f6c547';
+  return '#ff8a8a';
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(diff / 3600000);
+  const d = Math.floor(diff / 86400000);
+  if (m < 1) return 'just now';
+  if (h < 1) return `${m}m ago`;
+  if (d < 1) return `${h}h ago`;
+  return `${d}d ago`;
+}
+---
+
+<Dashboard title="SOC 2 Lab">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+    @media (max-width: 768px) {
+      main { padding-top: 40px !important; padding-bottom: 60px !important; }
+    }
+  </style>
+
+  <div style="text-align:center;margin-bottom:28px;">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:12px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 19"/></svg>
+      <span>Studio</span>
+    </a>
+    <span style={`display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ACCENT};margin-bottom:10px;`}>SOC 2 Lab</span>
+    <h2 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin-bottom:10px;">SOC 2 readiness, two ways</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.55);margin-bottom:18px;max-width:560px;margin-left:auto;margin-right:auto;line-height:1.5;">
+      Find the gaps before your auditor does. Hand us your code for a static review, or run an authorized live scan against your own domain. Every finding is mapped to the Trust Service Criteria with a prioritized fix.
+    </p>
+    <p style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:0.02em;">
+      {soc2Credits} credit{soc2Credits === 1 ? '' : 's'} remaining
+    </p>
+  </div>
+
+  {/* Legal disclaimer — permanent */}
+  <div style="max-width:760px;margin:0 auto 26px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    <p style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.5);margin:0;">
+      This is a <strong style="color:rgba(255,255,255,0.7);">readiness assessment</strong>, not a SOC 2 attestation. A SOC 2 report can only be issued by a licensed CPA firm after a formal audit. We help you get ready for that audit.
+    </p>
+  </div>
+
+  {justPurchased && (
+    <div style="max-width:760px;margin:0 auto 18px;background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:12px 18px;color:#6ee7a3;font-size:13.5px;text-align:center;">
+      ✓ Payment received. Your credits are ready.
+    </div>
+  )}
+
+  {/* Two modes */}
+  <div style="max-width:760px;margin:0 auto 30px;display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="soc2-modes">
+    {/* Mode 1 — Code Audit */}
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;display:flex;flex-direction:column;">
+      <div style={`width:40px;height:40px;border-radius:10px;background:${ACCENT}1a;display:flex;align-items:center;justify-content:center;margin-bottom:14px;`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ACCENT} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </div>
+      <h3 style="font-size:17px;font-weight:600;color:#fff;margin:0 0 6px;">Code Audit</h3>
+      <p style="font-size:13px;line-height:1.5;color:rgba(255,255,255,0.55);margin:0 0 14px;flex:1;">
+        Paste a snippet or link a public repo. Static review for hardcoded secrets, vulnerable dependencies, weak access control, encryption and logging gaps. No setup, zero risk. <strong style="color:rgba(255,255,255,0.7);">1 credit.</strong>
+      </p>
+      <button type="button" id="open-code-audit" class="mode-cta" style={`height:44px;border-radius:10px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>
+        {soc2Credits > 0 ? 'Start code audit' : 'Get credits'}
+      </button>
+    </div>
+
+    {/* Mode 2 — Live Pentest */}
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;display:flex;flex-direction:column;">
+      <div style={`width:40px;height:40px;border-radius:10px;background:${ACCENT}1a;display:flex;align-items:center;justify-content:center;margin-bottom:14px;`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ACCENT} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <h3 style="font-size:17px;font-weight:600;color:#fff;margin:0 0 6px;">Live Pentest</h3>
+      <p style="font-size:13px;line-height:1.5;color:rgba(255,255,255,0.55);margin:0 0 14px;flex:1;">
+        Active scan against a domain you control. Headers, TLS, DNS, exposed files, then auth, IDOR and injection probing. Requires <strong style="color:rgba(255,255,255,0.7);">domain ownership verification</strong> and explicit authorization before anything runs.
+      </p>
+      {verifiedDomains.length > 0 && (
+        <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;">
+          {verifiedDomains.map(v => (
+            <span style={`display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT}14;border:1px solid ${ACCENT}33;border-radius:999px;padding:3px 9px;`}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              {v.domain}
+            </span>
+          ))}
+        </div>
+      )}
+      {verifiedDomains.length > 0 ? (
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="open-run-scan" class="mode-cta" style={`flex:1;height:44px;border-radius:10px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>
+            Run live scan · 3 credits
+          </button>
+          <button type="button" id="open-verify" style="height:44px;padding:0 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Domain</button>
+        </div>
+      ) : (
+        <button type="button" id="open-verify" class="mode-cta" style={`height:44px;border-radius:10px;border:1px solid ${ACCENT}55;background:${ACCENT}14;color:${ACCENT};font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>
+          Verify a domain
+        </button>
+      )}
+    </div>
+  </div>
+
+  {/* Get credits */}
+  <div style="max-width:760px;margin:0 auto 30px;">
+    <div style={`background:${ACCENT}10;border:1px solid ${ACCENT}38;border-radius:14px;padding:22px;text-align:center;`}>
+      <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 12px;line-height:1.5;">
+        {soc2Credits > 0
+          ? 'Top up your balance for more assessments.'
+          : 'Out of credits? Grab a pack to start assessing.'}
+      </p>
+      <button type="button" id="buy-soc2-credits-btn" style={`display:inline-flex;align-items:center;gap:8px;background:${ACCENT};color:#0a0a0a;border:none;border-radius:999px;padding:10px 22px;font-size:13px;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:inherit;`}>
+        <span>Buy 10 credits, €20</span>
+      </button>
+    </div>
+  </div>
+
+  {/* Recent assessments */}
+  <div style="max-width:760px;margin:0 auto;">
+    {recent.length > 0 && (
+      <section>
+        <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 14px;">Recent assessments</h3>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;">
+          {recent.map(r => (
+            <li>
+              <a href={`/soc2/${r.id}`} style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;text-decoration:none;transition:background 0.18s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:13.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{r.target}</div>
+                  <div style="font-size:11.5px;color:rgba(255,255,255,0.4);margin-top:2px;text-transform:capitalize;">{r.mode} · {timeAgo(r.created_at)} · {r.status}</div>
+                </div>
+                {r.status === 'complete' ? (
+                  <div style={`flex-shrink:0;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.04);border:2px solid ${scoreColor(r.overall_score)};font-size:13px;font-weight:700;color:${scoreColor(r.overall_score)};`}>
+                    {r.overall_score ?? '—'}
+                  </div>
+                ) : (
+                  <span style="flex-shrink:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.45);">{r.status}</span>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+
+  {/* Run live scan modal */}
+  <div id="run-scan-modal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:100%;max-width:560px;background:#101512;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-size:18px;font-weight:600;color:#fff;margin:0;">Run live scan</h3>
+        <button type="button" id="close-run-scan" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      </div>
+      <p style="font-size:12.5px;color:rgba(255,255,255,0.5);margin:0 0 16px;line-height:1.5;">Non-destructive recon: security headers, TLS, DNS email auth, exposed files, and trust pages. Costs 3 credits.</p>
+
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:9px;">Target (verified domains only)</label>
+      <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px;">
+        {verifiedDomains.map((v, i) => (
+          <label style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:10px;cursor:pointer;">
+            <input type="radio" name="rs-domain" value={v.id} checked={i === 0} style="accent-color:#34d399;width:15px;height:15px;" />
+            <span style="font-size:13.5px;color:#fff;font-weight:500;">{v.domain}</span>
+          </label>
+        ))}
+      </div>
+
+      <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin-bottom:12px;padding:11px 13px;background:rgba(52,211,153,0.05);border:1px solid rgba(52,211,153,0.2);border-radius:10px;">
+        <input type="checkbox" id="rs-deep" style="margin-top:2px;flex-shrink:0;accent-color:#34d399;width:15px;height:15px;" />
+        <span style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.7);"><strong style="color:#34d399;">Deep offensive scan</strong> — adds crawl + injection, CORS, open-redirect and access-control probing. Slower (runs in the background) and costs 8 credits instead of 3.</span>
+      </label>
+
+      <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin-bottom:16px;">
+        <input type="checkbox" id="rs-consent" style="margin-top:2px;flex-shrink:0;accent-color:#34d399;width:15px;height:15px;" />
+        <span style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.6);">I confirm I own or am authorized to test this domain, and I authorize Grappes to run an active security scan against it now. This authorization is recorded with a timestamp.</span>
+      </label>
+
+      <p id="rs-error" style="display:none;margin:0 0 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:10px;padding:10px 14px;color:#ff8a8a;font-size:12.5px;"></p>
+
+      <button type="button" id="rs-submit" style={`width:100%;height:48px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;`}>
+        <span id="rs-submit-label">Run scan · 3 credits</span>
+      </button>
+    </div>
+  </div>
+
+  {/* Domain verification modal */}
+  <div id="verify-modal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:100%;max-width:580px;background:#101512;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-size:18px;font-weight:600;color:#fff;margin:0;">Verify domain ownership</h3>
+        <button type="button" id="close-verify" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      </div>
+      <p style="font-size:12.5px;color:rgba(255,255,255,0.5);margin:0 0 18px;line-height:1.5;">We only scan domains you can prove you control. Nothing active runs until this passes.</p>
+
+      {/* Step 1 — input */}
+      <div id="vf-step-input">
+        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:7px;">Domain</label>
+        <input type="text" id="vf-domain" placeholder="example.com" style="width:100%;height:46px;padding:0 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:10px;color:#fff;font-family:inherit;font-size:14px;outline:none;margin-bottom:16px;" />
+
+        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:rgba(255,255,255,0.4);margin-bottom:9px;">Method</label>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button type="button" class="vf-method" data-method="dns_txt" style={`flex:1;height:40px;border-radius:9px;border:1px solid ${ACCENT}55;background:${ACCENT}1a;color:${ACCENT};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;`}>DNS TXT record</button>
+          <button type="button" class="vf-method" data-method="file" style="flex:1;height:40px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;">Upload a file</button>
+        </div>
+        <p id="vf-method-hint" style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:0 0 16px;">Add a TXT record to your domain's DNS. Proves DNS-level control.</p>
+
+        <button type="button" id="vf-continue" style={`width:100%;height:46px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;`}>Continue</button>
+      </div>
+
+      {/* Step 2 — token + check */}
+      <div id="vf-step-token" style="display:none;">
+        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:14px;">
+          <p id="vf-instr-title" style="font-size:12px;font-weight:600;color:#fff;margin:0 0 10px;"></p>
+          <div id="vf-instr-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+
+        <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin-bottom:16px;">
+          <input type="checkbox" id="vf-consent" style="margin-top:2px;flex-shrink:0;accent-color:#34d399;width:15px;height:15px;" />
+          <span style="font-size:12px;line-height:1.5;color:rgba(255,255,255,0.6);">I own this domain or am authorized to test it, and I authorize Grappes to run active security scans against it.</span>
+        </label>
+
+        <p id="vf-status" style="display:none;font-size:12.5px;margin:0 0 12px;padding:10px 13px;border-radius:9px;"></p>
+
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="vf-back" style="height:46px;padding:0 16px;border-radius:11px;border:1px solid rgba(255,255,255,0.14);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Back</button>
+          <button type="button" id="vf-check" style={`flex:1;height:46px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;`}><span id="vf-check-label">Check verification</span></button>
+        </div>
+      </div>
+
+      {/* Step 3 — verified */}
+      <div id="vf-step-done" style="display:none;text-align:center;padding:18px 0;">
+        <div style={`width:52px;height:52px;border-radius:50%;background:${ACCENT}1f;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;`}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={ACCENT} stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <p style="font-size:16px;font-weight:600;color:#fff;margin:0 0 6px;"><span id="vf-done-domain"></span> verified</p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0 0 18px;">Live pentest scanning for this domain is unlocked.</p>
+        <button type="button" id="vf-done-close" style={`height:44px;padding:0 26px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>Done</button>
+      </div>
+    </div>
+  </div>
+
+  {/* Code Audit modal */}
+  <div id="code-audit-modal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:100%;max-width:600px;background:#101512;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-size:18px;font-weight:600;color:#fff;margin:0;">Code Audit</h3>
+        <button type="button" id="close-code-audit" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      </div>
+      <p style="font-size:12.5px;color:rgba(255,255,255,0.5);margin:0 0 16px;line-height:1.5;">Paste code or link a public GitHub repo. We map every finding to the Trust Service Criteria. Costs 1 credit.</p>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button type="button" class="ca-tab" data-tab="paste" style={`flex:1;height:38px;border-radius:9px;border:1px solid ${ACCENT}55;background:${ACCENT}1a;color:${ACCENT};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;`}>Paste code</button>
+        <button type="button" class="ca-tab" data-tab="repo" style="flex:1;height:38px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;">Public repo</button>
+      </div>
+
+      <div id="ca-pane-paste">
+        <textarea id="ca-code" placeholder="Paste source code here…" style="width:100%;height:200px;resize:vertical;padding:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:10px;color:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5;outline:none;"></textarea>
+      </div>
+      <div id="ca-pane-repo" style="display:none;">
+        <input type="text" id="ca-repo" placeholder="github.com/owner/repo" style="width:100%;height:46px;padding:0 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:10px;color:#fff;font-family:inherit;font-size:14px;outline:none;" />
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:8px 2px 0;">Public GitHub repos only. We review up to ~40 security-relevant files.</p>
+      </div>
+
+      <p id="ca-error" style="display:none;margin:14px 0 0;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:10px;padding:10px 14px;color:#ff8a8a;font-size:12.5px;"></p>
+
+      <button type="button" id="ca-submit" style={`width:100%;height:48px;margin-top:18px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;`}>
+        <span id="ca-submit-label">Run audit · 1 credit</span>
+      </button>
+    </div>
+  </div>
+
+  <style>
+    @media (max-width: 640px) { .soc2-modes { grid-template-columns: 1fr !important; } }
+    #buy-soc2-credits-btn:hover { box-shadow: 0 6px 20px -6px rgba(52,211,153,0.5); transform: translateY(-1px); }
+    #code-audit-modal #ca-code:focus, #code-audit-modal #ca-repo:focus { border-color: #34d399; }
+    .ca-spin { display:inline-block;width:15px;height:15px;border:2px solid rgba(0,0,0,0.25);border-top-color:#0a0a0a;border-radius:50%;animation:caspin 0.8s linear infinite; }
+    @keyframes caspin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script is:inline define:vars={{ hasCredits: soc2Credits > 0 }}>
+    // ── Buy credits ──
+    document.getElementById('buy-soc2-credits-btn')?.addEventListener('click', async function () {
+      this.disabled = true;
+      try {
+        const r = await fetch('/api/billing/buy-soc2-credits', { method: 'POST' });
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+        alert(data.error || 'Payment error.');
+      } catch { alert('Network error.'); }
+      this.disabled = false;
+    });
+
+    // ── Code Audit modal ──
+    const modal = document.getElementById('code-audit-modal');
+    const openBtn = document.getElementById('open-code-audit');
+    const errEl = document.getElementById('ca-error');
+
+    async function buyCredits(btn) {
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/billing/buy-soc2-credits', { method: 'POST' });
+        const data = await r.json();
+        if (data.url) { window.location.href = data.url; return; }
+        alert(data.error || 'Payment error.');
+      } catch { alert('Network error.'); }
+      btn.disabled = false;
+    }
+
+    openBtn?.addEventListener('click', function () {
+      if (!hasCredits) { buyCredits(this); return; }
+      modal.style.display = 'flex';
+    });
+    document.getElementById('close-code-audit')?.addEventListener('click', () => { modal.style.display = 'none'; });
+    modal?.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+    // Tabs
+    let activeTab = 'paste';
+    document.querySelectorAll('.ca-tab').forEach((tab) => {
+      tab.addEventListener('click', function () {
+        activeTab = this.dataset.tab;
+        document.querySelectorAll('.ca-tab').forEach((t) => {
+          const on = t.dataset.tab === activeTab;
+          t.style.border = on ? '1px solid #34d39955' : '1px solid rgba(255,255,255,0.12)';
+          t.style.background = on ? '#34d3991a' : 'transparent';
+          t.style.color = on ? '#34d399' : 'rgba(255,255,255,0.6)';
+        });
+        document.getElementById('ca-pane-paste').style.display = activeTab === 'paste' ? 'block' : 'none';
+        document.getElementById('ca-pane-repo').style.display = activeTab === 'repo' ? 'block' : 'none';
+      });
+    });
+
+    // Submit
+    const submitBtn = document.getElementById('ca-submit');
+    const label = document.getElementById('ca-submit-label');
+    submitBtn?.addEventListener('click', async function () {
+      errEl.style.display = 'none';
+      const payload = activeTab === 'repo'
+        ? { repo: document.getElementById('ca-repo').value.trim() }
+        : { code: document.getElementById('ca-code').value.trim() };
+      if ((activeTab === 'repo' && !payload.repo) || (activeTab === 'paste' && !payload.code)) {
+        errEl.textContent = activeTab === 'repo' ? 'Enter a repo URL.' : 'Paste some code first.';
+        errEl.style.display = 'block';
+        return;
+      }
+      submitBtn.disabled = true;
+      label.innerHTML = '<span class="ca-spin"></span> Analyzing — up to a minute…';
+      try {
+        const r = await fetch('/api/soc2/run-code', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (r.status === 402) { window.location.reload(); return; }
+        if (!r.ok) {
+          errEl.textContent = data.error || 'Audit failed.';
+          errEl.style.display = 'block';
+          submitBtn.disabled = false;
+          label.textContent = 'Run audit · 1 credit';
+          return;
+        }
+        window.location.href = '/soc2/' + data.id;
+      } catch {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        label.textContent = 'Run audit · 1 credit';
+      }
+    });
+
+    // ── Domain verification modal ──
+    const vfModal = document.getElementById('verify-modal');
+    const vfOpen = document.getElementById('open-verify');
+    let vfMethod = 'dns_txt';
+    let vfId = null;
+    let vfDomain = '';
+
+    function vfShowStep(step) {
+      document.getElementById('vf-step-input').style.display = step === 'input' ? 'block' : 'none';
+      document.getElementById('vf-step-token').style.display = step === 'token' ? 'block' : 'none';
+      document.getElementById('vf-step-done').style.display = step === 'done' ? 'block' : 'none';
+    }
+    function vfReset() { vfShowStep('input'); vfId = null; }
+
+    vfOpen?.addEventListener('click', () => { vfReset(); vfModal.style.display = 'flex'; });
+    document.getElementById('close-verify')?.addEventListener('click', () => { vfModal.style.display = 'none'; });
+    vfModal?.addEventListener('click', (e) => { if (e.target === vfModal) vfModal.style.display = 'none'; });
+
+    document.querySelectorAll('.vf-method').forEach((b) => {
+      b.addEventListener('click', function () {
+        vfMethod = this.dataset.method;
+        document.querySelectorAll('.vf-method').forEach((t) => {
+          const on = t.dataset.method === vfMethod;
+          t.style.border = on ? '1px solid #34d39955' : '1px solid rgba(255,255,255,0.12)';
+          t.style.background = on ? '#34d3991a' : 'transparent';
+          t.style.color = on ? '#34d399' : 'rgba(255,255,255,0.6)';
+        });
+        document.getElementById('vf-method-hint').textContent = vfMethod === 'dns_txt'
+          ? "Add a TXT record to your domain's DNS. Proves DNS-level control."
+          : 'Upload a small file to your web root. Proves server-level control.';
+      });
+    });
+
+    function copyRow(label, value) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+      row.innerHTML = '<span style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:rgba(255,255,255,0.4);min-width:64px;">' + label + '</span>'
+        + '<code style="flex:1;font-size:11.5px;font-family:ui-monospace,monospace;color:#a7f3d0;background:rgba(0,0,0,0.3);border-radius:6px;padding:6px 9px;word-break:break-all;">' + value + '</code>';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = 'Copy';
+      btn.style.cssText = 'flex-shrink:0;font-size:11px;font-weight:600;color:#34d399;background:#34d3991a;border:1px solid #34d39933;border-radius:7px;padding:6px 10px;cursor:pointer;';
+      btn.addEventListener('click', () => { navigator.clipboard.writeText(value); btn.textContent = 'Copied'; setTimeout(() => btn.textContent = 'Copy', 1200); });
+      row.appendChild(btn);
+      return row;
+    }
+
+    document.getElementById('vf-continue')?.addEventListener('click', async function () {
+      const domain = document.getElementById('vf-domain').value.trim();
+      if (!domain) return;
+      this.disabled = true;
+      const orig = this.textContent;
+      this.textContent = 'Generating…';
+      try {
+        const r = await fetch('/api/soc2/verify/start', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ domain, method: vfMethod }),
+        });
+        const data = await r.json();
+        if (!r.ok) { alert(data.error || 'Could not start.'); return; }
+        vfId = data.id; vfDomain = data.domain;
+        const title = document.getElementById('vf-instr-title');
+        const rows = document.getElementById('vf-instr-rows');
+        rows.innerHTML = '';
+        if (data.instructions.type === 'dns_txt') {
+          title.textContent = 'Add this TXT record to ' + data.domain + ', then check:';
+          rows.appendChild(copyRow('Type', data.instructions.recordType));
+          rows.appendChild(copyRow('Name', data.instructions.name));
+          rows.appendChild(copyRow('Value', data.instructions.value));
+        } else {
+          title.textContent = 'Make this file reachable, then check:';
+          rows.appendChild(copyRow('URL', data.instructions.url));
+          rows.appendChild(copyRow('Content', data.instructions.content));
+        }
+        if (data.status === 'verified') { document.getElementById('vf-done-domain').textContent = data.domain; vfShowStep('done'); }
+        else vfShowStep('token');
+      } catch { alert('Network error.'); }
+      finally { this.disabled = false; this.textContent = orig; }
+    });
+
+    document.getElementById('vf-back')?.addEventListener('click', () => vfShowStep('input'));
+
+    document.getElementById('vf-check')?.addEventListener('click', async function () {
+      if (!document.getElementById('vf-consent').checked) {
+        const st = document.getElementById('vf-status');
+        st.textContent = 'Please confirm authorization first.';
+        st.style.cssText = 'font-size:12.5px;margin:0 0 12px;padding:10px 13px;border-radius:9px;display:block;background:rgba(246,197,71,0.1);border:1px solid rgba(246,197,71,0.3);color:#f6c547;';
+        return;
+      }
+      const label = document.getElementById('vf-check-label');
+      const st = document.getElementById('vf-status');
+      this.disabled = true;
+      label.innerHTML = '<span class="ca-spin"></span> Checking…';
+      try {
+        const r = await fetch('/api/soc2/verify/check', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ id: vfId }),
+        });
+        const data = await r.json();
+        if (data.status === 'verified') {
+          document.getElementById('vf-done-domain').textContent = vfDomain;
+          vfShowStep('done');
+          return;
+        }
+        st.textContent = data.detail || data.error || 'Not verified yet.';
+        st.style.cssText = 'font-size:12.5px;margin:0 0 12px;padding:10px 13px;border-radius:9px;display:block;background:rgba(246,197,71,0.1);border:1px solid rgba(246,197,71,0.3);color:#f6c547;';
+      } catch {
+        st.textContent = 'Network error.';
+        st.style.cssText = 'font-size:12.5px;margin:0 0 12px;padding:10px 13px;border-radius:9px;display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ff8a8a;';
+      } finally {
+        this.disabled = false;
+        label.textContent = 'Check verification';
+      }
+    });
+
+    document.getElementById('vf-done-close')?.addEventListener('click', () => { window.location.reload(); });
+
+    // ── Run live scan modal ──
+    const rsModal = document.getElementById('run-scan-modal');
+    document.getElementById('open-run-scan')?.addEventListener('click', () => { rsModal.style.display = 'flex'; });
+    document.getElementById('rs-deep')?.addEventListener('change', function () {
+      const l = document.getElementById('rs-submit-label');
+      if (l && !l.querySelector('.ca-spin')) l.textContent = this.checked ? 'Run scan · 8 credits' : 'Run scan · 3 credits';
+    });
+    document.getElementById('close-run-scan')?.addEventListener('click', () => { rsModal.style.display = 'none'; });
+    rsModal?.addEventListener('click', (e) => { if (e.target === rsModal) rsModal.style.display = 'none'; });
+
+    document.getElementById('rs-submit')?.addEventListener('click', async function () {
+      const rsErr = document.getElementById('rs-error');
+      const rsLabel = document.getElementById('rs-submit-label');
+      rsErr.style.display = 'none';
+      const picked = document.querySelector('input[name="rs-domain"]:checked');
+      if (!picked) { rsErr.textContent = 'Pick a domain.'; rsErr.style.display = 'block'; return; }
+      if (!document.getElementById('rs-consent').checked) {
+        rsErr.textContent = 'You must authorize the scan first.'; rsErr.style.display = 'block'; return;
+      }
+      const deep = document.getElementById('rs-deep').checked;
+      const resetLabel = deep ? 'Run scan · 8 credits' : 'Run scan · 3 credits';
+      this.disabled = true;
+      rsLabel.innerHTML = '<span class="ca-spin"></span> ' + (deep ? 'Deep scanning — runs in background…' : 'Scanning — up to a minute…');
+      try {
+        const r = await fetch('/api/soc2/run-live', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ verificationId: picked.value, consent: true, deep }),
+        });
+        const data = await r.json();
+        if (r.status === 402) { rsErr.textContent = data.error || 'Not enough credits.'; rsErr.style.display = 'block'; this.disabled = false; rsLabel.textContent = resetLabel; return; }
+        if (!r.ok) { rsErr.textContent = data.error || 'Scan failed.'; rsErr.style.display = 'block'; this.disabled = false; rsLabel.textContent = resetLabel; return; }
+        window.location.href = '/soc2/' + data.id;
+      } catch {
+        rsErr.textContent = 'Network error. Please try again.';
+        rsErr.style.display = 'block';
+        this.disabled = false;
+        rsLabel.textContent = 'Run scan · 3 credits';
+      }
+    });
+  </script>
+</Dashboard>

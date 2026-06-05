@@ -111,6 +111,29 @@ export const POST: APIRoute = async ({ request }) => {
           break;
         }
 
+        // SOC 2 Lab credits pack
+        if (session.metadata?.type === 'soc2_credits' && session.metadata?.user_id) {
+          const userId = session.metadata.user_id;
+          const SOC2_PACK_SIZE = 10;
+          const { data: newTotal } = await client.rpc('increment_soc2_credits', { p_user_id: userId, p_amount: SOC2_PACK_SIZE });
+          console.log(`[Stripe webhook] +${SOC2_PACK_SIZE} SOC 2 credits credited to user ${userId} (new total: ${newTotal})`);
+          try {
+            const { data: userRow } = await client.from('users').select('email').eq('id', userId).single();
+            if (userRow?.email) {
+              await sendPaymentConfirmedEmail({
+                to: userRow.email,
+                productName: 'SOC 2 Lab',
+                amountAdded: SOC2_PACK_SIZE,
+                unitLabel: 'credits',
+                newBalance: newTotal ?? 0,
+                ctaUrl: 'https://grappes.dev/soc2',
+                ctaLabel: 'Run an assessment →',
+              });
+            }
+          } catch (emailErr) { console.error('[Stripe webhook] soc2-credits email failed:', emailErr); }
+          break;
+        }
+
         // Press kit publish — €15 one-time per kit
         if (session.metadata?.type === 'kit_publish' && session.metadata?.kit_id) {
           const kitId = session.metadata.kit_id;

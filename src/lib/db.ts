@@ -39,6 +39,7 @@ export interface User {
   extra_edits?: number | null;
   reel_credits?: number | null;
   audit_credits?: number | null;
+  soc2_credits?: number | null;
   multipage_addon?: boolean | null;
   multipage_addon_lifetime?: boolean | null;
   multipage_addon_subscription_id?: string | null;

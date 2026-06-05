@@ -1,0 +1,169 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { createAdminClient } from '../../lib/supabase';
+
+const authUser = Astro.locals.user!;
+const { id } = Astro.params;
+const ACCENT = '#34d399';
+
+const client = createAdminClient();
+const { data: a } = await client
+  .from('soc2_assessments')
+  .select('*')
+  .eq('id', id)
+  .eq('user_id', authUser.id)
+  .single();
+
+if (!a) return Astro.redirect('/soc2');
+
+const report = a.report ?? null;
+
+const TSC: { key: string; label: string; score: number | null }[] = [
+  { key: 'security', label: 'Security', score: a.security_score },
+  { key: 'availability', label: 'Availability', score: a.availability_score },
+  { key: 'confidentiality', label: 'Confidentiality', score: a.confidentiality_score },
+  { key: 'integrity', label: 'Processing Integrity', score: a.integrity_score },
+  { key: 'privacy', label: 'Privacy', score: a.privacy_score },
+];
+
+const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+const SEV_COLOR: Record<string, string> = {
+  critical: '#ff6b6b', high: '#ff8a8a', medium: '#f6c547', low: '#7dd3fc', info: 'rgba(255,255,255,0.5)',
+};
+const findings = (report?.findings ?? []).slice().sort(
+  (x: any, y: any) => (SEV_ORDER[x.severity] ?? 9) - (SEV_ORDER[y.severity] ?? 9),
+);
+const roadmap = report?.roadmap ?? [];
+
+function scoreColor(s: number | null): string {
+  if (s === null || s === undefined) return 'rgba(255,255,255,0.4)';
+  if (s >= 80) return '#6ee7a3';
+  if (s >= 50) return '#f6c547';
+  return '#ff8a8a';
+}
+---
+
+<Dashboard title="SOC 2 Assessment">
+  <style is:global>
+    main { padding-top: 48px !important; padding-bottom: 80px !important; }
+  </style>
+
+  <div style="max-width:780px;margin:0 auto;">
+    <a href="/soc2" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:18px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 19"/></svg>
+      <span>SOC 2 Lab</span>
+    </a>
+
+    {a.status === 'running' && (
+      <div style="text-align:center;padding:60px 0;color:rgba(255,255,255,0.6);">
+        <span style={`display:inline-block;width:20px;height:20px;border:2px solid ${ACCENT}33;border-top-color:${ACCENT};border-radius:50%;animation:spin 0.8s linear infinite;`}></span>
+        <p style="margin-top:14px;font-size:14px;">Assessment running… refresh in a moment.</p>
+      </div>
+    )}
+
+    {a.status === 'failed' && (
+      <div style="text-align:center;padding:50px 20px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:14px;color:#ff8a8a;">
+        <p style="font-size:15px;font-weight:600;margin:0 0 6px;">Assessment failed</p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0;">Your credit was refunded. Try again from the SOC 2 Lab.</p>
+      </div>
+    )}
+
+    {a.status === 'complete' && report && (
+      <>
+        <div style="display:flex;align-items:center;gap:18px;margin-bottom:8px;flex-wrap:wrap;">
+          <div style={`flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:88px;height:88px;border-radius:50%;border:3px solid ${scoreColor(a.overall_score)};`}>
+            <span style={`font-size:28px;font-weight:700;color:${scoreColor(a.overall_score)};line-height:1;`}>{a.overall_score}</span>
+            <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4);margin-top:3px;">Overall</span>
+          </div>
+          <div style="min-width:0;flex:1;">
+            <span style={`display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:${ACCENT};margin-bottom:4px;`}>{a.mode} audit · readiness</span>
+            <h2 style="font-family:'Inter',sans-serif;font-size:26px;font-weight:500;letter-spacing:-0.03em;color:#fff;margin:0 0 6px;word-break:break-word;">{a.target}</h2>
+            <p style="font-size:13.5px;color:rgba(255,255,255,0.6);line-height:1.5;margin:0;">{report.summary}</p>
+          </div>
+        </div>
+
+        {report.stats && (
+          <p style="font-size:11.5px;color:rgba(255,255,255,0.35);margin:10px 0 24px;">
+            {report.stats.filesScanned} file{report.stats.filesScanned === 1 ? '' : 's'} · {report.stats.linesScanned} lines reviewed · {findings.length} finding{findings.length === 1 ? '' : 's'}
+          </p>
+        )}
+
+        {/* TSC scores */}
+        <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 12px;">Trust Service Criteria</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:30px;">
+          {TSC.map(c => (
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="width:140px;flex-shrink:0;font-size:13px;color:rgba(255,255,255,0.75);">{c.label}</span>
+              <div style="flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+                <div style={`height:100%;width:${c.score ?? 0}%;background:${scoreColor(c.score)};border-radius:99px;`}></div>
+              </div>
+              <span style={`width:32px;text-align:right;font-size:13px;font-weight:600;color:${scoreColor(c.score)};`}>{c.score ?? '—'}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Findings */}
+        {findings.length > 0 && (
+          <section style="margin-bottom:30px;">
+            <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 12px;">Findings</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              {findings.map((f: any) => (
+                <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+                    <span style={`font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:3px 8px;border-radius:6px;color:${SEV_COLOR[f.severity] ?? '#fff'};background:${(SEV_COLOR[f.severity] ?? '#fff')}1f;`}>{f.severity}</span>
+                    <span style="font-size:10px;text-transform:capitalize;color:rgba(255,255,255,0.4);letter-spacing:0.04em;">{f.criterion}</span>
+                    <span style="font-size:14px;font-weight:600;color:#fff;">{f.title}</span>
+                  </div>
+                  <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.55;margin:0 0 8px;">{f.detail}</p>
+                  {f.evidence && (
+                    <p style="font-size:11.5px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.4);background:rgba(0,0,0,0.25);border-radius:6px;padding:6px 9px;margin:0 0 8px;word-break:break-all;">{f.evidence}</p>
+                  )}
+                  <p style="font-size:12.5px;color:#a7f3d0;line-height:1.5;margin:0;"><strong style="color:#6ee7a3;">Fix:</strong> {f.fix}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Roadmap */}
+        {roadmap.length > 0 && (
+          <section style="margin-bottom:30px;">
+            <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 12px;">Prioritized roadmap</h3>
+            <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:rm;">
+              {roadmap.map((r: any) => (
+                <li style="display:flex;gap:12px;align-items:flex-start;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:13px 15px;">
+                  <span style={`flex-shrink:0;width:22px;height:22px;border-radius:50%;background:${ACCENT}1f;color:${ACCENT};font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;`}>{r.priority}</span>
+                  <div style="min-width:0;">
+                    <div style="font-size:13.5px;font-weight:600;color:#fff;margin-bottom:2px;">{r.title} <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.4);text-transform:capitalize;">· {r.criterion} · {r.effort} effort</span></div>
+                    <p style="font-size:12.5px;color:rgba(255,255,255,0.55);line-height:1.5;margin:0;">{r.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {/* Scan log — live mode transparency */}
+        {report.scanLog && report.scanLog.length > 0 && (
+          <details style="margin-bottom:24px;">
+            <summary style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);cursor:pointer;margin-bottom:10px;">Scan log ({report.scanLog.length} probes)</summary>
+            <div style="display:flex;flex-direction:column;gap:3px;margin-top:10px;">
+              {report.scanLog.map((e: any) => (
+                <div style="display:flex;align-items:center;gap:10px;font-size:11.5px;font-family:ui-monospace,monospace;padding:5px 9px;background:rgba(255,255,255,0.02);border-radius:6px;">
+                  <span style="flex:1;color:rgba(255,255,255,0.55);word-break:break-all;">{e.target}</span>
+                  <span style={`flex-shrink:0;color:${String(e.status).startsWith('2') || String(e.status).startsWith('3') || String(e.status).startsWith('ok') ? '#6ee7a3' : 'rgba(255,255,255,0.4)'};`}>{e.status}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        <p style="font-size:11px;color:rgba(255,255,255,0.35);line-height:1.5;border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;margin:0;">
+          {report.disclaimer}
+        </p>
+      </>
+    )}
+  </div>
+
+  <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+</Dashboard>
