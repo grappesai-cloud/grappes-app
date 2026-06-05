@@ -48,12 +48,18 @@ function mockPoll(jobId: string): JobStatus {
   return { state: 'complete', url: MOCK_ASSETS[kind] ?? MOCK_ASSETS.image };
 }
 
-// ── Image generation (Higgsfield) ─────────────────────────────────────────────
-// TODO(kickoff): confirm endpoint + payload shape against the sponsor's
-// config.yaml. The seam is stable: prompt + optional reference image in,
-// jobId out, poll until URL.
+// ── Image generation (Higgsfield platform) ────────────────────────────────────
+// Models pinned by the sponsor brief (savoy-content-studio.docx):
+//   mode 'scene'   → GPT Image 2 (no giraffe)
+//   mode 'giraffe' → Nano Banana, identity-locked with girafa.jpg reference
+//   scene video    → Seedance 2.0
+// TODO(kickoff): confirm endpoint + payload field names against config.yaml.
+// The seam is stable: prompt + optional reference image in, jobId out, poll until URL.
 
 const HIGGSFIELD_BASE = e('HIGGSFIELD_API_BASE') || 'https://platform.higgsfield.ai/v1';
+const IMAGE_MODEL_SCENE = 'gpt-image-2';
+const IMAGE_MODEL_GIRAFFE = 'nano-banana';
+const VIDEO_MODEL_SCENE = 'seedance-2.0';
 
 export async function submitImage(opts: {
   scenePrompt: string;
@@ -75,6 +81,7 @@ export async function submitImage(opts: {
       Authorization: `Bearer ${e('HIGGSFIELD_API_KEY')}`,
     },
     body: JSON.stringify({
+      model: opts.withGiraffe ? IMAGE_MODEL_GIRAFFE : IMAGE_MODEL_SCENE,
       prompt,
       aspect_ratio: REEL_FORMAT.aspect,
       ...(opts.withGiraffe && opts.refImageUrl
@@ -184,6 +191,7 @@ export async function submitVideo(opts: {
       Authorization: `Bearer ${e('HIGGSFIELD_API_KEY')}`,
     },
     body: JSON.stringify({
+      model: VIDEO_MODEL_SCENE,
       image_url: opts.imageUrl,
       prompt: `Subtle cinematic camera motion. ${opts.scenePrompt}`,
       aspect_ratio: REEL_FORMAT.aspect,
