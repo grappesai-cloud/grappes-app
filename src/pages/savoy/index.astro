@@ -1,0 +1,299 @@
+---
+// Savoy Hotel Mamaia — public LP (redesign of savoyhotel.ro).
+// Awwwards direction: editorial serif + warm cream base, scroll-scrubbed
+// cream↔night transition into the Domnul Girafă chapter, reveal choreography,
+// marquee, parallax hero. Vanilla JS only (IntersectionObserver + rAF).
+---
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Savoy Hotel Mamaia · All Inclusive Ultra Boost pe malul mării</title>
+  <meta name="description" content="143 de camere chiar pe plajă, All Inclusive Ultra Boost, piscină cu apus și Domnul Girafă. Vacanța fără griji, în inima stațiunii Mamaia." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- Nav -->
+  <nav class="sv-nav" id="nav">
+    <a href="#sus" class="sv-logo">SAVOY<span>·</span>MAMAIA</a>
+    <div class="sv-nav-links">
+      <a href="#camere">Camere</a>
+      <a href="#inclusive">All Inclusive</a>
+      <a href="#girafa">Domnul Girafă</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <a class="sv-btn sv-btn-nav" href="https://booking.savoyhotel.ro/V8Client/Inquiry.aspx" target="_blank" rel="noopener">Rezervă</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="sv-hero" id="sus">
+    <p class="sv-eyebrow reveal">Hotel pe plajă · Mamaia · All Inclusive</p>
+    <h1 class="sv-h1">
+      <span class="sv-h1-line"><em>Vara ta,</em></span>
+      <span class="sv-h1-line">chiar pe malul mării.</span>
+    </h1>
+    <p class="sv-hero-sub reveal" data-delay="2">All Inclusive Ultra Boost, plajă cu ieșire directă și o piscină care prinde apusul în fiecare seară. Restul îl rezolvăm noi.</p>
+    <div class="sv-hero-cta reveal" data-delay="3">
+      <a class="sv-btn sv-btn-primary" href="https://booking.savoyhotel.ro/V8Client/Inquiry.aspx" target="_blank" rel="noopener">Rezervă sejurul</a>
+      <a class="sv-btn sv-btn-ghost" href="#girafa">Fă cunoștință cu Girafa ↓</a>
+    </div>
+    <img class="sv-hero-giraffe" id="hero-giraffe" src="/studio/poses/wave.png" alt="Domnul Girafă salută" />
+    <div class="sv-hero-orb" aria-hidden="true"></div>
+  </header>
+
+  <!-- Marquee -->
+  <div class="sv-marquee" aria-hidden="true">
+    <div class="sv-marquee-track">
+      <span>ALL INCLUSIVE ULTRA BOOST · PLAJĂ PRIVATĂ · PISCINĂ CU APUS · ANIMAȚIE PENTRU COPII · </span>
+      <span>ALL INCLUSIVE ULTRA BOOST · PLAJĂ PRIVATĂ · PISCINĂ CU APUS · ANIMAȚIE PENTRU COPII · </span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <section class="sv-stats">
+    <div class="sv-stat reveal"><strong data-count="143">0</strong><span>camere și apartamente</span></div>
+    <div class="sv-stat reveal" data-delay="1"><strong data-count="80">0</strong><span>% dintre oaspeți revin</span></div>
+    <div class="sv-stat reveal" data-delay="2"><strong data-count="0">0</strong><span>metri până la plajă</span></div>
+    <div class="sv-stat reveal" data-delay="3"><strong data-count="3">0</strong><span>tipuri de camere, toate cu vară inclusă</span></div>
+  </section>
+
+  <!-- Despre -->
+  <section class="sv-about">
+    <p class="sv-kicker reveal">Despre Savoy</p>
+    <h2 class="sv-h2 reveal" data-delay="1">Un singur lucru de făcut aici: <em>nimic.</em></h2>
+    <p class="sv-lead reveal" data-delay="2">Ești la 0 metri de plajă, cu micul dejun lung, prânzul lent și cina cu picioarele în nisip. Copiii au animatori, tu ai un șezlong cu numele tău pe el. La Savoy, vacanța înseamnă că nimeni nu te întreabă nimic.</p>
+  </section>
+
+  <!-- Camere -->
+  <section class="sv-rooms" id="camere">
+    <p class="sv-kicker reveal">Camere</p>
+    <h2 class="sv-h2 reveal" data-delay="1">Dormi cu fereastra <em>spre mare.</em></h2>
+    <div class="sv-room-grid">
+      <article class="sv-room reveal"><span class="sv-room-no">01</span><h3>Cameră Dublă</h3><p>Pentru doi. Balcon, briză, și liniștea aia pe care o căutai.</p></article>
+      <article class="sv-room reveal" data-delay="1"><span class="sv-room-no">02</span><h3>Dublă Family</h3><p>Spațiu pentru toată echipa, cu copii cu tot. Plaja e curtea voastră.</p></article>
+      <article class="sv-room reveal" data-delay="2"><span class="sv-room-no">03</span><h3>Apartament</h3><p>Living, dormitor și cel mai bun apus din Mamaia, inclus în preț.</p></article>
+    </div>
+  </section>
+
+  <!-- All Inclusive -->
+  <section class="sv-inclusive" id="inclusive">
+    <p class="sv-kicker reveal">All Inclusive Ultra Boost</p>
+    <h2 class="sv-h2 reveal" data-delay="1">Totul înseamnă <em>chiar totul.</em></h2>
+    <ul class="sv-list">
+      <li class="reveal">Mic dejun, prânz și cină, bufet fără grabă</li>
+      <li class="reveal" data-delay="1">Baruri cu băuturi incluse, de dimineața până seara</li>
+      <li class="reveal" data-delay="2">Plajă privată cu șezlonguri și umbrele</li>
+      <li class="reveal" data-delay="3">Piscină exterioară cu vedere la apus</li>
+      <li class="reveal" data-delay="4">Animație și activități pentru copii, zilnic</li>
+      <li class="reveal" data-delay="5">Programe de divertisment pentru toată familia</li>
+    </ul>
+  </section>
+
+  <!-- Girafa chapter (dark) -->
+  <section class="sv-giraffe" id="girafa">
+    <p class="sv-kicker reveal">Mascota oficială</p>
+    <h2 class="sv-h2 sv-h2-light reveal" data-delay="1">El e <em>Domnul Girafă.</em></h2>
+    <p class="sv-lead sv-lead-light reveal" data-delay="2">Gazda neoficială, vedeta oficială. Apare pe Instagram și TikTok, salută copiii la piscină și are mereu papionul la locul lui. Dacă îl vezi cu o înghețată, e a lui. Nu întreba.</p>
+    <div class="sv-pose-strip">
+      <img class="reveal" src="/studio/poses/wave.png" alt="Girafa salută" />
+      <img class="reveal" data-delay="1" src="/studio/poses/icecream.png" alt="Girafa cu înghețată" />
+      <img class="reveal" data-delay="2" src="/studio/poses/selfie.png" alt="Girafa face selfie" />
+      <img class="reveal" data-delay="3" src="/studio/poses/dance.png" alt="Girafa dansează" />
+      <img class="reveal" data-delay="4" src="/studio/poses/sit.png" alt="Girafa stă turcește" />
+    </div>
+    <blockquote class="sv-quote reveal" data-delay="2">„Venim în fiecare an. Copiii întreabă de Girafă din mașină, de la Fetești."<cite>Familie din București, a 6-a vară la Savoy</cite></blockquote>
+  </section>
+
+  <!-- Contact / CTA -->
+  <section class="sv-contact" id="contact">
+    <h2 class="sv-h2 reveal">Marea e <em>aici.</em> Tu?</h2>
+    <div class="sv-contact-row reveal" data-delay="1">
+      <a class="sv-btn sv-btn-primary sv-btn-big" href="https://booking.savoyhotel.ro/V8Client/Inquiry.aspx" target="_blank" rel="noopener">Rezervă acum</a>
+    </div>
+    <div class="sv-contact-meta reveal" data-delay="2">
+      <a href="tel:0241606900">0241 606 900</a>
+      <span>·</span>
+      <a href="mailto:rezervari@savoyhotel.ro">rezervari@savoyhotel.ro</a>
+      <span>·</span>
+      <span>Stațiunea Mamaia, Constanța</span>
+    </div>
+  </section>
+
+  <footer class="sv-footer">
+    <span>© 2026 Hotel Savoy Mamaia</span>
+    <a href="/savoy/admin">Admin</a>
+  </footer>
+
+  <style>
+    :root {
+      --cream: #FAF4E8;
+      --night: #0D1B2A;
+      --ink: #1A1A14;
+      --gold: #FFB300;
+      --orange: #E85D04;
+      --serif: 'Fraunces', serif;
+      --sans: 'Inter', sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans); color: var(--ink);
+      background: var(--cream);
+      transition: background-color 0.6s ease, color 0.6s ease;
+      overflow-x: hidden;
+    }
+    body.night { background: var(--night); color: var(--cream); }
+
+    /* Nav */
+    .sv-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 18px clamp(20px, 5vw, 56px); mix-blend-mode: difference; color: #fff; }
+    .sv-logo { font-family: var(--mono); font-size: 14px; font-weight: 500; letter-spacing: 0.22em; color: #fff; text-decoration: none; }
+    .sv-logo span { color: var(--gold); margin: 0 2px; }
+    .sv-nav-links { display: flex; gap: 26px; }
+    .sv-nav-links a { font-size: 13px; font-weight: 500; letter-spacing: 0.04em; color: #fff; text-decoration: none; opacity: 0.75; transition: opacity 0.2s; }
+    .sv-nav-links a:hover { opacity: 1; }
+    .sv-btn-nav { mix-blend-mode: normal; }
+    @media (max-width: 760px) { .sv-nav-links { display: none; } }
+
+    /* Buttons */
+    .sv-btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; padding: 13px 24px; border-radius: 999px; text-decoration: none; transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s, color 0.2s; }
+    .sv-btn:hover { transform: translateY(-2px); }
+    .sv-btn-primary { background: var(--ink); color: var(--cream); }
+    body.night .sv-btn-primary { background: var(--gold); color: var(--night); }
+    .sv-btn-ghost { color: inherit; border: 1px solid currentColor; opacity: 0.8; }
+    .sv-btn-nav { background: var(--gold); color: var(--night); font-size: 13px; padding: 10px 20px; }
+    .sv-btn-big { font-size: 17px; padding: 18px 38px; }
+
+    /* Hero */
+    .sv-hero { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 120px clamp(20px, 6vw, 72px) 80px; position: relative; }
+    .sv-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; opacity: 0.55; margin-bottom: 26px; }
+    .sv-h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(46px, 9.5vw, 132px); line-height: 0.98; letter-spacing: -0.02em; max-width: 11ch; }
+    .sv-h1 em { font-style: italic; font-weight: 400; color: var(--orange); }
+    .sv-h1-line { display: block; overflow: hidden; }
+    .sv-h1-line > * , .sv-h1-line { animation: sv-rise 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .sv-h1-line:nth-child(2) { animation-delay: 0.12s; }
+    @keyframes sv-rise { from { transform: translateY(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+    .sv-hero-sub { font-size: clamp(15px, 1.6vw, 19px); line-height: 1.6; max-width: 46ch; margin-top: 30px; opacity: 0.78; }
+    .sv-hero-cta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 38px; }
+    .sv-hero-giraffe { position: absolute; right: clamp(-30px, 4vw, 90px); bottom: 0; height: min(72vh, 640px); pointer-events: none; will-change: transform; filter: drop-shadow(0 30px 50px rgba(26,26,20,0.18)); }
+    @media (max-width: 900px) { .sv-hero-giraffe { opacity: 0.32; height: 56vh; right: -60px; } }
+    .sv-hero-orb { position: absolute; top: 12%; right: 8%; width: 38vmin; height: 38vmin; border-radius: 50%; background: radial-gradient(circle at 32% 32%, #FFD57A, var(--gold) 55%, var(--orange)); opacity: 0.5; filter: blur(2px); z-index: -1; animation: sv-float 9s ease-in-out infinite; }
+    @keyframes sv-float { 50% { transform: translateY(-26px); } }
+
+    /* Marquee */
+    .sv-marquee { overflow: hidden; border-top: 1px solid rgba(26,26,20,0.14); border-bottom: 1px solid rgba(26,26,20,0.14); padding: 16px 0; }
+    body.night .sv-marquee { border-color: rgba(250,244,232,0.16); }
+    .sv-marquee-track { display: flex; width: max-content; animation: sv-marquee 28s linear infinite; }
+    .sv-marquee-track span { font-family: var(--mono); font-size: 13px; letter-spacing: 0.24em; white-space: nowrap; opacity: 0.6; }
+    @keyframes sv-marquee { to { transform: translateX(-50%); } }
+
+    /* Stats */
+    .sv-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; padding: clamp(60px, 9vw, 110px) clamp(20px, 6vw, 72px); }
+    @media (max-width: 760px) { .sv-stats { grid-template-columns: repeat(2, 1fr); } }
+    .sv-stat strong { display: block; font-family: var(--serif); font-weight: 300; font-size: clamp(40px, 6vw, 76px); line-height: 1; }
+    .sv-stat span { display: block; font-size: 13px; opacity: 0.6; margin-top: 8px; max-width: 18ch; }
+
+    /* Sections shared */
+    section { padding: clamp(70px, 11vw, 150px) clamp(20px, 6vw, 72px); }
+    .sv-kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--orange); margin-bottom: 20px; }
+    body.night .sv-kicker { color: var(--gold); }
+    .sv-h2 { font-family: var(--serif); font-weight: 300; font-size: clamp(34px, 5.6vw, 76px); line-height: 1.04; letter-spacing: -0.015em; max-width: 17ch; }
+    .sv-h2 em { font-style: italic; color: var(--orange); }
+    .sv-h2-light em { color: var(--gold); }
+    .sv-lead { font-size: clamp(15px, 1.7vw, 19px); line-height: 1.65; max-width: 56ch; margin-top: 26px; opacity: 0.8; }
+
+    /* Rooms */
+    .sv-room-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
+    @media (max-width: 860px) { .sv-room-grid { grid-template-columns: 1fr; } }
+    .sv-room { border: 1px solid rgba(26,26,20,0.16); border-radius: 22px; padding: 30px 26px 34px; transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s; background: rgba(255,255,255,0.4); }
+    .sv-room:hover { transform: translateY(-8px); background: #fff; }
+    .sv-room-no { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; opacity: 0.45; }
+    .sv-room h3 { font-family: var(--serif); font-weight: 400; font-size: 27px; margin: 18px 0 10px; }
+    .sv-room p { font-size: 14px; line-height: 1.6; opacity: 0.7; }
+
+    /* Inclusive */
+    .sv-list { list-style: none; margin-top: 50px; }
+    .sv-list li { font-family: var(--serif); font-weight: 300; font-size: clamp(20px, 3vw, 34px); padding: 22px 0; border-bottom: 1px solid rgba(26,26,20,0.14); transition: padding-left 0.3s; }
+    .sv-list li:hover { padding-left: 16px; }
+    body.night .sv-list li { border-color: rgba(250,244,232,0.16); }
+
+    /* Giraffe chapter */
+    .sv-giraffe { text-align: center; }
+    .sv-lead-light { margin-left: auto; margin-right: auto; }
+    .sv-pose-strip { display: flex; justify-content: center; align-items: flex-end; gap: clamp(8px, 2vw, 26px); margin-top: 64px; flex-wrap: wrap; }
+    .sv-pose-strip img { height: clamp(150px, 24vw, 300px); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .sv-pose-strip img:hover { transform: translateY(-14px) rotate(-2deg); }
+    .sv-quote { font-family: var(--serif); font-style: italic; font-weight: 300; font-size: clamp(20px, 2.6vw, 30px); max-width: 34ch; margin: 80px auto 0; line-height: 1.4; }
+    .sv-quote cite { display: block; font-family: var(--mono); font-style: normal; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.5; margin-top: 18px; }
+
+    /* Contact */
+    .sv-contact { text-align: center; padding-bottom: clamp(50px, 7vw, 90px); }
+    .sv-contact-row { margin-top: 40px; }
+    .sv-contact-meta { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 30px; font-size: 14px; opacity: 0.75; }
+    .sv-contact-meta a { color: inherit; }
+
+    .sv-footer { display: flex; justify-content: space-between; padding: 26px clamp(20px, 6vw, 72px); font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; opacity: 0.55; }
+    .sv-footer a { color: inherit; }
+
+    /* Reveal system */
+    .reveal { opacity: 0; transform: translateY(34px); transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+    .reveal[data-delay="1"] { transition-delay: 0.08s; } .reveal[data-delay="2"] { transition-delay: 0.16s; }
+    .reveal[data-delay="3"] { transition-delay: 0.24s; } .reveal[data-delay="4"] { transition-delay: 0.32s; }
+    .reveal[data-delay="5"] { transition-delay: 0.4s; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { transition: none; opacity: 1; transform: none; }
+      .sv-marquee-track, .sv-hero-orb, .sv-h1-line { animation: none; }
+    }
+  </style>
+
+  <script>
+    // Reveal on scroll
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.18 });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // Animated counters
+    const cio = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        cio.unobserve(e.target);
+        const el = e.target as HTMLElement;
+        const target = Number(el.dataset.count ?? 0);
+        const t0 = performance.now();
+        const tick = (t: number) => {
+          const p = Math.min((t - t0) / 1400, 1);
+          el.textContent = String(Math.round(target * (1 - Math.pow(1 - p, 3))));
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }, { threshold: 0.6 });
+    document.querySelectorAll('[data-count]').forEach(el => cio.observe(el));
+
+    // Hero parallax
+    const giraffe = document.getElementById('hero-giraffe');
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        if (giraffe) giraffe.style.transform = `translateY(${y * 0.16}px)`;
+        // Scroll-scrubbed cream↔night: flip body theme inside the giraffe chapter
+        const g = document.getElementById('girafa')!;
+        const r = g.getBoundingClientRect();
+        const inNight = r.top < window.innerHeight * 0.55 && r.bottom > window.innerHeight * 0.4;
+        document.body.classList.toggle('night', inNight);
+        ticking = false;
+      });
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  </script>
+</body>
+</html>
