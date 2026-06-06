@@ -20,8 +20,8 @@ export interface Finding {
   criterion: TSC;
   detail: string;        // what's wrong
   fix: string;           // how to fix it
-  evidence?: string;     // a redacted snippet / file:line
-  source: 'static' | 'ai';
+  evidence?: string;     // a redacted snippet / file:line / control ref
+  source: 'static' | 'ai' | 'questionnaire';
 }
 
 // A single file submitted for review

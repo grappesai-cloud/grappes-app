@@ -1,0 +1,176 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { db } from '../../lib/db';
+import { CONTROL_CATEGORIES } from '../../lib/soc2/controls-catalog';
+
+const authUser = Astro.locals.user!;
+const dbUser = await db.users.findById(authUser.id);
+const soc2Credits = dbUser?.soc2_credits ?? 0;
+
+const ACCENT = '#34d399';
+const totalControls = CONTROL_CATEGORIES.reduce((n, c) => n + c.controls.length, 0);
+
+const ANSWERS = [
+  { value: 'yes', label: 'Yes', color: '#6ee7a3' },
+  { value: 'partial', label: 'Partly', color: '#f6c547' },
+  { value: 'no', label: 'No', color: '#ff8a8a' },
+  { value: 'na', label: 'N/A', color: '#9ca3af' },
+];
+---
+
+<Dashboard title="SOC 2 Controls Self-Assessment">
+  <style is:global>
+    main { padding-top: 48px !important; padding-bottom: 120px !important; }
+  </style>
+
+  <div style="max-width:820px;margin:0 auto;">
+    <a href="/soc2" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:18px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 19"/></svg>
+      <span>SOC 2 Lab</span>
+    </a>
+
+    <span style={`display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:${ACCENT};margin-bottom:8px;`}>Controls self-assessment</span>
+    <h1 style="font-family:'Inter',sans-serif;font-size:32px;font-weight:500;letter-spacing:-0.035em;color:#fff;margin:0 0 8px;">The {totalControls} controls an auditor will ask about</h1>
+    <p style="font-size:13.5px;color:rgba(255,255,255,0.55);line-height:1.55;margin:0 0 6px;max-width:640px;">
+      Code scanning and live recon only see your technical surface. SOC 2 is mostly about process: who owns security, how access is reviewed, how changes ship, how you handle incidents and data. Answer honestly. We score it against the Trust Service Criteria and hand you a prioritized gap list.
+    </p>
+    <p style="font-size:12px;color:rgba(255,255,255,0.4);margin:0 0 26px;">Costs 1 credit · {soc2Credits} remaining · unanswered controls count as N/A</p>
+
+    {/* Progress */}
+    <div style="position:sticky;top:0;z-index:5;background:rgba(16,21,18,0.92);backdrop-filter:blur(8px);padding:12px 0;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.07);">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="flex:1;height:6px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden;">
+          <div id="prog-bar" style={`height:100%;width:0%;background:${ACCENT};border-radius:99px;transition:width 0.25s;`}></div>
+        </div>
+        <span id="prog-text" style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);white-space:nowrap;">0 / {totalControls}</span>
+      </div>
+    </div>
+
+    <form id="controls-form">
+      {CONTROL_CATEGORIES.map(cat => (
+        <section style="margin-top:26px;">
+          <div style="margin-bottom:12px;">
+            <h2 style="font-size:15px;font-weight:600;color:#fff;margin:0 0 3px;">{cat.label}</h2>
+            <p style="font-size:12px;color:rgba(255,255,255,0.4);margin:0;">{cat.blurb}</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            {cat.controls.map(ctl => (
+              <div class="ctl-row" data-id={ctl.id} style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 16px;">
+                <div style="display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;">
+                  <div style="min-width:0;flex:1;">
+                    <p style="font-size:13.5px;font-weight:500;color:#fff;line-height:1.45;margin:0 0 4px;">
+                      <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);font-family:ui-monospace,monospace;margin-right:7px;">{ctl.ref}</span>
+                      {ctl.question}
+                    </p>
+                    <p style="font-size:11.5px;color:rgba(255,255,255,0.4);line-height:1.45;margin:0;">{ctl.why}</p>
+                  </div>
+                  <div class="ctl-opts" style="display:flex;gap:5px;flex-shrink:0;">
+                    {ANSWERS.map(a => (
+                      <button type="button" class="ctl-opt" data-id={ctl.id} data-val={a.value} data-color={a.color}
+                        style="height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.12s;">
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </form>
+
+    <p id="cf-error" style="display:none;margin:18px 0 0;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:10px;padding:11px 14px;color:#ff8a8a;font-size:12.5px;"></p>
+
+    {/* Sticky submit bar */}
+    <div style="position:fixed;left:0;right:0;bottom:0;z-index:20;background:linear-gradient(to top,rgba(10,12,11,0.98),rgba(10,12,11,0.92) 70%,transparent);padding:16px 20px;">
+      <div style="max-width:820px;margin:0 auto;display:flex;align-items:center;gap:14px;">
+        <span id="bottom-progress" style="font-size:12.5px;color:rgba(255,255,255,0.5);white-space:nowrap;">Answer at least one control</span>
+        <button type="button" id="cf-submit" disabled
+          style={`margin-left:auto;height:46px;padding:0 26px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;opacity:0.5;display:flex;align-items:center;justify-content:center;gap:9px;`}>
+          <span id="cf-submit-label">Score my readiness · 1 credit</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .ctl-spin { display:inline-block;width:15px;height:15px;border:2px solid rgba(0,0,0,0.25);border-top-color:#0a0a0a;border-radius:50%;animation:ctlspin 0.8s linear infinite; }
+    @keyframes ctlspin { to { transform: rotate(360deg); } }
+    @media (max-width:560px){ .ctl-opts{ width:100%; } .ctl-opt{ flex:1; } }
+  </style>
+
+  <script is:inline define:vars={{ total: totalControls, hasCredits: soc2Credits > 0 }}>
+    const answers = {};
+    const submitBtn = document.getElementById('cf-submit');
+    const submitLabel = document.getElementById('cf-submit-label');
+    const errEl = document.getElementById('cf-error');
+    const progBar = document.getElementById('prog-bar');
+    const progText = document.getElementById('prog-text');
+    const bottomProg = document.getElementById('bottom-progress');
+
+    function answeredNonNa() {
+      return Object.values(answers).filter(v => v !== 'na').length;
+    }
+    function refresh() {
+      const touched = Object.keys(answers).length;
+      progBar.style.width = (touched / total * 100) + '%';
+      progText.textContent = touched + ' / ' + total;
+      const ready = hasCredits && answeredNonNa() > 0;
+      submitBtn.disabled = !ready;
+      submitBtn.style.opacity = ready ? '1' : '0.5';
+      submitBtn.style.cursor = ready ? 'pointer' : 'not-allowed';
+      if (!hasCredits) bottomProg.textContent = 'No credits — contact your administrator';
+      else if (touched === 0) bottomProg.textContent = 'Answer at least one control';
+      else bottomProg.textContent = touched + ' of ' + total + ' answered';
+    }
+
+    document.querySelectorAll('.ctl-opt').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const id = this.dataset.id;
+        const val = this.dataset.val;
+        answers[id] = val;
+        // Re-style the option group for this control.
+        document.querySelectorAll('.ctl-opt[data-id="' + id + '"]').forEach((sib) => {
+          const on = sib.dataset.val === val;
+          const color = sib.dataset.color;
+          sib.style.border = on ? ('1px solid ' + color) : '1px solid rgba(255,255,255,0.12)';
+          sib.style.background = on ? (color + '22') : 'transparent';
+          sib.style.color = on ? color : 'rgba(255,255,255,0.6)';
+        });
+        refresh();
+      });
+    });
+
+    submitBtn?.addEventListener('click', async function () {
+      if (submitBtn.disabled) return;
+      errEl.style.display = 'none';
+      submitBtn.disabled = true;
+      submitLabel.innerHTML = '<span class="ctl-spin"></span> Scoring…';
+      try {
+        const r = await fetch('/api/soc2/run-controls', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ answers }),
+        });
+        const data = await r.json();
+        if (r.status === 402) { window.location.href = '/soc2'; return; }
+        if (!r.ok) {
+          errEl.textContent = data.error || 'Assessment failed.';
+          errEl.style.display = 'block';
+          submitBtn.disabled = false;
+          submitLabel.textContent = 'Score my readiness · 1 credit';
+          return;
+        }
+        window.location.href = '/soc2/' + data.id;
+      } catch {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitLabel.textContent = 'Score my readiness · 1 credit';
+      }
+    });
+
+    refresh();
+  </script>
+</Dashboard>

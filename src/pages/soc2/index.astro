@@ -135,6 +135,28 @@ function timeAgo(dateStr: string): string {
     </div>
   </div>
 
+  {/* Mode 3 — Controls self-assessment (the process/governance layer) */}
+  <div style="max-width:760px;margin:0 auto 30px;">
+    <div style={`background:linear-gradient(135deg, ${ACCENT}12, rgba(255,255,255,0.02));border:1px solid ${ACCENT}2e;border-radius:16px;padding:22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;`}>
+      <div style={`flex-shrink:0;width:44px;height:44px;border-radius:11px;background:${ACCENT}24;display:flex;align-items:center;justify-content:center;`}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ACCENT} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div style="min-width:0;flex:1;">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:5px;flex-wrap:wrap;">
+          <h3 style="font-size:17px;font-weight:600;color:#fff;margin:0;">Controls self-assessment</h3>
+          <span style={`font-size:9.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ACCENT};background:${ACCENT}1f;border-radius:6px;padding:3px 7px;`}>Start here</span>
+        </div>
+        <p style="font-size:13px;line-height:1.5;color:rgba(255,255,255,0.6);margin:0;max-width:520px;">
+          Code and recon only see your technical surface. SOC 2 is mostly process: governance, access reviews, change management, vendor risk, incident response, backups, privacy. Answer the questions an auditor will ask and get a scored gap list. <strong style="color:rgba(255,255,255,0.78);">1 credit.</strong>
+        </p>
+      </div>
+      <a href={soc2Credits > 0 ? '/soc2/controls' : undefined} id="controls-cta" class="mode-cta"
+         style={`flex-shrink:0;height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;border-radius:10px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;`}>
+        {soc2Credits > 0 ? 'Begin assessment' : 'No credits'}
+      </a>
+    </div>
+  </div>
+
   {/* Out of credits — white-label: credits are provisioned by your administrator */}
   {soc2Credits <= 0 && (
     <div id="soc2-no-credits" style="max-width:760px;margin:0 auto 30px;">
@@ -316,6 +338,12 @@ function timeAgo(dateStr: string): string {
         return;
       }
       modal.style.display = 'flex';
+    });
+    document.getElementById('controls-cta')?.addEventListener('click', function (e) {
+      if (!hasCredits) {
+        e.preventDefault();
+        document.getElementById('soc2-no-credits')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     });
     document.getElementById('close-code-audit')?.addEventListener('click', () => { modal.style.display = 'none'; });
     modal?.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
