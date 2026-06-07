@@ -1,0 +1,43 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { loadBrandBook } from '../../lib/brandbook-db';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in');
+
+const book = await loadBrandBook(Astro.params.id as string, authUser.id);
+if (!book) return Astro.redirect('/brandbook');
+---
+<Dashboard title={`${book.name} — Brand book`}>
+  <style is:global>
+    main { padding-top: 36px !important; padding-bottom: 80px !important; max-width: 1200px !important; }
+  </style>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap;">
+    <a href="/brandbook" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Brand Book Lab</span>
+    </a>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a href="/brandbook/new" style="height:40px;display:inline-flex;align-items:center;padding:0 18px;background:transparent;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.16);border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.03em;">New book</a>
+      <a href={`/api/brandbook/${book.id}/pdf`} style="height:40px;display:inline-flex;align-items:center;gap:8px;padding:0 20px;background:#f97316;color:#0a0a0a;border-radius:999px;font-size:12.5px;font-weight:700;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download PDF</span>
+      </a>
+    </div>
+  </div>
+
+  <div>
+    <h1 style="font-family:'Inter',sans-serif;font-size:34px;font-weight:400;letter-spacing:-0.035em;color:#fff;margin:0 0 4px;">{book.name}</h1>
+    <p style="font-size:13px;color:rgba(255,255,255,0.5);margin:0 0 22px;">{book.tagline}</p>
+  </div>
+
+  <div style="border:1px solid rgba(255,255,255,0.1);border-radius:16px;overflow:hidden;background:#1a1a1a;">
+    <iframe
+      src={`/api/brandbook/${book.id}/html`}
+      title={`${book.name} brand guidelines`}
+      style="display:block;width:100%;height:78vh;border:0;background:#1a1a1a;"
+    ></iframe>
+  </div>
+  <p style="font-size:11.5px;color:rgba(255,255,255,0.35);margin-top:10px;">Scroll inside the preview to flip through the pages. The PDF export matches it 1:1.</p>
+</Dashboard>

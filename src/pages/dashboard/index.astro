@@ -34,9 +34,16 @@ const reelCredits = dbUser?.reel_credits ?? 0;
 const auditCredits = dbUser?.audit_credits ?? 0;
 const soc2Credits = dbUser?.soc2_credits ?? 0;
 
-// Press Kit Lab — shelved. Counts kept at 0 so the tile reads as Soon.
-let kitCount = 0;
-let publishedKits = 0;
+// Brand Book Lab — count for the tile meter.
+let bookCount = 0;
+try {
+  const { count } = await createAdminClient()
+    .from('press_kits')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', authUser.id)
+    .eq('mode', 'brand_book');
+  bookCount = count ?? 0;
+} catch { /* table/columns not migrated yet — tile still renders */ }
 
 const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
 
@@ -161,12 +168,14 @@ try {
           isNew={true}
         />
         <ProductTile
-          name="Press Kit Lab"
-          tagline="Press kits & brand books, AI-built. Editorial documents for journalists or visual guidelines for your team."
-          href="#"
+          name="Brand Book Lab"
+          tagline="Brand books, AI-built. Visual identity guidelines and editorial documents for your team."
+          href="/brandbook"
           icon={kitIcon}
+          meter={bookCount === 0 ? 'No brand books yet' : `${bookCount} brand book${bookCount === 1 ? '' : 's'}`}
+          cta={bookCount > 0 ? 'Open Brand Book Lab' : 'New brand book'}
           accent="#f97316"
-          comingSoon={true}
+          isNew={true}
         />
         <ProductTile
           name="Logo Lab"

@@ -1,0 +1,129 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+import { createAdminClient } from '../../lib/supabase';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in');
+
+const client = createAdminClient();
+const { data: booksRaw } = await client
+  .from('press_kits')
+  .select('id, name, tagline, logo_url, typeface, created_at')
+  .eq('user_id', authUser.id)
+  .eq('mode', 'brand_book')
+  .order('created_at', { ascending: false });
+
+const books = (booksRaw ?? []) as Array<{
+  id: string; name: string; tagline: string | null; logo_url: string | null; typeface: string | null; created_at: string;
+}>;
+
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), day = Math.floor(diff / 86400000);
+  if (m < 1) return 'just now';
+  if (h < 1) return `${m}m ago`;
+  if (day < 1) return `${h}h ago`;
+  return `${day}d ago`;
+}
+---
+<Dashboard title="Brand Book Lab">
+  <style is:global>
+    main { padding-top: 56px !important; padding-bottom: 80px !important; }
+  </style>
+
+  <div style="max-width:1080px;margin:0 auto;">
+    <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.45);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:18px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Studio</span>
+    </a>
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:32px;">
+      <div>
+        <span style="display:inline-block;font-size:13px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#f97316;margin-bottom:10px;">Brand Book Lab</span>
+        <h1 style="font-family:'Inter',sans-serif;font-size:44px;font-weight:400;line-height:1.05;letter-spacing:-0.045em;color:#fff;margin:0 0 10px;">Your brand books</h1>
+        <p style="font-size:14px;color:rgba(255,255,255,0.55);max-width:540px;line-height:1.5;margin:0;">
+          Complete brand guidelines, AI-built. Answer a few questions, upload your logo, get a 20-page editorial brand book as PDF.
+        </p>
+      </div>
+      {books.length > 0 ? (
+        <a href="/brandbook/new" style="display:inline-flex;align-items:center;gap:8px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;padding:13px 26px;font-size:13.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
+          <span>New brand book</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      ) : null}
+    </div>
+
+    <section>
+      {books.length === 0 ? (
+        <div style="background:linear-gradient(180deg,rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%),rgba(18,18,22,0.92);backdrop-filter:blur(24px) saturate(1.3);border:1px solid rgba(255,255,255,0.09);border-radius:20px;padding:64px 32px;text-align:center;">
+          <div style="width:64px;height:64px;border-radius:16px;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.3);display:inline-flex;align-items:center;justify-content:center;margin-bottom:20px;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+          <h2 style="font-family:'Inter',sans-serif;font-size:24px;font-weight:400;letter-spacing:-0.025em;color:#fff;margin:0 0 8px;">No brand books yet</h2>
+          <p style="font-size:13.5px;color:rgba(255,255,255,0.55);margin:0 0 26px;line-height:1.5;">Answer a few questions, upload your logo, and we'll write your full brand guidelines.</p>
+          <a href="/brandbook/new" style="display:inline-flex;align-items:center;gap:8px;background:#f97316;color:#0a0a0a;border:none;border-radius:999px;padding:13px 26px;font-size:13.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;text-decoration:none;">
+            <span>Create your brand book</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>
+      ) : (
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+          {books.map((b) => (
+            <div data-book-id={b.id} style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+              <a href={`/brandbook/${b.id}`} style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0a0a0a;aspect-ratio:4/3;padding:28px;text-decoration:none;">
+                {b.logo_url ? (
+                  <img src={b.logo_url} alt={b.name} style="height:42px;width:auto;max-width:70%;object-fit:contain;filter:brightness(0) invert(1);" />
+                ) : null}
+                <div style="text-align:center;">
+                  <div style="font-size:17px;font-weight:600;letter-spacing:0.03em;text-transform:uppercase;color:#fff;">{b.name}</div>
+                  <div style="font-size:11px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:4px;">Brand guidelines</div>
+                </div>
+              </a>
+              <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+                <div>
+                  <h3 style="font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:700;letter-spacing:-0.02em;color:#fff;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{b.name}</h3>
+                  <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:2px 0 0;">{timeAgo(b.created_at)}</p>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <a href={`/brandbook/${b.id}`} class="bb-btn" style="flex:1;min-width:0;height:32px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;font-size:11.5px;font-weight:600;text-decoration:none;letter-spacing:0.04em;">View</a>
+                  <a href={`/api/brandbook/${b.id}/pdf`} class="bb-btn" style="flex:1;min-width:0;height:32px;display:inline-flex;align-items:center;justify-content:center;background:rgba(249,115,22,0.14);border:1px solid rgba(249,115,22,0.4);border-radius:8px;color:#fdba74;font-size:11.5px;font-weight:600;text-decoration:none;letter-spacing:0.04em;">PDF</a>
+                  <button type="button" data-delete={b.id} class="bb-del" style="width:32px;height:32px;border:1px solid rgba(255,255,255,0.1);background:transparent;border-radius:8px;color:rgba(255,255,255,0.5);cursor:pointer;font-family:inherit;font-size:14px;">×</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </div>
+
+  <style>
+    .bb-btn:hover { background: rgba(255,255,255,0.12) !important; color: #fff !important; }
+    .bb-del:hover { background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.4); color: #ff8a8a; }
+  </style>
+
+  <script is:inline>
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-delete]');
+      if (!btn) return;
+      e.preventDefault();
+      const id = btn.dataset.delete;
+      if (!confirm('Delete this brand book? This cannot be undone.')) return;
+      btn.disabled = true;
+      try {
+        const r = await fetch(`/api/brandbook/${id}`, { method: 'DELETE' });
+        if (!r.ok) {
+          alert('Could not delete.');
+          btn.disabled = false;
+          return;
+        }
+        const card = document.querySelector(`[data-book-id="${id}"]`);
+        if (card) card.remove();
+        if (!document.querySelector('[data-book-id]')) window.location.reload();
+      } catch {
+        alert('Network error.');
+        btn.disabled = false;
+      }
+    });
+  </script>
+</Dashboard>

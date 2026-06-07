@@ -1,0 +1,34 @@
+---
+import Dashboard from '../../layouts/Dashboard.astro';
+
+const authUser = Astro.locals.user;
+if (!authUser) return Astro.redirect('/sign-in');
+---
+<Dashboard title="New brand book">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <!-- Typeface step previews -->
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&family=Space+Grotesk:wght@400;600&family=Manrope:wght@400;600&family=Work+Sans:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=DM+Sans:wght@400;600&family=Sora:wght@400;600&display=swap" rel="stylesheet" />
+
+  <style is:global>
+    main { padding-top: 28px !important; padding-bottom: 80px !important; max-width: 980px !important; }
+    .pkw-input:focus, .pkw-textarea:focus { border-color:#f97316 !important; box-shadow:0 0 0 3px rgba(249,115,22,0.22) !important; }
+    .pkw-fadein { animation: pkwFade .28s ease both; }
+    @keyframes pkwFade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .pkw-primary:hover:not(:disabled) { background:#fdba74; }
+    .pkw-primary:disabled { opacity:.6;cursor:wait; }
+    .pkw-secondary:hover { background:rgba(255,255,255,0.05); color:#fff; }
+  </style>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;">
+    <a href="/brandbook" style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.06em;text-transform:uppercase;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      <span>Brand Book Lab</span>
+    </a>
+  </div>
+
+  <div id="wizard-progress" style="max-width:680px;margin:0 auto 28px;"></div>
+  <div id="wiz-stage"></div>
+
+  <script is:inline src="/brandbook-wizard.js" defer></script>
+</Dashboard>
