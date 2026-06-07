@@ -82,10 +82,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
   }
 
-  if (
-    (context.url.pathname.startsWith('/dashboard') || context.url.pathname.startsWith('/soc2')) &&
-    !user
-  ) {
+  // Authenticated product routes — anything here does `Astro.locals.user!` and
+  // 500s for logged-out visitors unless we redirect first.
+  const AUTHED_PREFIXES = ['/dashboard', '/soc2', '/audit', '/reels', '/social', '/logo'];
+  if (AUTHED_PREFIXES.some((p) => context.url.pathname.startsWith(p)) && !user) {
     return context.redirect('/sign-in');
   }
 
