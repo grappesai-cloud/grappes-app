@@ -4,6 +4,7 @@
 // this module only produces the words.
 
 import { createMessage } from './anthropic';
+import type { WebsiteContext } from './website-context';
 
 export const BRANDBOOK_MODEL = 'claude-sonnet-4-6';
 
@@ -16,6 +17,7 @@ export interface BrandBookInput {
   colors: Array<{ hex: string; label?: string }>; // 1-4 brand colors beyond black/white
   typeface: string;         // Google Font family name
   logoUrl: string;          // Vercel Blob URL (transparent PNG or SVG)
+  website?: WebsiteContext | null; // scraped site copy, optional grounding
 }
 
 export interface BrandBookContent {
@@ -49,6 +51,11 @@ ${input.values?.length ? `- Brand values picked by the founder (use these as the
 ${input.voiceKeywords?.length ? `- Tone-of-voice keywords picked by the founder (use as the 4 tone titles): ${input.voiceKeywords.join(', ')}` : '- Tone of voice: not provided — derive 4 fitting tone adjectives yourself.'}
 - Brand colors: ${colorList}
 - Typeface: ${input.typeface}
+${input.website ? `
+WEBSITE CONTEXT (scraped from ${input.website.url} — this is the brand's real public copy; ground the book in it, reuse its vocabulary, services, and claims, but never invent facts that contradict the founder's words above):
+- Page title: ${input.website.title || 'n/a'}
+- Meta description: ${input.website.description || 'n/a'}
+- Visible copy excerpt: ${input.website.text}` : ''}
 
 WRITING RULES:
 - Language: English.

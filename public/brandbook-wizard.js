@@ -4,7 +4,7 @@
     const ACCENT = '#f97316';
     const ACCENT_SOFT = 'rgba(249,115,22,0.12)';
     const ACCENT_BORDER = 'rgba(249,115,22,0.32)';
-    const BB = { name: '', about: '', industry: '', values: [], voice: [], colors: [], typeface: 'Inter', logoUrl: '', template: 'editorial' };
+    const BB = { name: '', about: '', industry: '', website: '', values: [], voice: [], colors: [], typeface: 'Inter', logoUrl: '', logoDataUrl: '', logoIsLight: true, template: 'editorial' };
 
     const STEPS = [
       { key: 'bb-template', chapter: 'Style',    title: 'Pick a template' },
@@ -125,30 +125,30 @@
     }
 
     function renderTemplate(card) {
-      // Mini page previews drawn with plain divs, one per style.
+      // Miniature real covers, one per style — actual type, not abstract bars.
+      const brand = (BB.name || 'Acme').toUpperCase();
       const previews = {
         editorial: `
-          <div style="aspect-ratio:4/3;background:#0a0a0a;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:center;gap:5px;">
-            <div style="width:22px;height:10px;background:#fff;"></div>
-            <div style="width:64%;height:8px;background:#fff;margin-top:6px;"></div>
-            <div style="width:80%;height:8px;background:rgba(255,255,255,0.4);"></div>
+          <div style="aspect-ratio:4/3;background:#0a0a0a;border-radius:8px;padding:16px 14px;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">
+            <div style="width:18px;height:18px;background:#fff;clip-path:polygon(0 100%, 45% 0, 75% 0, 30% 100%);margin-bottom:10px;"></div>
+            <div style="font-size:13px;font-weight:700;letter-spacing:0.04em;color:#fff;line-height:1.15;">${brand}</div>
+            <div style="font-size:13px;font-weight:700;letter-spacing:0.04em;color:rgba(255,255,255,0.4);line-height:1.15;">BRAND GUIDELINES</div>
           </div>`,
         corporate: `
-          <div style="aspect-ratio:16/9;background:#1766e8;border-radius:8px;padding:12px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;">
-            <div style="width:55%;height:10px;background:#fff;"></div>
-            <div style="width:35%;height:10px;background:#fff;"></div>
-            <div style="height:8px;"></div>
+          <div style="aspect-ratio:16/9;background:#1766e8;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;">
+            <div style="font-size:9px;font-weight:700;color:#fff;">${escapeHtml(BB.name || 'acme')}</div>
+            <div style="font-family:'Inter',sans-serif;font-size:19px;font-weight:700;color:#fff;line-height:1.05;letter-spacing:-0.02em;">Brand<br/>Guidelines</div>
+            <div style="font-size:7px;color:rgba(255,255,255,0.8);">2026</div>
           </div>`,
         urban: `
-          <div style="aspect-ratio:16/9;background:#f0594e;border-radius:8px;padding:12px;display:flex;flex-direction:column;justify-content:center;gap:4px;">
-            <div style="width:70%;height:12px;background:#111;"></div>
-            <div style="width:48%;height:12px;background:#111;"></div>
+          <div style="aspect-ratio:16/9;background:#f0594e;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">
+            <div style="font-family:'Anton',Impact,sans-serif;font-size:24px;color:#111;line-height:0.95;text-transform:uppercase;">Brand<br/>Guidelines</div>
           </div>`,
         contemporary: `
-          <div style="aspect-ratio:16/9;background:#12b35f;border-radius:8px;padding:12px;position:relative;overflow:hidden;">
-            <div style="position:absolute;left:-22px;bottom:-30px;width:64px;height:64px;border:5px solid rgba(0,0,0,0.25);border-radius:50%;"></div>
-            <div style="margin-left:45%;width:50%;height:9px;background:#fff;"></div>
-            <div style="margin-left:45%;width:36%;height:9px;background:#fff;margin-top:4px;"></div>
+          <div style="aspect-ratio:16/9;background:#12b35f;border-radius:8px;padding:14px;position:relative;overflow:hidden;">
+            <div style="position:absolute;left:-30px;bottom:-44px;width:84px;height:84px;border:6px solid rgba(0,0,0,0.22);border-radius:50%;"></div>
+            <div style="position:absolute;left:6px;bottom:-70px;width:90px;height:90px;border:6px solid rgba(0,0,0,0.22);border-radius:50%;"></div>
+            <div style="margin-left:42%;font-size:17px;font-weight:700;color:#fff;line-height:1.1;letter-spacing:-0.01em;">Brand<br/>Guidelines</div>
           </div>`,
       };
       const opts = [
@@ -208,10 +208,14 @@
         <textarea id="bb-about" maxlength="1000" class="pkw-textarea" placeholder="e.g. A boutique architecture firm specializing in sustainable, culturally reflective designs for private homes and hospitality projects." style="${STYLE_TEXTAREA}">${escapeAttr(BB.about)}</textarea>
         <label style="${STYLE_LABEL};margin-top:16px;">Industry (optional)</label>
         <input id="bb-industry" type="text" maxlength="80" class="pkw-input" value="${escapeAttr(BB.industry)}" placeholder="e.g. architecture, music, hospitality" style="${STYLE_INPUT}" />
+        <label style="${STYLE_LABEL};margin-top:16px;">Website (optional)</label>
+        <input id="bb-website" type="url" maxlength="200" class="pkw-input" value="${escapeAttr(BB.website)}" placeholder="e.g. https://yourbrand.com" style="${STYLE_INPUT}" />
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:6px 0 0;line-height:1.5;">If you add it, we read your site and ground the book in your real story and copy.</p>
         ${footerHTML({ hideSkip: true })}
       `;
       card.querySelector('#bb-about').addEventListener('input', (e) => { BB.about = e.target.value; });
       card.querySelector('#bb-industry').addEventListener('input', (e) => { BB.industry = e.target.value; });
+      card.querySelector('#bb-website').addEventListener('input', (e) => { BB.website = e.target.value; });
       wireFooter(card, { onNext: async () => {
         const v = (card.querySelector('#bb-about').value || '').trim();
         if (!v) { card.querySelector('#bb-about').focus(); return false; }
@@ -286,13 +290,13 @@
         wrap.innerHTML = `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div style="background:#fafafa;border-radius:12px;aspect-ratio:2.2;display:flex;align-items:center;justify-content:center;padding:18px;">
-              <img src="${BB.logoUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;filter:brightness(0);" />
+              <img src="${BB.logoUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;" />
             </div>
             <div style="background:#0a0a0a;border:1px solid rgba(255,255,255,0.12);border-radius:12px;aspect-ratio:2.2;display:flex;align-items:center;justify-content:center;padding:18px;">
-              <img src="${BB.logoUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;filter:brightness(0) invert(1);" />
+              <img src="${BB.logoUrl}" alt="" style="max-width:100%;max-height:100%;object-fit:contain;" />
             </div>
           </div>
-          <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:8px 0 0;line-height:1.5;">This is how the mark reads on light and dark pages.</p>
+          <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:8px 0 0;line-height:1.5;">Your logo, exactly as uploaded. We place it on light or dark panels so it always stays visible.</p>
         `;
       }
       renderPreview();
@@ -304,6 +308,15 @@
         const btn = card.querySelector('#bb-add-logo');
         btn.disabled = true; btn.textContent = 'Uploading…';
         try {
+          // Keep a local copy for client-side palette extraction (no CORS).
+          const reader = new FileReader();
+          reader.onload = () => {
+            BB.logoDataUrl = reader.result;
+            // Measure the mark's tone so the renderer can pick a contrasting panel.
+            measureLogoTone().then((isLight) => { BB.logoIsLight = isLight; }).catch(() => {});
+          };
+          reader.readAsDataURL(file);
+
           const { upload } = await import('/vendor/vercel-blob-client.js');
           const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/brandbook/sign-upload' });
           BB.logoUrl = blob.url;
@@ -329,6 +342,80 @@
       }});
     }
 
+    // Average luminance of the logo's opaque pixels → is the mark light or dark?
+    function measureLogoTone() {
+      return new Promise((resolve, reject) => {
+        if (!BB.logoDataUrl) return reject(new Error('no-logo'));
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const SIZE = 64;
+            const cv = document.createElement('canvas');
+            cv.width = SIZE; cv.height = SIZE;
+            const ctx = cv.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, SIZE, SIZE);
+            const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+            let sum = 0, n = 0;
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i + 3] < 140) continue;
+              sum += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
+              n++;
+            }
+            if (n === 0) return resolve(true); // all transparent → assume light mark
+            resolve(sum / n > 0.5);
+          } catch (e) { reject(e); }
+        };
+        img.onerror = () => reject(new Error('img-load'));
+        img.src = BB.logoDataUrl;
+      });
+    }
+
+    // Extract up to 3 dominant colors from the uploaded logo (local data URL).
+    function extractLogoPalette() {
+      return new Promise((resolve, reject) => {
+        if (!BB.logoDataUrl) return reject(new Error('no-logo'));
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const SIZE = 72;
+            const cv = document.createElement('canvas');
+            cv.width = SIZE; cv.height = SIZE;
+            const ctx = cv.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, SIZE, SIZE);
+            const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+            const buckets = new Map();
+            for (let i = 0; i < data.length; i += 4) {
+              const a = data[i + 3];
+              if (a < 140) continue; // transparent
+              const r = data[i], g = data[i + 1], b = data[i + 2];
+              const key = `${r >> 4}-${g >> 4}-${b >> 4}`; // quantize to 16 levels
+              const cur = buckets.get(key) || { n: 0, r: 0, g: 0, b: 0 };
+              cur.n++; cur.r += r; cur.g += g; cur.b += b;
+              buckets.set(key, cur);
+            }
+            const all = [...buckets.values()]
+              .map((x) => ({ n: x.n, r: x.r / x.n, g: x.g / x.n, b: x.b / x.n }))
+              .sort((p, q) => q.n - p.n);
+            const lum = (c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+            const dist = (p, q) => Math.abs(p.r - q.r) + Math.abs(p.g - q.g) + Math.abs(p.b - q.b);
+            // Prefer real colors (skip near-white/near-black); fall back if the mark is monochrome.
+            let pool = all.filter((x) => lum(x) > 0.06 && lum(x) < 0.94);
+            if (pool.length === 0) pool = all;
+            const picked = [];
+            for (const x of pool) {
+              if (picked.some((p) => dist(p, x) < 90)) continue;
+              picked.push(x);
+              if (picked.length === 3) break;
+            }
+            const hex = (v) => Math.round(v).toString(16).padStart(2, '0');
+            resolve(picked.map((p) => '#' + hex(p.r) + hex(p.g) + hex(p.b)));
+          } catch (e) { reject(e); }
+        };
+        img.onerror = () => reject(new Error('img-load'));
+        img.src = BB.logoDataUrl;
+      });
+    }
+
     function renderColors(card) {
       const swatch = (c, i) => `
         <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;">
@@ -340,7 +427,13 @@
       card.innerHTML = `
         ${eyebrowHTML()}
         <h2 style="${STYLE_TITLE}">Brand colors</h2>
-        <p style="${STYLE_HELPER}">White and black are always in the palette, like any serious guidelines doc. Add up to 4 brand colors on top, or skip for a pure monochrome identity.</p>
+        <p style="${STYLE_HELPER}">White and black are always in the palette, like any serious guidelines doc. Add up to 4 brand colors, pull them straight from your logo, or skip for a pure monochrome identity.</p>
+        ${BB.logoDataUrl && BB.colors.length < 4 ? `
+        <button type="button" id="bb-extract" style="${STYLE_ADD};margin-bottom:10px;">
+          <img src="${BB.logoDataUrl}" alt="" style="height:18px;width:auto;max-width:34px;object-fit:contain;opacity:.85;" />
+          Extract colors from my logo
+        </button>
+        <p id="bb-extract-err" style="display:none;font-size:12px;color:#ff8a8a;margin:-4px 0 10px;"></p>` : ''}
         <div id="bb-colors-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
           ${BB.colors.map(swatch).join('')}
         </div>
@@ -352,6 +445,26 @@
         </div>` : ''}
         ${footerHTML({ skipText: 'Black & white only' })}
       `;
+      card.querySelector('#bb-extract')?.addEventListener('click', async () => {
+        const btn = card.querySelector('#bb-extract');
+        btn.disabled = true;
+        try {
+          const hexes = await extractLogoPalette();
+          const existing = new Set(BB.colors.map((c) => c.hex));
+          for (const hx of hexes) {
+            if (BB.colors.length >= 4) break;
+            if (!existing.has(hx)) BB.colors.push({ hex: hx, label: '' });
+          }
+          renderColors(card);
+        } catch (e) {
+          const err = card.querySelector('#bb-extract-err');
+          if (err) {
+            err.textContent = 'Could not read colors from this logo, pick them manually.';
+            err.style.display = 'block';
+          }
+          btn.disabled = false;
+        }
+      });
       card.querySelector('#bb-color-add')?.addEventListener('click', () => {
         const hex = card.querySelector('#bb-color-pick').value;
         BB.colors = [...BB.colors, { hex, label: '' }];
@@ -405,6 +518,7 @@
           ${summaryRow('Template', BB.template.charAt(0).toUpperCase() + BB.template.slice(1))}
           ${summaryRow('Brand', escapeHtml(BB.name))}
           ${summaryRow('About', escapeHtml(BB.about.length > 64 ? BB.about.slice(0, 64) + '…' : BB.about))}
+          ${BB.website ? summaryRow('Website', escapeHtml(BB.website)) : ''}
           ${summaryRow('Values', BB.values.length ? escapeHtml(BB.values.join(', ')) : 'AI decides')}
           ${summaryRow('Tone', BB.voice.length ? escapeHtml(BB.voice.join(', ')) : 'AI decides')}
           ${summaryRow('Logo', BB.logoUrl ? '<span style="color:#6ee7a3;">Uploaded ✓</span>' : '—')}
@@ -458,11 +572,13 @@
               name: BB.name,
               about: BB.about,
               industry: BB.industry || undefined,
+              website: BB.website || undefined,
               values: BB.values,
               voiceKeywords: BB.voice,
               colors: BB.colors,
               typeface: BB.typeface,
               logoUrl: BB.logoUrl,
+              logoIsLight: BB.logoIsLight,
               template: BB.template,
             }),
           });

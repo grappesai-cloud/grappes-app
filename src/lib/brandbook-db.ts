@@ -15,6 +15,7 @@ export interface BrandBookRow {
   logo_url: string;
   typeface: string | null;
   template: BrandBookTemplate | null;
+  logo_is_light: boolean | null;
   palette_named: Array<{ hex: string; label?: string }> | null;
   donts: string[] | null;
   book_content: BrandBookContent | null;
@@ -25,7 +26,7 @@ export async function loadBrandBook(id: string, userId: string): Promise<BrandBo
   const client = createAdminClient();
   const { data, error } = await client
     .from('press_kits')
-    .select('id, user_id, name, tagline, logo_url, typeface, template, palette_named, donts, book_content, created_at')
+    .select('id, user_id, name, tagline, logo_url, typeface, template, logo_is_light, palette_named, donts, book_content, created_at')
     .eq('id', id)
     .eq('user_id', userId)
     .eq('mode', 'brand_book')
@@ -50,5 +51,6 @@ export function toDoc(row: BrandBookRow): BrandBookDoc | null {
     colors: Array.isArray(row.palette_named) ? row.palette_named : [],
     donts: Array.isArray(row.donts) && row.donts.length ? row.donts : DEFAULT_DONTS,
     content: row.book_content,
+    logoIsLight: row.logo_is_light !== false,
   };
 }

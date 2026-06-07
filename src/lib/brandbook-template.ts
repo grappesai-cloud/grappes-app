@@ -12,6 +12,7 @@ export interface BrandBookDoc {
   colors: Array<{ hex: string; label?: string }>;      // brand colors beyond b/w
   donts: string[];
   content: BrandBookContent;
+  logoIsLight?: boolean;                               // true = light mark (place on dark panels)
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -51,8 +52,10 @@ function luminance(hex: string): number {
 
 // Force the uploaded mark to a flat silhouette so it reads like a real
 // monochrome logo on any panel (transparent PNG/SVG assumed).
-const LOGO_BLACK: string = 'filter:brightness(0);';
-const LOGO_WHITE: string = 'filter:brightness(0) invert(1);';
+// The uploaded mark is shown AS-IS (never recolored). Panels are chosen to
+// contrast with the logo's tone. These stay as no-ops so call sites need no edit.
+const LOGO_BLACK: string = '';
+const LOGO_WHITE: string = '';
 
 // ── page chrome ──────────────────────────────────────────────────────────────
 
@@ -99,6 +102,11 @@ function divider(no: string, title: string, items: Array<[string, string]>): str
 export function renderBrandBookHTML(doc: BrandBookDoc): string {
   const { name, logoUrl, typeface, colors, donts, content: c } = doc;
   const fontParam = typeface.trim().replace(/ /g, '+');
+  // A light logo needs dark panels to stay visible; a dark logo needs light ones.
+  const logoIsLight = doc.logoIsLight !== false;
+  const PANEL = logoIsLight ? '#0a0a0a' : '#f2f2f2';
+  const PANEL_INK = logoIsLight ? '#ffffff' : '#0a0a0a';
+  const PANEL_LINE = logoIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(10,10,10,0.45)';
   const pages: string[] = [];
   let pageNo = 0;
 
@@ -189,74 +197,56 @@ export function renderBrandBookHTML(doc: BrandBookDoc): string {
     ${divider('2', 'Logo design', [['2.1', 'Logomark'], ['2.2', 'Logotype'], ['2.3', 'Lockup'], ['2.4', 'Clear space'], ['2.5', 'Minimum sizes']])}
   `, { dark: true });
 
+  // Logo showcase pages share a flex column so copy never overlaps the panel.
+  const logoShowcase = (title: string, paras: string[], panelInner: string, meta: Omit<PageMeta, 'pageNo' | 'dark'>) => page(`
+    <div style="display:flex;flex-direction:column;height:610px;margin-top:30px;">
+      <div style="display:grid;grid-template-columns:300px 1fr 1fr;gap:48px;flex:0 0 auto;">
+        <h1 style="font-size:44px;font-weight:500;letter-spacing:-0.01em;margin:0;text-transform:uppercase;line-height:1.05;">${esc(title)}</h1>
+        <p style="font-size:14.5px;line-height:1.5;margin:0;">${esc(paras[0] || '')}</p>
+        ${paras[1] ? `<p style="font-size:14.5px;line-height:1.5;margin:0;">${esc(paras[1])}</p>` : '<div></div>'}
+      </div>
+      <div style="flex:1 1 auto;min-height:0;margin-top:30px;background:${PANEL};display:flex;align-items:center;justify-content:center;">
+        ${panelInner}
+      </div>
+    </div>
+  `, { meta });
+
   // 9 · Logomark
-  page(`
-    <div style="display:grid;grid-template-columns:300px 1fr 1fr;gap:60px;margin-top:46px;">
-      <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0;text-transform:uppercase;">Logomark</h1>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;">${esc(c.logomark[0])}</p>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;">${esc(c.logomark[1])}</p>
-    </div>
-    <div style="position:absolute;left:75px;right:75px;bottom:75px;top:385px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;">
-      <img src="${esc(logoUrl)}" alt="" style="height:120px;width:auto;max-width:320px;object-fit:contain;${LOGO_WHITE}" />
-    </div>
-  `, { meta: { topic: '2.1', crumbTop: 'Logo design', crumbBottom: 'Logomark' } });
+  logoShowcase('Logomark', [c.logomark[0], c.logomark[1]],
+    `<img src="${esc(logoUrl)}" alt="" style="height:120px;width:auto;max-width:340px;object-fit:contain;" />`,
+    { topic: '2.1', crumbTop: 'Logo design', crumbBottom: 'Logomark' });
 
   // 10 · Logotype
-  page(`
-    <div style="display:grid;grid-template-columns:300px 1fr 1fr;gap:60px;margin-top:46px;">
-      <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0;text-transform:uppercase;">Logotype</h1>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;">${esc(c.logotype[0])}</p>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;">${esc(c.logotype[1])}</p>
-    </div>
-    <div style="position:absolute;left:75px;right:75px;bottom:75px;top:385px;border:1px solid #0a0a0a;display:flex;align-items:center;justify-content:center;">
-      <span style="font-size:64px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;">${esc(name)}</span>
-    </div>
-  `, { meta: { topic: '2.2', crumbTop: 'Logotype', crumbBottom: 'Logomark' } });
+  logoShowcase('Logotype', [c.logotype[0], c.logotype[1]],
+    `<span style="font-size:64px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;color:${PANEL_INK};">${esc(name)}</span>`,
+    { topic: '2.2', crumbTop: 'Logotype', crumbBottom: 'Logomark' });
 
   // 11 · Lockup
-  page(`
-    <div style="display:grid;grid-template-columns:440px 1fr;gap:70px;margin-top:46px;height:640px;">
-      <div>
-        <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0 0 90px;text-transform:uppercase;">Logo lockup</h1>
-        <p style="font-size:15.5px;line-height:1.55;margin:0;max-width:330px;">${esc(c.lockup)}</p>
-      </div>
-      <div style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;">
-        ${lockup(LOGO_WHITE, 52, '#fff')}
-      </div>
-    </div>
-  `, { meta: { topic: '2.3', crumbTop: 'Logo lockup', crumbBottom: 'Logomark' } });
+  logoShowcase('Logo lockup', [c.lockup],
+    lockup(LOGO_WHITE, 52, PANEL_INK),
+    { topic: '2.3', crumbTop: 'Logo lockup', crumbBottom: 'Logomark' });
 
   // 12 · Clear space
-  page(`
-    <div style="display:grid;grid-template-columns:340px 1fr;gap:60px;margin-top:40px;">
-      <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0;text-transform:uppercase;">Clear space</h1>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;max-width:520px;">${esc(c.clear_space)}</p>
-    </div>
-    <div style="position:absolute;left:64px;right:64px;bottom:55px;top:400px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;">
-      <div style="position:relative;padding:46px 56px;border:1px solid rgba(255,255,255,0.55);">
-        <div style="position:absolute;inset:46px 56px;border:1px solid rgba(255,255,255,0.35);"></div>
-        ${lockup(LOGO_WHITE, 40, '#fff')}
-      </div>
-    </div>
-  `, { meta: { topic: '2.4', crumbTop: 'Clear space', crumbBottom: 'Logomark' } });
+  logoShowcase('Clear space', [c.clear_space],
+    `<div style="position:relative;padding:46px 56px;border:1px solid ${PANEL_LINE};">
+       <div style="position:absolute;inset:46px 56px;border:1px solid ${PANEL_LINE};opacity:0.6;"></div>
+       ${lockup(LOGO_WHITE, 40, PANEL_INK)}
+     </div>`,
+    { topic: '2.4', crumbTop: 'Clear space', crumbBottom: 'Logomark' });
 
   // 13 · Minimum sizes
-  page(`
-    <div style="display:grid;grid-template-columns:340px 1fr;gap:60px;margin-top:40px;">
-      <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0;line-height:1.1;text-transform:uppercase;">Minimum<br/>sizes</h1>
-      <p style="font-size:15.5px;line-height:1.55;margin:6px 0 0;max-width:520px;">${esc(c.minimum_sizes)}</p>
-    </div>
-    <div style="position:absolute;left:64px;right:64px;bottom:55px;top:400px;border:1px solid #0a0a0a;display:flex;align-items:center;justify-content:center;gap:26px;">
-      ${lockup(LOGO_BLACK, 34, '#0a0a0a')}
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:1px;height:44px;background:#0a0a0a;position:relative;">
-          <div style="position:absolute;top:0;left:-5px;width:11px;height:1px;background:#0a0a0a;"></div>
-          <div style="position:absolute;bottom:0;left:-5px;width:11px;height:1px;background:#0a0a0a;"></div>
-        </div>
-        <span style="font-size:15px;">.75&rdquo; or 50px</span>
-      </div>
-    </div>
-  `, { meta: { topic: '2.5', crumbTop: 'Minimum Sizes', crumbBottom: 'Logomark' } });
+  logoShowcase('Minimum sizes', [c.minimum_sizes],
+    `<div style="display:flex;align-items:center;gap:26px;">
+       ${lockup(LOGO_WHITE, 34, PANEL_INK)}
+       <div style="display:flex;align-items:center;gap:12px;color:${PANEL_INK};">
+         <div style="width:1px;height:44px;background:${PANEL_INK};position:relative;">
+           <div style="position:absolute;top:0;left:-5px;width:11px;height:1px;background:${PANEL_INK};"></div>
+           <div style="position:absolute;bottom:0;left:-5px;width:11px;height:1px;background:${PANEL_INK};"></div>
+         </div>
+         <span style="font-size:15px;">.75&rdquo; or 50px</span>
+       </div>
+     </div>`,
+    { topic: '2.5', crumbTop: 'Minimum Sizes', crumbBottom: 'Logomark' });
 
   // 14 · Divider: colors
   page(`
@@ -312,13 +302,16 @@ export function renderBrandBookHTML(doc: BrandBookDoc): string {
     `, { meta: { topic: '3.1', crumbTop: 'Color Palette', crumbBottom: 'Colors' } });
   }
 
-  // Combinations
+  // Combinations — only show the logo on backgrounds that contrast its own tone
+  // (the mark is never recolored, so a same-tone panel would hide it).
   const comboPanel = (hex: string) => {
     const dark = luminance(hex) < 0.45;
     const border = luminance(hex) > 0.85 ? 'border:1px solid rgba(10,10,10,0.6);' : '';
-    return `<div style="background:${hex};${border}display:flex;align-items:center;justify-content:center;">${lockup(dark ? LOGO_WHITE : LOGO_BLACK, 30, dark ? '#fff' : '#0a0a0a')}</div>`;
+    return `<div style="background:${hex};${border}display:flex;align-items:center;justify-content:center;">${lockup(LOGO_WHITE, 30, dark ? '#fff' : '#0a0a0a')}</div>`;
   };
-  const comboColors = ['#fafafa', '#0a0a0a', ...colors.map((x) => x.hex)].slice(0, 4);
+  const neutralTile = logoIsLight ? '#0a0a0a' : '#fafafa';
+  const contrastBrand = colors.map((x) => x.hex).filter((hex) => (logoIsLight ? luminance(hex) < 0.62 : luminance(hex) > 0.42));
+  const comboColors = [neutralTile, ...(contrastBrand.length ? contrastBrand : colors.map((x) => x.hex))].slice(0, 4);
   page(`
     <div style="display:grid;grid-template-columns:340px 1fr;gap:60px;margin-top:40px;">
       <h1 style="font-size:48px;font-weight:500;letter-spacing:-0.01em;margin:0;text-transform:uppercase;">Combinations</h1>

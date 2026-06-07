@@ -8,9 +8,10 @@ import { DEFAULT_DONTS } from '../src/lib/brandbook-gen.ts';
 
 const doc = {
   name: 'Nirakara',
-  // Simple geometric mark with transparent bg, served over data: URL.
+  // WHITE mark on transparent bg (like the Grappes logo) → logoIsLight true.
+  logoIsLight: true,
   logoUrl: 'data:image/svg+xml;base64,' + Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64"><path fill="#000" d="M0 64 L28 20 L52 20 L24 64 Z M40 64 L68 20 L92 20 L92 64 L68 64 L68 40 L52 64 Z"/></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 64"><path fill="#ffffff" d="M0 64 L28 20 L52 20 L24 64 Z M40 64 L68 20 L92 20 L92 64 L68 64 L68 40 L52 64 Z"/></svg>`
   ).toString('base64'),
   typeface: 'Archivo',
   colors: [

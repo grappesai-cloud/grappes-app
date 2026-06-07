@@ -7,6 +7,7 @@ import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { createAdminClient } from '../../../lib/supabase';
 import { generateBrandBookContent, DEFAULT_DONTS, type BrandBookInput } from '../../../lib/brandbook-gen';
+import { fetchWebsiteContext } from '../../../lib/website-context';
 
 interface GenerateBody {
   name?: string;
@@ -17,7 +18,9 @@ interface GenerateBody {
   colors?: Array<{ hex: string; label?: string }>;
   typeface?: string;
   logoUrl?: string;
+  logoIsLight?: boolean;
   template?: string;
+  website?: string;
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -61,10 +64,15 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const voiceKeywords = (Array.isArray(body.voiceKeywords) ? body.voiceKeywords : [])
     .map((v) => (v || '').toString().trim().slice(0, 30)).filter(Boolean).slice(0, 4);
 
+  // Optional grounding from the brand's own site; best effort, never blocks.
+  const websiteRaw = (body.website || '').trim().slice(0, 200);
+  const website = websiteRaw ? await fetchWebsiteContext(websiteRaw) : null;
+
   const input: BrandBookInput = {
     name,
     about,
     industry: (body.industry || '').trim().slice(0, 80) || undefined,
+    website,
     values: values.length ? values : undefined,
     voiceKeywords: voiceKeywords.length ? voiceKeywords : undefined,
     colors,
@@ -96,8 +104,10 @@ export const POST: APIRoute = async ({ locals, request }) => {
       voice_keywords: voiceKeywords.join(', ') || null,
       voice_paragraph: content.tone.map((t) => t.title).join(', '),
       palette_named: colors,
+      links: website ? { website: website.url } : {},
       donts: DEFAULT_DONTS,
       logo_url: logoUrl,
+      logo_is_light: body.logoIsLight !== false,
       typeface,
       template,
       book_content: content,

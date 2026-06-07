@@ -52,9 +52,10 @@ function rgbToCmyk(r: number, g: number, b: number): { c: number; m: number; y: 
   };
 }
 
-const LOGO_BLACK = 'filter:brightness(0);';
-const LOGO_WHITE = 'filter:brightness(0) invert(1);';
-const logoFilterFor = (bgHex: string) => (luminance(bgHex) < 0.45 ? LOGO_WHITE : LOGO_BLACK);
+// Logo is shown AS-IS (never recolored). These no-ops keep call sites unchanged.
+const LOGO_BLACK = '';
+const LOGO_WHITE = '';
+const logoFilterFor = (_bgHex: string) => '';
 const inkFor = (bgHex: string) => (luminance(bgHex) < 0.45 ? '#ffffff' : '#0d0d0d');
 
 const DEFAULT_PRIMARY: Record<AkriviStyle, string> = {
@@ -73,6 +74,7 @@ export function renderAkriviHTML(doc: BrandBookDoc, style: AkriviStyle): string 
   const headingFont = urban ? 'Anton' : typeface;
   const headingCase = urban ? 'text-transform:uppercase;letter-spacing:0.01em;' : '';
   const panel = '#eef1f4';
+  const logoIsLight = doc.logoIsLight !== false;
   const year = '2025';
 
   const pages: string[] = [];
@@ -243,46 +245,51 @@ export function renderAkriviHTML(doc: BrandBookDoc, style: AkriviStyle): string 
   // ── Logo section ───────────────────────────────────────────────────────────
   divider('2.0', 'Logo', [['2.1', 'Logomark'], ['2.2', 'Logotype'], ['2.3', 'Full Logo'], ['2.4', 'Minimum Size'], ['2.5', 'Logo Backgrounds'], ['2.6', 'Misuses']]);
 
+  // Logo-hosting panel adapts to the mark's own tone (light mark → dark panel).
+  const showPanel = logoIsLight ? '#0d0d0d' : '#eef1f4';
+  const showInk = inkFor(showPanel);
+
   const showcase = (inner: string, text: string, title: string) => contentPage(title, 'Logo', `
     <div style="display:grid;grid-template-columns:300px 1fr;gap:30px;">
       <p style="font-size:14px;line-height:1.55;margin:0;">${esc(text)}</p>
-      <div style="background:${panel};border-radius:14px;height:470px;display:flex;align-items:center;justify-content:center;">${inner}</div>
+      <div style="background:${showPanel};border-radius:14px;height:470px;display:flex;align-items:center;justify-content:center;">${inner}</div>
     </div>`);
 
-  showcase(`<img src="${esc(logoUrl)}" alt="" style="height:130px;width:auto;max-width:380px;object-fit:contain;${LOGO_BLACK}" />`, c.logomark[0], 'Logomark');
-  showcase(`<span style="${h(72)}">${esc(name)}</span>`, c.logotype[0], 'Logotype');
-  showcase(lockup(LOGO_BLACK, 64, '#0d0d0d'), c.lockup, 'Full Logo');
+  showcase(`<img src="${esc(logoUrl)}" alt="" style="height:130px;width:auto;max-width:380px;object-fit:contain;" />`, c.logomark[0], 'Logomark');
+  showcase(`<span style="${h(72, showInk)}">${esc(name)}</span>`, c.logotype[0], 'Logotype');
+  showcase(lockup(LOGO_BLACK, 64, showInk), c.lockup, 'Full Logo');
 
   // Minimum size
   contentPage('Minimum Size', 'Logo', `
     <div style="display:grid;grid-template-columns:300px 1fr;gap:30px;">
       <p style="font-size:14px;line-height:1.55;margin:0;">${esc(c.minimum_sizes)}</p>
-      <div style="background:${panel};border-radius:14px;height:470px;padding:56px;display:flex;flex-direction:column;justify-content:space-between;">
+      <div style="background:${showPanel};color:${showInk};border-radius:14px;height:470px;padding:56px;display:flex;flex-direction:column;justify-content:space-between;">
         <div style="display:flex;gap:120px;">
-          <div><img src="${esc(logoUrl)}" alt="" style="height:46px;width:auto;max-width:110px;object-fit:contain;${LOGO_BLACK}" />
-            <div style="${h(15)};margin-top:14px;">Logomark</div>
+          <div><img src="${esc(logoUrl)}" alt="" style="height:46px;width:auto;max-width:110px;object-fit:contain;" />
+            <div style="${h(15, showInk)};margin-top:14px;">Logomark</div>
             <div style="font-size:11.5px;margin-top:6px;line-height:1.5;">Print: 10mm<br/>Digital: 50px</div></div>
-          <div><span style="${h(40)}">${esc(name)}</span>
-            <div style="${h(15)};margin-top:14px;">Logotype</div>
+          <div><span style="${h(40, showInk)}">${esc(name)}</span>
+            <div style="${h(15, showInk)};margin-top:14px;">Logotype</div>
             <div style="font-size:11.5px;margin-top:6px;line-height:1.5;">Print: 50mm<br/>Digital: 150px</div></div>
         </div>
-        <div>${lockup(LOGO_BLACK, 36, '#0d0d0d')}
-          <div style="${h(15)};margin-top:14px;">Full Logo</div>
+        <div>${lockup(LOGO_BLACK, 36, showInk)}
+          <div style="${h(15, showInk)};margin-top:14px;">Full Logo</div>
           <div style="font-size:11.5px;margin-top:6px;line-height:1.5;">Print: 50mm<br/>Digital: 150px</div></div>
       </div>
     </div>`);
 
-  // Logo backgrounds 3x3
-  const bgTiles = [primary, shade(primary, -0.3), shade(primary, -0.55), '#0d0d0d', '#8a8f94', '#c9cdd1', panel, '#ffffff'];
+  // Logo backgrounds — only tiles that contrast the mark's tone (no recolor).
+  const bgTiles = logoIsLight
+    ? [primary, shade(primary, -0.3), shade(primary, -0.55), '#0d0d0d', '#3a3a3a', '#5c5c5c']
+    : [primary, shade(primary, 0.35), shade(primary, 0.6), '#fafafa', '#e4e4e4', '#c9cdd1'];
   contentPage('Logo Backgrounds', 'Logo', `
     <div style="display:grid;grid-template-columns:300px 1fr;gap:30px;">
       <p style="font-size:14px;line-height:1.55;margin:0;">${esc(c.combinations)}</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:148px;gap:14px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:226px;gap:14px;">
         ${bgTiles.map((bgc) => `
           <div style="background:${bgc};${luminance(bgc) > 0.9 ? 'border:1px solid rgba(13,13,13,0.18);' : ''}border-radius:12px;display:flex;align-items:center;justify-content:center;">
-            ${lockup(logoFilterFor(bgc), 22, inkFor(bgc))}
+            ${lockup(LOGO_WHITE, 22, inkFor(bgc))}
           </div>`).join('')}
-        <div style="background:${panel};border-radius:12px;"></div>
       </div>
     </div>`);
 
@@ -293,8 +300,8 @@ export function renderAkriviHTML(doc: BrandBookDoc, style: AkriviStyle): string 
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
         ${donts.slice(0, 6).map((m) => `
           <div>
-            <div style="position:relative;background:${panel};border-radius:10px;height:130px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-              ${lockup(LOGO_BLACK, 18, '#0d0d0d')}
+            <div style="position:relative;background:${showPanel};border-radius:10px;height:130px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+              ${lockup(LOGO_BLACK, 18, showInk)}
               <div style="position:absolute;inset:0;background:linear-gradient(to top right, transparent 49%, #e02020 49%, #e02020 51%, transparent 51%);"></div>
             </div>
             <p style="font-size:11.5px;line-height:1.5;margin:8px 0 0;">${esc(m)}</p>
