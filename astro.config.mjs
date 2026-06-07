@@ -19,21 +19,15 @@ const ffBinaries = [
   './node_modules/@ffprobe-installer/linux-x64/package.json',
 ].filter((p) => existsSync(p));
 
-// @sparticuz/chromium ships headless Chromium as brotli archives that
-// executablePath() unpacks at runtime. Ensure the tracer bundles them.
-const chromiumBinaries = [
-  './node_modules/@sparticuz/chromium/bin/chromium.br',
-  './node_modules/@sparticuz/chromium/bin/al2.tar.br',
-  './node_modules/@sparticuz/chromium/bin/al2023.tar.br',
-  './node_modules/@sparticuz/chromium/bin/fonts.tar.br',
-  './node_modules/@sparticuz/chromium/bin/swiftshader.tar.br',
-].filter((p) => existsSync(p));
+// Note: Chromium is NOT bundled. We use @sparticuz/chromium-min, which fetches
+// the headless binary from a remote pack at runtime, keeping the serverless
+// function under Vercel's 250 MB limit (see src/lib/browser.ts).
 
 export default defineConfig({
   output: 'server',
   adapter: vercel({
     maxDuration: 800,
-    includeFiles: [...ffBinaries, ...chromiumBinaries],
+    includeFiles: ffBinaries,
   }),
   security: { checkOrigin: false }, // CSRF handled via auth middleware — Astro's checkOrigin breaks Vercel preview URLs
 
@@ -49,7 +43,7 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: ['puppeteer', 'puppeteer-core', '@sparticuz/chromium', 'sharp'],
+        external: ['puppeteer', 'puppeteer-core', '@sparticuz/chromium-min', 'sharp'],
       },
     },
     resolve: {
