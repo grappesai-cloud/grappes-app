@@ -1,0 +1,79 @@
+---
+import '../../../styles/tailwind.css';
+import AnalysisView from '../../../components/reels/AnalysisView';
+import { findAnalysis } from '../../../lib/reels/db';
+
+const { id } = Astro.params;
+const row = id ? await findAnalysis(id) : null;
+const available = !!row && row.isPublic && row.status === 'done';
+const title = available ? 'Reel analysis — Grappes' : 'Not available — Grappes';
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{title}</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/png" href="/assets/grappes/logo.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/grappes/design-tokens.css" />
+  <!-- Open Graph so the shared link previews nicely -->
+  <meta property="og:title" content="Reel analysis — Grappes" />
+  <meta property="og:description" content="See how a social-graph ranker would score this reel: attention, emotion, memory, retention and hook strength." />
+  <meta property="og:type" content="website" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0a0a0a; color: #fff; font-family: var(--font-sans, 'DM Sans', sans-serif); -webkit-font-smoothing: antialiased; min-height: 100%; }
+    .share-bg { position: fixed; inset: 0; z-index: -2; background: url('/assets/grappes/dashboard-bg.webp') center/cover no-repeat, #0a0a0a; }
+    .share-bg-veil { position: fixed; inset: 0; z-index: -1; background: linear-gradient(to bottom, rgba(10,10,10,0.55), rgba(10,10,10,0.78)); }
+    .share-bar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: rgba(10,10,10,0.7); backdrop-filter: blur(28px); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .share-brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -0.01em; color: #fff; text-decoration: none; }
+    .share-brand img { width: 26px; height: 26px; border-radius: 7px; }
+    .share-cta { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 999px; background: #fff; color: #0a0a0a; font-size: 13px; font-weight: 600; text-decoration: none; transition: opacity .15s; }
+    .share-cta:hover { opacity: 0.88; }
+    .share-foot { text-align: center; padding: 56px 24px 64px; }
+    .share-foot a { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; border-radius: 999px; background: #fff; color: #0a0a0a; font-size: 14px; font-weight: 700; text-decoration: none; }
+    .nf-wrap { min-height: 100vh; display: grid; place-items: center; padding: 64px 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="share-bg" aria-hidden="true"></div>
+  <div class="share-bg-veil" aria-hidden="true"></div>
+
+  {available ? (
+    <>
+      <header class="share-bar">
+        <a class="share-brand" href="https://grappes.dev">
+          <img src="/assets/grappes/logo.png" alt="Grappes" />
+          <span>grappes</span>
+        </a>
+        <a class="share-cta" href="https://grappes.dev/reels">Analyze your reel →</a>
+      </header>
+
+      <main style="padding: 40px 16px 0;">
+        <div style="max-width:1100px;margin:0 auto;padding:0 8px;">
+          <AnalysisView id={id!} initial={row!} readOnly={true} client:load />
+        </div>
+      </main>
+
+      <footer class="share-foot">
+        <div style="font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:18px;">Made with Grappes Reels Lab</div>
+        <a href="https://grappes.dev/reels">Analyze your own reel →</a>
+      </footer>
+    </>
+  ) : (
+    <main class="nf-wrap">
+      <div>
+        <a class="share-brand" href="https://grappes.dev" style="justify-content:center;margin-bottom:22px;">
+          <img src="/assets/grappes/logo.png" alt="Grappes" />
+          <span>grappes</span>
+        </a>
+        <h1 style="font-size:clamp(32px,6vw,52px);font-weight:300;letter-spacing:-0.03em;margin:0 0 12px;">This analysis isn't available.</h1>
+        <p style="color:rgba(255,255,255,0.55);max-width:420px;margin:0 auto 28px;line-height:1.6;">The link may be private or the analysis was removed.</p>
+        <a class="share-cta" href="https://grappes.dev/reels" style="display:inline-flex;">Analyze your reel →</a>
+      </div>
+    </main>
+  )}
+</body>
+</html>

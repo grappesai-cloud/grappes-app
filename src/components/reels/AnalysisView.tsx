@@ -18,9 +18,9 @@ import Pill from "./_components/Pill";
 import Reveal from "./_components/Reveal";
 import BrainHeatmap from "./_components/BrainHeatmap";
 
-type Props = { id: string; initial: Analysis };
+type Props = { id: string; initial: Analysis; readOnly?: boolean };
 
-export default function AnalysisView({ id, initial }: Props) {
+export default function AnalysisView({ id, initial, readOnly = false }: Props) {
   const [row, setRow] = useState<Analysis>(initial);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function AnalysisView({ id, initial }: Props) {
   }
 
   const result = row.result as AnalysisResult;
-  return <Dashboard row={row} result={result} />;
+  return <Dashboard row={row} result={result} readOnly={readOnly} />;
 }
 
 function IntakeStep({
@@ -221,13 +221,45 @@ function ProcessingState({ row }: { row: Analysis }) {
 export function Dashboard({
   row,
   result,
+  readOnly = false,
 }: {
   row: Analysis;
   result: AnalysisResult;
+  readOnly?: boolean;
 }) {
   const playerRef = useRef<VideoPlayerHandle>(null);
   const [tab, setTab] = useState<"summary" | "in_depth">("in_depth");
   const [videoTime, setVideoTime] = useState(0);
+  const [isPublic, setIsPublic] = useState<boolean>(row.isPublic ?? false);
+  const [shareState, setShareState] = useState<"idle" | "working" | "copied" | "error">("idle");
+
+  async function handleShare() {
+    setShareState("working");
+    try {
+      if (!isPublic) {
+        const r = await fetch(`/api/reels/analysis/${row.id}/share`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ public: true }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Share failed");
+        setIsPublic(true);
+      }
+      const link = `${window.location.origin}/reels/share/${row.id}`;
+      try {
+        await navigator.clipboard.writeText(link);
+        setShareState("copied");
+      } catch {
+        window.prompt("Copy your public link:", link);
+        setShareState("idle");
+      }
+      setTimeout(() => setShareState("idle"), 2200);
+    } catch {
+      setShareState("error");
+      setTimeout(() => setShareState("idle"), 2600);
+    }
+  }
 
   // Performance-weighted headline + heavy-ranker, computed once and reused.
   const xRanking = result.x_signals ?? computeXRankingSignals(result);
@@ -528,23 +560,38 @@ export function Dashboard({
 
           <div className="flex flex-col items-stretch gap-3 lg:items-end">
             <ScoreBadge score={xRanking.performance_score ?? result.overall.score} />
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end" data-print-hide="true">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70 transition hover:border-white/25 hover:text-white"
-              >
-                <span aria-hidden>⤓</span> Export PDF
-              </button>
-              <span
-                className="hidden items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.02] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/35 sm:inline-flex"
-                title="Space / K play · ← → ±2s · J L ±10s"
-              >
-                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">␣</kbd>
-                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">← →</kbd>
-                <kbd className="rounded bg-white/10 px-1 py-0.5 text-white/70">J L</kbd>
-              </span>
-            </div>
+            {!readOnly && (
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  disabled={shareState === "working"}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] transition ${
+                    shareState === "copied"
+                      ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
+                      : shareState === "error"
+                        ? "border-red-400/40 bg-red-400/10 text-red-300"
+                        : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white"
+                  }`}
+                >
+                  <span aria-hidden>
+                    {shareState === "copied" ? "✓" : shareState === "working" ? "…" : "🔗"}
+                  </span>
+                  {shareState === "copied"
+                    ? "Link copied"
+                    : shareState === "error"
+                      ? "Try again"
+                      : isPublic
+                        ? "Copy public link"
+                        : "Create public link"}
+                </button>
+                {isPublic && shareState !== "copied" && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/[0.06] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-300/80">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Public
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </motion.header>

@@ -25,6 +25,7 @@ const PUBLIC_PREFIXES = [
   '/_astro/',
   '/favicon',
   '/kit/',  // published press kits — anyone with the slug can view
+  '/reels/share/',  // public shared reel analyses (gated by is_public in the page)
 ];
 
 function isPublic(path: string): boolean {
@@ -83,9 +84,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Authenticated product routes — anything here does `Astro.locals.user!` and
-  // 500s for logged-out visitors unless we redirect first.
+  // 500s for logged-out visitors unless we redirect first. Public prefixes
+  // (e.g. /reels/share/) are exempt so logged-out visitors can view shared links.
   const AUTHED_PREFIXES = ['/dashboard', '/soc2', '/audit', '/reels', '/social', '/logo', '/brandbook'];
-  if (AUTHED_PREFIXES.some((p) => context.url.pathname.startsWith(p)) && !user) {
+  if (!isPublic(path) && AUTHED_PREFIXES.some((p) => context.url.pathname.startsWith(p)) && !user) {
     return context.redirect('/sign-in');
   }
 

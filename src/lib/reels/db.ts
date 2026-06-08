@@ -16,6 +16,7 @@ export interface Analysis {
   progress: ProcessingProgress | null;
   result: AnalysisResult | null;
   error: string | null;
+  isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,9 +46,20 @@ function rowToAnalysis(r: any): Analysis {
     progress: r.progress as ProcessingProgress | null,
     result: r.result as AnalysisResult | null,
     error: r.error as string | null,
+    isPublic: r.is_public ?? false,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
+}
+
+/** Toggle public sharing. Only the owner can change it. Returns the new state, or null if not owned/found. */
+export async function setAnalysisPublic(id: string, userId: string, isPublic: boolean): Promise<boolean | null> {
+  const rows = await sql`
+    UPDATE reel_analyses SET is_public = ${isPublic}, updated_at = now()
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING is_public
+  `;
+  return rows.length > 0 ? (rows[0].is_public as boolean) : null;
 }
 
 export async function insertAnalysis(a: NewAnalysis): Promise<void> {
