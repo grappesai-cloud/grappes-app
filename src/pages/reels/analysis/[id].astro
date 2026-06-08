@@ -15,9 +15,31 @@ if (!row || row.userId !== authUser.id) return Astro.redirect('/reels');
 <Dashboard title="Analysis">
   <style is:global>
     main { padding-top: 56px !important; padding-bottom: 80px !important; max-width: none !important; }
+
+    /* ── Clean PDF export (Export PDF → window.print) ──────────────────────
+       Keep the dark branded report exactly as on screen, strip the app chrome
+       (nav, support chat, back link, action buttons) and force colors to print. */
+    @media print {
+      /* margin:0 makes Chrome drop its default date/URL/page-number header+footer */
+      @page { margin: 0; }
+      html, body {
+        background: #0a0a0a !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      header,
+      #sup-btn, #sup-panel,
+      [data-print-hide], [data-print-hide="true"],
+      .reels-back-link { display: none !important; }
+      main { padding: 0 !important; }
+      /* our own page padding since @page margin is 0 */
+      .analysis-print-root { max-width: 100% !important; margin: 0 !important; padding: 12mm 12mm !important; }
+      section, .break-avoid { break-inside: avoid; }
+    }
   </style>
-  <div style="max-width:1100px;margin:0 auto;padding:0 8px;">
-    <a href="/reels" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px;">
+  <div class="analysis-print-root" style="max-width:1100px;margin:0 auto;padding:0 8px;">
+    <a href="/reels" class="reels-back-link" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:16px;">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       <span>Reels Lab</span>
     </a>
