@@ -14,7 +14,7 @@ import {
 } from "./ffmpeg";
 import { transcribeAudio } from "./groq";
 import { analyzeWithClaude, selfCritique } from "./anthropic";
-import { detectNiche } from "./niche";
+import { detectNiche, detectContentMode } from "./niche";
 import { generateIntake } from "./intake";
 import {
   findAnalysis,
@@ -154,6 +154,15 @@ export async function runAnalysis(id: string, blobUrl: string) {
       hookFrames,
     });
 
+    // How does this reel communicate? Music-led / no-narration reels are judged
+    // as audiovisual edits, not as a spoken message.
+    const contentMode = await detectContentMode({
+      durationSec: meta.duration_sec,
+      transcript,
+      hasVoice: transcriptResult.has_voice,
+      hookFrames,
+    });
+
     let intakeContext: IntakeContext | undefined;
     let intakeAnswers: IntakeAnswers | undefined;
     if (process.env.INTAKE_DISABLED !== "1") {
@@ -200,6 +209,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
       loudnessFine,
       cutDensity: cutDensityDs,
       niche,
+      contentMode,
       intake:
         intakeContext && intakeAnswers
           ? { inferred: intakeContext.inferred, answers: intakeAnswers }
@@ -225,6 +235,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
           loudnessFine,
           cutDensity: cutDensityDs,
           niche,
+          contentMode,
           intake:
             intakeContext && intakeAnswers
               ? { inferred: intakeContext.inferred, answers: intakeAnswers }
@@ -275,6 +286,7 @@ export async function runAnalysis(id: string, blobUrl: string) {
     ensureCompleteDimensions(result, initial);
     const finalResult: AnalysisResult = {
       ...result,
+      content_mode: contentMode,
       signals: {
         motion,
         loudness,

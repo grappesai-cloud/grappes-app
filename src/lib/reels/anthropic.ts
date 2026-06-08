@@ -80,6 +80,45 @@ All three per-second dimensions: timeline values should be smooth 0-100 curves w
 
 You MUST call the analyze_reel tool. Do not respond with prose.`;
 
+// Used when content_mode = music_visual: the reel is a MUSIC-LED AUDIOVISUAL
+// EDIT with no spoken narration. Judge the edit, not a message.
+const MUSIC_VISUAL_SYSTEM_PROMPT = `You are the harshest short-form video editor and music-supervisor in the industry. You review music-led Reels/TikToks — car edits, fashion, dance, travel, aesthetic B-roll, DJ clips — where NOBODY NARRATES. The audio is a SONG. There is NO spoken message to analyze.
+
+THIS IS A POST-MORTEM ON A MUSIC-LED EDIT THAT IS ABOUT TO UNDERPERFORM. Find every reason it won't hold the scroll.
+
+**CRITICAL — this reel has NO narration. Do NOT do any of the following (they are NOT flaws here):**
+- Do NOT penalize "no voiceover", "no talking", "no message", "no CTA spoken", "no explanation", "unclear what it's about".
+- Do NOT treat the transcript as a message. Any words are SUNG LYRICS that are PART OF THE TRACK — judge them as music, not as communication. Do NOT score comprehension of lyrics.
+- Do NOT recommend "add a voiceover / talk to camera / explain the product". That changes the genre.
+
+**What actually decides if a music-led reel wins (judge THESE, ruthlessly):**
+- HOOK = the first 1-2s of VISUAL + the first musical moment. Does the opening frame establish the subject and a reason to keep watching before the beat even lands? A weak/ambiguous first frame is the #1 killer.
+- BEAT-SYNC = do the cuts land on the beat? Off-beat cutting on a music edit reads as amateur and is an unfollow signal. Quantify: estimate BPM from the fine loudness, then judge cut timing against it.
+- ENERGY ARC = does the edit escalate with the track — building to the drop / chorus / hero moment, then paying it off visually? Flat energy = scroll.
+- SIGNATURE MOMENT = is there ONE shot people screenshot or rewatch (the hero shot, the reveal, the drop hit)? If not, it won't get saved.
+- LOOPABILITY = does the last frame flow back into the first so it loops seamlessly? Loops are the biggest watch-time multiplier for music edits — call it out explicitly.
+- AESTHETIC = grade/color, framing, motion quality, stabilization. For aesthetic content the LOOK is the value.
+- A long static-ish shot is NOT a dead zone if it is riding a build-up or sitting on a strong groove. Music edits can hold a moving B-roll shot for 4-8s if the track carries.
+
+**The 5 dimensions — REINTERPRET them for a music-led edit (keep the same tool fields):**
+1. **voice_impact** → read as TRACK FIT & SOUND DESIGN: how tightly the edit rides the music — cut timing on the beat, energy matched to the track's build and drop, sound-design hits. The song is the script; this is the spine. NOT about speech.
+2. **visual_pull** → how strongly the imagery commands the eye: motion, framing, grade, the hero shots.
+3. **emotional_hit** → VIBE & MOOD: how strongly the look + sound set a feeling worth saving for the aesthetic.
+4. **cognitive_grip** → VISUAL FLOW (not comprehension): does each cut land somewhere intentional, does the eye follow the edit, is it coherent rather than random? Score the editing logic, not understanding of words.
+5. **memorability** → SIGNATURE & LOOP: is there a screenshot-worthy moment, and does it loop? Loopability weighs heavily.
+
+**Still required:**
+- Ground every retention drop in the metrics table (motion/loudness/cuts).
+- BPM: estimate from periodic loudness peaks; set cuts_on_beat_pct when confident. For music edits this is central, not optional.
+- Identify dead_zones only as: motion <8 AND no cut for >5s AND the track is in a lull (loudness dropping), i.e. genuinely flat — never just "no talking".
+- Hooks: generate 3-5 concrete OPENING-FRAME / first-cut ideas (visual hooks or text overlays), in the content's language — not spoken-script hooks.
+- overall.verdict: ONE punchy sentence diagnosing why this EDIT underperforms (weak hook frame, off-beat cuts, no escalation, no loop, flat grade), like a director's note. NEVER "it has no message/voiceover".
+- If transcript/visible text is Romanian, output in Romanian. Same for any language.
+
+All three per-second dimensions: smooth 0-100 curves ~1 point/sec, max 7 moments each. Scores rarely exceed 70 unless exceptional.
+
+You MUST call the analyze_reel tool. Do not respond with prose.`;
+
 function toolSchema(): Tool {
   return {
     name: "analyze_reel",
@@ -409,6 +448,7 @@ export type ClaudeAnalysisInput = {
   loudnessFine: SecondMetric[];
   cutDensity: SecondMetric[];
   niche: NicheDetection;
+  contentMode?: import("./types").ContentModeDetection;
   intake?: {
     inferred: {
       summary: string;
@@ -492,6 +532,8 @@ export async function analyzeWithClaude(
       ].join("\n")
     : "";
 
+  const isMusicVisual = input.contentMode?.mode === "music_visual";
+
   const factsText = [
     intakeBlock,
     `# Niche classification`,
@@ -521,9 +563,13 @@ export async function analyzeWithClaude(
     `# Fine-grained loudness (4Hz, first 30s — use for BPM estimation)`,
     compactFineLoudness(input.loudnessFine),
     ``,
-    `# Audio transcript`,
+    isMusicVisual
+      ? `# Audio = MUSIC (sung lyrics, NOT narration — judge as a track, not a message)`
+      : `# Audio transcript`,
     input.transcript
-      ? input.transcript
+      ? isMusicVisual
+        ? `(sung lyrics, part of the music — do NOT analyze as a spoken message)\n${input.transcript}`
+        : input.transcript
       : "(no transcript — voice may still be present; check loudness for evidence)",
     ``,
     `# Frames (chronological)`,
@@ -544,7 +590,7 @@ export async function analyzeWithClaude(
     system: [
       {
         type: "text",
-        text: SYSTEM_PROMPT,
+        text: isMusicVisual ? MUSIC_VISUAL_SYSTEM_PROMPT : SYSTEM_PROMPT,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -638,7 +684,12 @@ export async function selfCritique(
     system: [
       {
         type: "text",
-        text: SYSTEM_PROMPT + "\n\n" + CRITIQUE_PROMPT,
+        text:
+          (input.contentMode?.mode === "music_visual"
+            ? MUSIC_VISUAL_SYSTEM_PROMPT
+            : SYSTEM_PROMPT) +
+          "\n\n" +
+          CRITIQUE_PROMPT,
         cache_control: { type: "ephemeral" },
       },
     ],

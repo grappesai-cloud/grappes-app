@@ -141,6 +141,17 @@ export type XRankingSignals = {
   rationale: string;
 };
 
+// How the reel communicates — decides whether it's judged as a message
+// (narration/comprehension) or as an audiovisual edit (music-led, no speech).
+export type ContentMode = 'spoken' | 'music_visual' | 'hybrid';
+
+export type ContentModeDetection = {
+  mode: ContentMode;
+  // true = the speech is the creator narrating; false = sung lyrics / music vocals
+  is_narration: boolean;
+  reason: string;
+};
+
 export type AnalysisResult = {
   meta: {
     duration_sec: number;
@@ -150,6 +161,7 @@ export type AnalysisResult = {
     aspect_ratio: string;
     file_size_mb: number;
   };
+  content_mode?: ContentModeDetection;
   niche: NicheDetection;
   hook: {
     score: number;

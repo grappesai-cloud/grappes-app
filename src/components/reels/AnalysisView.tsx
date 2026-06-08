@@ -340,6 +340,77 @@ export function Dashboard({
   const signals = result.signals;
   const nicheProfile = profileFor(result.niche?.niche);
 
+  // Music-led reels (no spoken narration) are judged as audiovisual edits: the
+  // 5 dimension slots keep the same data but are relabelled, and all are shown.
+  const isMusicVisual = result.content_mode?.mode === "music_visual";
+  const showDim = (k: keyof typeof nicheProfile.dims) =>
+    isMusicVisual ? true : nicheProfile.dims[k];
+  const dimMeta = isMusicVisual
+    ? {
+        voice_impact: {
+          title: "Track Fit",
+          via: "Sound",
+          description:
+            "Track Fit measures how tightly the edit rides the music — cuts landing on the beat, energy matched to the track's build and drop. On a music-led reel the song is the script, so this is the spine of the whole piece.",
+        },
+        visual_pull: {
+          title: "Visual Pull",
+          via: "Attention",
+          description:
+            "Visual Pull measures how strongly the imagery commands the eye — motion, framing, grade and the hero shots. For an aesthetic edit the look IS the value, and this is the single biggest stop-the-scroll predictor.",
+        },
+        emotional_hit: {
+          title: "Vibe & Mood",
+          via: "Emotion",
+          description:
+            "Vibe & Mood measures how strongly the look and sound set a feeling. It's the reason someone saves a reel for the aesthetic rather than the message — and saves are the strongest distribution signal a music edit can earn.",
+        },
+        cognitive_grip: {
+          title: "Visual Flow",
+          via: "Editing",
+          description:
+            "Visual Flow measures how easily the eye follows the edit — whether each cut lands somewhere intentional or feels random. This is editing coherence, not comprehension of words; a clean flow is what makes an edit feel pro.",
+        },
+        memorability: {
+          title: "Signature & Loop",
+          via: "Recall",
+          description:
+            "Signature & Loop measures whether there's one screenshot-worthy moment and whether the end flows back into the start so it loops seamlessly. Loopability is the #1 watch-time multiplier for music-led reels.",
+        },
+      }
+    : {
+        voice_impact: {
+          title: "Voice Impact",
+          via: "Attention",
+          description:
+            "Voice Impact measures how much the voiceover, sound design, and audio cues are doing the heavy lifting. A high score means viewers are processing what they hear — not just looking at the visuals — which is what keeps them past the first three seconds and lifts brand recall.",
+        },
+        visual_pull: {
+          title: "Visual Pull",
+          via: "Attention",
+          description:
+            "Visual Pull measures how strongly the imagery commands the eye. A high score means the framing, motion, and on-screen treatment are pulling the viewer's gaze where the storyline wants it — the single biggest predictor of whether someone scrolls past or stops.",
+        },
+        emotional_hit: {
+          title: "Emotional Hit",
+          via: "Emotion",
+          description:
+            "Emotional Hit measures how strongly the content provokes a felt response — joy, surprise, urgency, empathy. A high score is what makes a creative shareable, memorable, and durable; emotional creative consistently out-performs neutral creative on every downstream KPI.",
+        },
+        cognitive_grip: {
+          title: "Cognitive Grip",
+          via: "Comprehension",
+          description:
+            "Cognitive Grip measures how easily viewers can follow what you're communicating. A high score means the message lands without re-watching — which translates directly into intent shifts, click-through, and the willingness to act on the call-to-action.",
+        },
+        memorability: {
+          title: "Memorability",
+          via: "Memory",
+          description:
+            "Memorability measures how likely viewers are to remember the brand or message tomorrow. A high score predicts post-view recall and brand lift in tracking studies — the difference between an ad that ran and an ad that registered.",
+        },
+      };
+
   // Per-clip min/max normalization so the brain reflects WHAT'S HAPPENING IN
   // THIS REEL, not absolute thresholds. ASMR at -50 dB will still light auditory
   // for its loudest moments; a DJ set at -8 dB won't sit permanently red.
@@ -532,15 +603,26 @@ export function Dashboard({
                   {result.niche.niche.replace(/_/g, " ")} · {result.niche.confidence}
                 </span>
               )}
+              {isMusicVisual && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/[0.08] px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300"
+                  title={result.content_mode?.reason}
+                >
+                  <span aria-hidden>♪</span> Music · no narration
+                </span>
+              )}
             </div>
 
             <h1 className="mt-5 max-w-2xl text-balance font-sans text-[clamp(28px,3.4vw,40px)] font-light leading-[1.1] tracking-[-0.025em] text-white">
-              Here&apos;s what a social-graph ranker would do with this reel.
+              {isMusicVisual
+                ? "Here's how a feed would judge this edit."
+                : "Here's what a social-graph ranker would do with this reel."}
             </h1>
 
             <p className="mt-4 max-w-xl text-[13.5px] leading-relaxed text-white/50">
-              We scored every second across attention, emotion, memory, decision and comprehension —
-              then ran the same 10 signals an algorithmic feed uses to decide if you get boost or burial.
+              {isMusicVisual
+                ? "No narration here, so we judged the edit, not a message: hook frame, beat-sync, energy arc, the signature moment and whether it loops — the signals a feed uses to boost or bury a music-led reel."
+                : "We scored every second across attention, emotion, memory, decision and comprehension — then ran the same 10 signals an algorithmic feed uses to decide if you get boost or burial."}
             </p>
 
             <dl className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-white/40">
@@ -698,11 +780,11 @@ export function Dashboard({
             </div>
           )}
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            {nicheProfile.dims.voice_impact && (
+            {showDim("voice_impact") && (
               <CognitiveCard
-                title="Voice Impact"
-                via="Attention"
-                description="Voice Impact measures how much the voiceover, sound design, and audio cues are doing the heavy lifting. A high score means viewers are processing what they hear — not just looking at the visuals — which is what keeps them past the first three seconds and lifts brand recall."
+                title={dimMeta.voice_impact.title}
+                via={dimMeta.voice_impact.via}
+                description={dimMeta.voice_impact.description}
                 data={dims.voice_impact}
                 perSecond
                 duration={result.meta.duration_sec}
@@ -713,11 +795,11 @@ export function Dashboard({
                 }}
               />
             )}
-            {nicheProfile.dims.visual_pull && (
+            {showDim("visual_pull") && (
               <CognitiveCard
-                title="Visual Pull"
-                via="Attention"
-                description="Visual Pull measures how strongly the imagery commands the eye. A high score means the framing, motion, and on-screen treatment are pulling the viewer's gaze where the storyline wants it — the single biggest predictor of whether someone scrolls past or stops."
+                title={dimMeta.visual_pull.title}
+                via={dimMeta.visual_pull.via}
+                description={dimMeta.visual_pull.description}
                 data={dims.visual_pull}
                 perSecond
                 duration={result.meta.duration_sec}
@@ -729,11 +811,11 @@ export function Dashboard({
               />
             )}
           </div>
-          {nicheProfile.dims.emotional_hit && (
+          {showDim("emotional_hit") && (
             <CognitiveCard
-              title="Emotional Hit"
-              via="Emotion"
-              description="Emotional Hit measures how strongly the content provokes a felt response — joy, surprise, urgency, empathy. A high score is what makes a creative shareable, memorable, and durable; emotional creative consistently out-performs neutral creative on every downstream KPI."
+              title={dimMeta.emotional_hit.title}
+              via={dimMeta.emotional_hit.via}
+              description={dimMeta.emotional_hit.description}
               data={dims.emotional_hit}
               perSecond
               duration={result.meta.duration_sec}
@@ -744,25 +826,24 @@ export function Dashboard({
               }}
             />
           )}
-          {(nicheProfile.dims.cognitive_grip ||
-            nicheProfile.dims.memorability) && (
+          {(showDim("cognitive_grip") || showDim("memorability")) && (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {nicheProfile.dims.cognitive_grip && (
+              {showDim("cognitive_grip") && (
                 <CognitiveCard
-                  title="Cognitive Grip"
-                  via="Comprehension"
-                  description="Cognitive Grip measures how easily viewers can follow what you're communicating. A high score means the message lands without re-watching — which translates directly into intent shifts, click-through, and the willingness to act on the call-to-action."
+                  title={dimMeta.cognitive_grip.title}
+                  via={dimMeta.cognitive_grip.via}
+                  description={dimMeta.cognitive_grip.description}
                   data={dims.cognitive_grip}
                   perSecond={false}
                   duration={result.meta.duration_sec}
                   currentTime={videoTime}
                 />
               )}
-              {nicheProfile.dims.memorability && (
+              {showDim("memorability") && (
                 <CognitiveCard
-                  title="Memorability"
-                  via="Memory"
-                  description="Memorability measures how likely viewers are to remember the brand or message tomorrow. A high score predicts post-view recall and brand lift in tracking studies — the difference between an ad that ran and an ad that registered."
+                  title={dimMeta.memorability.title}
+                  via={dimMeta.memorability.via}
+                  description={dimMeta.memorability.description}
                   data={dims.memorability}
                   perSecond={false}
                   duration={result.meta.duration_sec}

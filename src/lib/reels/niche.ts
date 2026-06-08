@@ -99,6 +99,84 @@ export async function detectNiche(input: {
   return tu.input as NicheDetection;
 }
 
+// ── Content mode ──────────────────────────────────────────────────────────────
+// Decide whether the reel is a MESSAGE (creator narrating → judge comprehension)
+// or an AUDIOVISUAL EDIT (music-led, no spoken narration → judge the edit/vibe).
+// Crucially distinguishes a creator TALKING from SUNG LYRICS in a music track.
+
+const MODE_TOOL: Tool = {
+  name: "classify_mode",
+  description: "Classify how the reel communicates.",
+  input_schema: {
+    type: "object",
+    properties: {
+      mode: { type: "string", enum: ["spoken", "music_visual", "hybrid"] },
+      is_narration: {
+        type: "boolean",
+        description:
+          "true if the audio is the creator SPEAKING/narrating to the viewer; false if it is sung lyrics or a music track with no spoken narration.",
+      },
+      reason: { type: "string" },
+    },
+    required: ["mode", "is_narration", "reason"],
+  },
+};
+
+export async function detectContentMode(input: {
+  durationSec: number;
+  transcript: string;
+  hasVoice: boolean;
+  hookFrames: { base64: string; sec: number }[];
+}): Promise<import("./types").ContentModeDetection> {
+  // Fast path: Whisper found no voice at all → definitely a music/visual edit.
+  if (!input.hasVoice || input.transcript.trim().length < 4) {
+    return { mode: "music_visual", is_narration: false, reason: "No speech detected in the audio." };
+  }
+
+  const text = [
+    `Decide how this short-form reel communicates. The big question: is the audio the CREATOR SPEAKING TO THE VIEWER (narration, explanation, a joke, a story, a sales pitch), or is it SUNG LYRICS / a music track that just happens to contain vocals?`,
+    ``,
+    `Rules:`,
+    `- "spoken": a person narrates/talks to camera or in voiceover. The value is in WHAT IS SAID. (talking head, tutorial, comedy with a verbal punchline, product explanation.)`,
+    `- "music_visual": the audio is a song / music. Any words are SUNG LYRICS, not narration. The value is in the EDIT, the visuals, the vibe, beat-sync — NOT a spoken message. (car edits, fashion, dance, travel montages, aesthetic B-roll, DJ.) Lyrics that rhyme, repeat as a chorus, and sit on a steady beat = music, not narration.`,
+    `- "hybrid": real spoken narration AND a prominent music bed both carry meaning (e.g. a voiceover story over a beat).`,
+    ``,
+    `Duration: ${input.durationSec.toFixed(1)}s`,
+    `Transcript (could be narration OR sung lyrics — you decide which): ${input.transcript.slice(0, 1500) || "(none)"}`,
+    ``,
+    `The hook frames (0-3s) follow: a person talking to camera suggests "spoken"; B-roll / scenery / product with no talking head suggests "music_visual".`,
+  ].join("\n");
+
+  try {
+    const res = await client().messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: "You classify how a short-form reel communicates. Use the tool.",
+      tools: [MODE_TOOL],
+      tool_choice: { type: "tool", name: "classify_mode" },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text },
+            ...input.hookFrames.map((f) => ({
+              type: "image" as const,
+              source: { type: "base64" as const, media_type: "image/jpeg" as const, data: f.base64 },
+            })),
+          ],
+        },
+      ],
+    });
+    const tu = res.content.find(
+      (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
+    );
+    if (tu) return tu.input as import("./types").ContentModeDetection;
+  } catch (err) {
+    console.warn("[reels] content-mode detection failed, defaulting to spoken", err);
+  }
+  return { mode: "spoken", is_narration: true, reason: "Defaulted to spoken (mode detection unavailable)." };
+}
+
 const NICHE_PLAYBOOK: Record<Niche, string> = {
   comedy_skit: `COMEDY SKIT playbook (be ruthless):
 - Retention killers: punchline too late, weak first frame, no relatable hook line, dead time between gags
