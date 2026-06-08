@@ -407,6 +407,13 @@
               picked.push(x);
               if (picked.length === 3) break;
             }
+            // Order by brand vividness so the saturated mid-tone leads, not a pale tint.
+            const vivid = (c) => {
+              const mx = Math.max(c.r, c.g, c.b) / 255, mn = Math.min(c.r, c.g, c.b) / 255;
+              const sat = mx === 0 ? 0 : (mx - mn) / mx, L = lum(c);
+              return sat - Math.max(0, L - 0.72) * 1.2 - Math.max(0, 0.18 - L) * 1.2;
+            };
+            picked.sort((a, b) => vivid(b) - vivid(a));
             const hex = (v) => Math.round(v).toString(16).padStart(2, '0');
             resolve(picked.map((p) => '#' + hex(p.r) + hex(p.g) + hex(p.b)));
           } catch (e) { reject(e); }
