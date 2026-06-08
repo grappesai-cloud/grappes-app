@@ -28,14 +28,20 @@ if (!row || row.userId !== authUser.id) return Astro.redirect('/reels');
         print-color-adjust: exact !important;
       }
       body * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      /* hide app chrome + the fixed full-screen background layers (Chrome prints
+         position:fixed on EVERY page → was filling pages with the dashboard photo) */
       header,
       #sup-btn, #sup-panel,
+      body > div[aria-hidden="true"],
+      canvas,
       [data-print-hide], [data-print-hide="true"],
       .reels-back-link { display: none !important; }
       main { padding: 0 !important; }
       /* our own page padding since @page margin is 0 */
       .analysis-print-root { max-width: 100% !important; margin: 0 !important; padding: 12mm 12mm !important; }
-      section, .break-avoid { break-inside: avoid; }
+      /* nothing may bleed past the page width */
+      .analysis-print-root, .analysis-print-root * { overflow: visible !important; max-width: 100% !important; }
+      section, figure, .break-avoid { break-inside: avoid; }
     }
   </style>
   <div class="analysis-print-root" style="max-width:1100px;margin:0 auto;padding:0 8px;">
