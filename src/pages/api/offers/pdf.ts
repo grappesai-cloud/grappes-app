@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { renderOfferHTML, type Offer } from '../../../lib/offer-template';
+import { launchBrowser } from '../../../lib/browser';
 
 function slugify(s: string): string {
   return (s || 'oferta')
@@ -35,19 +36,15 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: 'Offer needs a client and at least one service.' }, 400);
   }
 
-  let puppeteer: any;
-  try {
-    puppeteer = (await import('puppeteer' as string)).default;
-  } catch {
-    return json({ error: 'PDF engine unavailable.' }, 503);
-  }
-
   const html = renderOfferHTML(offer);
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  let browser: any;
+  try {
+    browser = await launchBrowser();
+  } catch (err) {
+    console.error('[offers/pdf] browser launch failed:', err);
+    return json({ error: 'PDF engine unavailable.' }, 503);
+  }
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
