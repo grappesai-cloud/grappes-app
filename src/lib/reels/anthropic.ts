@@ -113,11 +113,25 @@ THIS IS A POST-MORTEM ON A MUSIC-LED EDIT THAT IS ABOUT TO UNDERPERFORM. Find ev
 - Identify dead_zones only as: motion <8 AND no cut for >5s AND the track is in a lull (loudness dropping), i.e. genuinely flat — never just "no talking".
 - Hooks: generate 3-5 concrete OPENING-FRAME / first-cut ideas (visual hooks or text overlays), in the content's language — not spoken-script hooks.
 - overall.verdict: ONE punchy sentence diagnosing why this EDIT underperforms (weak hook frame, off-beat cuts, no escalation, no loop, flat grade), like a director's note. NEVER "it has no message/voiceover".
-- If transcript/visible text is Romanian, output in Romanian. Same for any language.
+
+**OUTPUT LANGUAGE (critical for music-led reels):**
+The SONG'S lyrics language does NOT decide the output language — the lyrics are just the backing track, not the creator's words. Write the ENTIRE analysis (verdict, issues, suggestions, hooks) in **Romanian by default**. Use **English** only if the on-screen text / captions / the creator's handle are clearly English. NEVER output in the song's language (e.g. do not write in Portuguese just because the track is a Brazilian funk).
 
 All three per-second dimensions: smooth 0-100 curves ~1 point/sec, max 7 moments each. Scores rarely exceed 70 unless exceptional.
 
 You MUST call the analyze_reel tool. Do not respond with prose.`;
+
+// Replaces the verbal niche playbook when the reel is a music-led edit, so no
+// "show the product / add a CTA / explain it" rules leak in from a mis-detected
+// verbal niche (e.g. a car edit guessed as product_demo).
+const MUSIC_VISUAL_PLAYBOOK = `MUSIC-LED EDIT playbook (no narration — judge the edit):
+- The track is the script. Cuts must land on the beat; off-beat cutting is an unfollow signal. Estimate BPM from loudness peaks and grade cut timing against it.
+- Hook = the opening frame + first cut, not a spoken line. A slow/ambiguous first 1-2s before the beat lands is the #1 killer — recommend opening ON the drop.
+- Energy must escalate with the track toward the drop/chorus and pay off with a hero shot.
+- Loopability is critical: the last frame should flow back into the first. Fade-to-black endings kill the loop — always flag them.
+- Grade/color and framing ARE the value for aesthetic content. Recommend LUT/grade and stabilization, never "add a voiceover".
+- Dead zone ONLY if motion is genuinely flat AND the track is in a lull. A moving B-roll shot on a strong groove is NOT dead.
+- Hooks to generate = opening-frame / first-cut ideas or text overlays, in the OUTPUT language (see language rule), never spoken scripts.`;
 
 function toolSchema(): Tool {
   return {
@@ -541,7 +555,7 @@ export async function analyzeWithClaude(
     `- reasoning: ${input.niche.reasoning}`,
     ``,
     `# Niche playbook (apply these rules — they override generic advice)`,
-    nichePlaybook(input.niche.niche),
+    isMusicVisual ? MUSIC_VISUAL_PLAYBOOK : nichePlaybook(input.niche.niche),
     ``,
     `# Video metadata`,
     `- duration: ${input.meta.duration_sec.toFixed(2)}s`,
@@ -583,7 +597,9 @@ export async function analyzeWithClaude(
 
   const tools = [toolSchema()];
 
-  const response = await client().messages.create({
+  // Stream → finalMessage: the SDK refuses long non-streaming calls (>10min
+  // estimate) with extended thinking + large max_tokens. Same Message shape.
+  const response = await client().messages.stream({
     model: "claude-sonnet-4-6",
     max_tokens: 20000,
     thinking: { type: "enabled", budget_tokens: 10000 },
@@ -602,7 +618,7 @@ export async function analyzeWithClaude(
         content: [{ type: "text", text: factsText }, ...frameBlocks],
       },
     ],
-  });
+  }).finalMessage();
 
   const toolUse = response.content.find(
     (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
@@ -677,7 +693,7 @@ export async function selfCritique(
     "```",
   ].join("\n");
 
-  const response = await client().messages.create({
+  const response = await client().messages.stream({
     model: "claude-sonnet-4-6",
     max_tokens: 24000,
     thinking: { type: "enabled", budget_tokens: 4000 },
@@ -711,7 +727,7 @@ export async function selfCritique(
         ],
       },
     ],
-  });
+  }).finalMessage();
 
   const toolUse = response.content.find(
     (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",

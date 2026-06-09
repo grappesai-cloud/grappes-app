@@ -598,7 +598,7 @@ export function Dashboard({
                 <span className="h-1 w-1 rounded-full bg-violet-300 shadow-[0_0_6px_currentColor]" />
                 Reel · Analysis
               </span>
-              {result.niche && (
+              {result.niche && !isMusicVisual && (
                 <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-white/70">
                   {result.niche.niche.replace(/_/g, " ")} · {result.niche.confidence}
                 </span>
@@ -771,14 +771,21 @@ export function Dashboard({
           transition={{ duration: 0.4 }}
           className="space-y-5"
         >
-          {nicheProfile.rationale && (
+          {isMusicVisual ? (
+            <div className="rounded-xl border border-cyan-900/40 bg-cyan-950/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-widest text-cyan-300">
+              music-led edit ·{" "}
+              <span className="normal-case tracking-normal text-cyan-200">
+                No narration — judged as an audiovisual edit (hook frame, beat-sync, energy arc, signature moment, loop), not a spoken message.
+              </span>
+            </div>
+          ) : nicheProfile.rationale ? (
             <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 px-4 py-2.5 font-mono text-[10px] uppercase tracking-widest text-amber-300">
               niche profile · {result.niche?.niche.replace(/_/g, " ")} ·{" "}
               <span className="normal-case tracking-normal text-amber-200">
                 {nicheProfile.rationale}
               </span>
             </div>
-          )}
+          ) : null}
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {showDim("voice_impact") && (
               <CognitiveCard
