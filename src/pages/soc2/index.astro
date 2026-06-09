@@ -101,6 +101,23 @@ function timeAgo(dateStr: string): string {
       </button>
     </div>
 
+    {/* Mode — MCP / Agent Security Scan */}
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;display:flex;flex-direction:column;">
+      <div style={`width:40px;height:40px;border-radius:10px;background:${ACCENT}1a;display:flex;align-items:center;justify-content:center;margin-bottom:14px;`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={ACCENT} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M6.5 10v4a1 1 0 0 0 1 1h10"/></svg>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 6px;flex-wrap:wrap;">
+        <h3 style="font-size:17px;font-weight:600;color:#fff;margin:0;">MCP / Agent Security Scan</h3>
+        <span style={`font-size:9.5px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${ACCENT};background:${ACCENT}1f;border-radius:6px;padding:3px 7px;`}>1 credit</span>
+      </div>
+      <p style="font-size:13px;line-height:1.5;color:rgba(255,255,255,0.55);margin:0 0 14px;flex:1;">
+        Scan your AI agent's MCP servers and tools for tool poisoning, prompt injection, rug-pull, credential exposure and excessive permissions. Mapped to SOC 2, ISO 27001 and NIST.
+      </p>
+      <button type="button" id="open-mcp-scan" class="mode-cta" style={`height:44px;border-radius:10px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;`}>
+        {soc2Credits > 0 ? 'Start MCP scan' : 'No credits'}
+      </button>
+    </div>
+
     {/* Mode 2 — Live Pentest */}
     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;display:flex;flex-direction:column;">
       <div style={`width:40px;height:40px;border-radius:10px;background:${ACCENT}1a;display:flex;align-items:center;justify-content:center;margin-bottom:14px;`}>
@@ -319,8 +336,39 @@ function timeAgo(dateStr: string): string {
     </div>
   </div>
 
+  {/* MCP / Agent Security Scan modal */}
+  <div id="mcp-scan-modal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div style="width:100%;max-width:600px;background:#101512;border:1px solid rgba(255,255,255,0.12);border-radius:18px;padding:26px;max-height:90vh;overflow:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-size:18px;font-weight:600;color:#fff;margin:0;">MCP / Agent Security Scan</h3>
+        <button type="button" id="close-mcp-scan" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:22px;line-height:1;cursor:pointer;">×</button>
+      </div>
+      <p style="font-size:12.5px;color:rgba(255,255,255,0.5);margin:0 0 16px;line-height:1.5;">Paste an MCP config or tools manifest, or link a public repo. We check for tool poisoning, prompt injection, rug-pull, credential exposure and excessive permissions, mapped to SOC 2, ISO 27001 and NIST. Costs 1 credit.</p>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button type="button" class="mc-tab" data-tab="paste" style={`flex:1;height:38px;border-radius:9px;border:1px solid ${ACCENT}55;background:${ACCENT}1a;color:${ACCENT};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;`}>Paste manifest</button>
+        <button type="button" class="mc-tab" data-tab="repo" style="flex:1;height:38px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:rgba(255,255,255,0.6);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;">Public repo</button>
+      </div>
+
+      <div id="mc-pane-paste">
+        <textarea id="mc-manifest" placeholder={'{"mcpServers": { ... }}'} style="width:100%;height:200px;resize:vertical;padding:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:10px;color:#fff;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.5;outline:none;"></textarea>
+      </div>
+      <div id="mc-pane-repo" style="display:none;">
+        <input type="text" id="mc-repo" placeholder="github.com/owner/repo" style="width:100%;height:46px;padding:0 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:10px;color:#fff;font-family:inherit;font-size:14px;outline:none;" />
+        <p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin:8px 2px 0;">Public GitHub repos only. We look for mcp.json, claude_desktop_config.json and .cursor/mcp.json.</p>
+      </div>
+
+      <p id="mc-error" style="display:none;margin:14px 0 0;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.28);border-radius:10px;padding:10px 14px;color:#ff8a8a;font-size:12.5px;"></p>
+
+      <button type="button" id="mc-submit" style={`width:100%;height:48px;margin-top:18px;border-radius:11px;border:none;background:${ACCENT};color:#0a0a0a;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;`}>
+        <span id="mc-submit-label">Run MCP scan · 1 credit</span>
+      </button>
+    </div>
+  </div>
+
   <style>
     @media (max-width: 640px) { .soc2-modes { grid-template-columns: 1fr !important; } }
+    #mcp-scan-modal #mc-manifest:focus, #mcp-scan-modal #mc-repo:focus { border-color: #34d399; }
     #code-audit-modal #ca-code:focus, #code-audit-modal #ca-repo:focus { border-color: #34d399; }
     .ca-spin { display:inline-block;width:15px;height:15px;border:2px solid rgba(0,0,0,0.25);border-top-color:#0a0a0a;border-radius:50%;animation:caspin 0.8s linear infinite; }
     @keyframes caspin { to { transform: rotate(360deg); } }
@@ -400,6 +448,76 @@ function timeAgo(dateStr: string): string {
         errEl.style.display = 'block';
         submitBtn.disabled = false;
         label.textContent = 'Run audit · 1 credit';
+      }
+    });
+
+    // ── MCP / Agent Security Scan modal ──
+    const mcModal = document.getElementById('mcp-scan-modal');
+    const mcOpenBtn = document.getElementById('open-mcp-scan');
+    const mcErrEl = document.getElementById('mc-error');
+
+    mcOpenBtn?.addEventListener('click', function () {
+      if (!hasCredits) {
+        document.getElementById('soc2-no-credits')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      mcModal.style.display = 'flex';
+    });
+    document.getElementById('close-mcp-scan')?.addEventListener('click', () => { mcModal.style.display = 'none'; });
+    mcModal?.addEventListener('click', (e) => { if (e.target === mcModal) mcModal.style.display = 'none'; });
+
+    // Tabs
+    let mcActiveTab = 'paste';
+    document.querySelectorAll('.mc-tab').forEach((tab) => {
+      tab.addEventListener('click', function () {
+        mcActiveTab = this.dataset.tab;
+        document.querySelectorAll('.mc-tab').forEach((t) => {
+          const on = t.dataset.tab === mcActiveTab;
+          t.style.border = on ? '1px solid #34d39955' : '1px solid rgba(255,255,255,0.12)';
+          t.style.background = on ? '#34d3991a' : 'transparent';
+          t.style.color = on ? '#34d399' : 'rgba(255,255,255,0.6)';
+        });
+        document.getElementById('mc-pane-paste').style.display = mcActiveTab === 'paste' ? 'block' : 'none';
+        document.getElementById('mc-pane-repo').style.display = mcActiveTab === 'repo' ? 'block' : 'none';
+      });
+    });
+
+    // Submit
+    const mcSubmitBtn = document.getElementById('mc-submit');
+    const mcLabel = document.getElementById('mc-submit-label');
+    mcSubmitBtn?.addEventListener('click', async function () {
+      mcErrEl.style.display = 'none';
+      const manifest = document.getElementById('mc-manifest').value.trim();
+      const repo = document.getElementById('mc-repo').value.trim();
+      const payload = mcActiveTab === 'repo' ? { repo } : { manifest };
+      if ((mcActiveTab === 'repo' && !repo) || (mcActiveTab === 'paste' && !manifest)) {
+        mcErrEl.textContent = mcActiveTab === 'repo' ? 'Enter a repo URL.' : 'Paste an MCP config first.';
+        mcErrEl.style.display = 'block';
+        return;
+      }
+      mcSubmitBtn.disabled = true;
+      mcLabel.innerHTML = '<span class="ca-spin"></span> Scanning, up to a minute…';
+      try {
+        const r = await fetch('/api/soc2/run-mcp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+        if (r.status === 402) { window.location.reload(); return; }
+        if (!r.ok) {
+          mcErrEl.textContent = data.error || 'Scan failed.';
+          mcErrEl.style.display = 'block';
+          mcSubmitBtn.disabled = false;
+          mcLabel.textContent = 'Run MCP scan · 1 credit';
+          return;
+        }
+        window.location.href = '/soc2/' + data.id;
+      } catch {
+        mcErrEl.textContent = 'Network error. Please try again.';
+        mcErrEl.style.display = 'block';
+        mcSubmitBtn.disabled = false;
+        mcLabel.textContent = 'Run MCP scan · 1 credit';
       }
     });
 

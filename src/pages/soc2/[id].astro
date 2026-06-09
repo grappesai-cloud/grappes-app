@@ -76,13 +76,19 @@ function scoreColor(s: number | null): string {
             <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.4);margin-top:3px;">Overall</span>
           </div>
           <div style="min-width:0;flex:1;">
-            <span style={`display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:${ACCENT};margin-bottom:4px;`}>{a.mode} audit · readiness</span>
+            <span style={`display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:${ACCENT};margin-bottom:4px;`}>{a.mode === 'mcp' ? 'MCP / agent security scan' : a.mode === 'controls' ? 'controls self-assessment' : a.mode === 'live' ? 'live scan' : 'code audit'} · readiness</span>
             <h2 style="font-family:'Inter',sans-serif;font-size:26px;font-weight:500;letter-spacing:-0.03em;color:#fff;margin:0 0 6px;word-break:break-word;">{a.target}</h2>
             <p style="font-size:13.5px;color:rgba(255,255,255,0.6);line-height:1.5;margin:0;">{report.summary}</p>
           </div>
         </div>
 
-        {report.stats && (
+        {report.stats && a.mode === 'mcp' && (
+          <p style="font-size:11.5px;color:rgba(255,255,255,0.35);margin:10px 0 24px;">
+            {report.stats.serversScanned} server{report.stats.serversScanned === 1 ? '' : 's'} · {report.stats.toolsScanned} tool{report.stats.toolsScanned === 1 ? '' : 's'} reviewed · {findings.length} finding{findings.length === 1 ? '' : 's'}
+          </p>
+        )}
+
+        {report.stats && a.mode !== 'mcp' && report.stats.filesScanned !== undefined && (
           <p style="font-size:11.5px;color:rgba(255,255,255,0.35);margin:10px 0 24px;">
             {report.stats.filesScanned} file{report.stats.filesScanned === 1 ? '' : 's'} · {report.stats.linesScanned} lines reviewed · {findings.length} finding{findings.length === 1 ? '' : 's'}
           </p>
@@ -142,6 +148,19 @@ function scoreColor(s: number | null): string {
                     <p style="font-size:11.5px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.4);background:rgba(0,0,0,0.25);border-radius:6px;padding:6px 9px;margin:0 0 8px;word-break:break-all;">{f.evidence}</p>
                   )}
                   <p style="font-size:12.5px;color:#a7f3d0;line-height:1.5;margin:0;"><strong style="color:#6ee7a3;">Fix:</strong> {f.fix}</p>
+                  {f.frameworks && (
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;">
+                      {[
+                        { label: 'SOC 2', items: f.frameworks.soc2 },
+                        { label: 'ISO 27001', items: f.frameworks.iso27001 },
+                        { label: 'NIST 800-53', items: f.frameworks.nist80053 },
+                      ].filter(g => g.items && g.items.length).map(g => (
+                        <span style="font-size:9.5px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.45);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.07);border-radius:5px;padding:2px 6px;">
+                          <span style="color:rgba(255,255,255,0.3);">{g.label}</span> {g.items.join(', ')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

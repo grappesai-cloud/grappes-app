@@ -21,7 +21,7 @@ export interface Finding {
   detail: string;        // what's wrong
   fix: string;           // how to fix it
   evidence?: string;     // a redacted snippet / file:line / control ref
-  source: 'static' | 'ai' | 'questionnaire';
+  source: 'static' | 'ai' | 'questionnaire' | 'mcp';
 }
 
 // A single file submitted for review
