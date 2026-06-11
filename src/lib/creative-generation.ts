@@ -1015,7 +1015,7 @@ export function injectEffectRuntimes(html: string): string {
 
 // ─── Opus Creative Plan (the brain — thinks, doesn't code) ──────────────────
 
-async function generateCreativePlan(brief: BriefData, locale: string, rawConversation?: string): Promise<{ plan: string; inputTokens: number; outputTokens: number }> {
+export async function generateCreativePlan(brief: BriefData, locale: string, rawConversation?: string): Promise<{ plan: string; inputTokens: number; outputTokens: number }> {
   const briefJson = JSON.stringify(brief, null, 2);
   const businessName = brief?.business?.name || 'Brand';
   const industry = brief?.business?.industry || '';
@@ -1206,7 +1206,7 @@ export async function generateSite(params: {
     model: GEN_MODEL,
     max_tokens: MAX_TOKENS,
     thinking: { type: 'adaptive' },
-    output_config: { effort: 'high' },
+    output_config: { effort: 'xhigh' }, // A/B winner: xhigh is the biggest design-quality lever (~2.5x cost/latency, worth it for premium one-shot sites)
     system: CREATIVE_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
   } as any);
@@ -1230,7 +1230,7 @@ export async function generateSite(params: {
       model: GEN_MODEL,
       max_tokens: MAX_TOKENS,
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
+      output_config: { effort: 'xhigh' },
       system: CREATIVE_SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: userPrompt },
