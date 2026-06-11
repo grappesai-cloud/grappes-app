@@ -7,15 +7,23 @@
 // Each step is wrapped in try/catch so a failure in one doesn't kill the whole
 // audit; the report shows what we could analyse and reports the rest as errors.
 
+import { put } from "@vercel/blob";
 import { createMessage, HAIKU_MODEL } from "./anthropic";
 import {
   runHtmlChecks,
   scoreChecks,
   type AuditCheck,
 } from "./audit-html-checks";
+import { capturePages, type PageCapture } from "./audit-capture";
 
 const PSI_ENDPOINT =
   "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
+
+/** What the visitor is meant to do — shapes the Attention + Content analysis. */
+export type AuditGoal = "sales" | "presentation";
+
+/** Hard cap on how many pages we crawl + screenshot per audit (cost/time). */
+const MAX_AUDIT_PAGES = 30;
 
 export interface PerfReport {
   score: number; // 0-100
@@ -76,12 +84,23 @@ export interface ContentReport {
  * does it grab attention, is the value-prop clear, does the eye reach the CTA.
  * Distinct from SEO/perf, so surfaced as its own score (not folded into overall).
  */
-export interface PageAttention {
-  url: string;
+/** One viewport's first-impression verdict (desktop or mobile). */
+export interface ViewportAttention {
   score: number; // 0-100
   verdict: string;
   checks: AuditCheck[];
-  screenshot?: string; // data URI (above-the-fold)
+  screenshot?: string; // public Blob URL of the above-the-fold shot
+}
+
+export interface PageAttention {
+  url: string;
+  score: number; // 0-100 — average of the available viewports
+  verdict: string; // kept for backward compat (mobile, or whichever exists)
+  checks: AuditCheck[]; // kept for backward compat
+  screenshot?: string; // kept for backward compat (mobile URL)
+  /** Per-viewport breakdown — the page is judged on BOTH desktop and mobile. */
+  desktop?: ViewportAttention;
+  mobile?: ViewportAttention;
 }
 
 export interface AttentionReport {
@@ -93,11 +112,18 @@ export interface AttentionReport {
   pages?: PageAttention[];
   /** Site-level average across crawled pages. */
   siteScore?: number;
+  /** Conversion goal the analysis was tuned for. */
+  goal?: AuditGoal;
+  /** How many pages were crawled and whether the site had more than the cap. */
+  pagesCrawled?: number;
+  pagesTruncated?: boolean;
 }
 
 export interface AuditReport {
   url: string;
   fetchedAt: string;
+  /** Conversion goal chosen before the run (sales vs presentation). */
+  goal?: AuditGoal;
   perf?: PerfReport;
   onpage: AuditCheck[];
   technical: AuditCheck[];
@@ -229,10 +255,18 @@ async function checkRobotsAndSitemap(baseUrl: string): Promise<AuditCheck[]> {
 }
 
 // ── Claude content analysis ─────────────────────────────────────────────────
+const GOAL_CONTENT_LENS: Record<AuditGoal, string> = {
+  sales:
+    "The site's goal is SALES / CONVERSION. Weight the analysis toward: a clear value proposition, benefit-led (not feature-list) copy, urgency/proof (testimonials, numbers, guarantees), and whether the copy pushes the reader toward a purchase or sign-up. Flag vague or purely descriptive copy that doesn't sell.",
+  presentation:
+    "The site's goal is PRESENTATION / BRAND. Weight the analysis toward: clarity of who this is and what they stand for, tone and brand consistency, memorability, and whether the copy tells a coherent story. Flag generic copy that could belong to any brand.",
+};
+
 async function runContentAnalysis(params: {
   url: string;
   title: string;
   mainText: string;
+  goal: AuditGoal;
 }): Promise<ContentReport> {
   if (params.mainText.length < 200) {
     return {
@@ -273,7 +307,9 @@ saas-product, dev-tool, ai-tool, ecommerce-store, marketplace, fashion-apparel, 
 
 If the page truly doesn't fit any, return ONE entry with id "other" confidence 50. Confidence must sum to a value that reflects actual belief; if the site is clearly one niche, top should be ≥70 and the rest ≤30.
 
-Also check for: clear primary topic, keyword stuffing, thin content, missing structured sections (no clear intro/value-prop), readability, generic copy that could fit any business, mismatch between title and body.`;
+Also check for: clear primary topic, keyword stuffing, thin content, missing structured sections (no clear intro/value-prop), readability, generic copy that could fit any business, mismatch between title and body.
+
+${GOAL_CONTENT_LENS[params.goal]}`;
 
   const user = `URL: ${params.url}
 Page title: ${params.title}
@@ -366,147 +402,241 @@ function deriveNicheCoherence(raw: unknown): NicheCoherence | undefined {
   };
 }
 
-// ── Attention / first-impression (Claude vision on the screenshot) ──────────
-function dataUriToImageBlock(dataUri: string) {
-  const m = dataUri.match(/^data:(image\/\w+);base64,(.+)$/s);
-  const media_type = (m?.[1] ?? "image/jpeg") as
-    | "image/jpeg"
-    | "image/png"
-    | "image/webp";
-  const data = m?.[2] ?? dataUri.replace(/^data:[^,]+,/, "");
-  return { type: "image" as const, source: { type: "base64" as const, media_type, data } };
+// ── Attention / first-impression (Claude vision on the screenshots) ─────────
+function base64ToImageBlock(b64: string) {
+  // Capture module returns raw base64 JPEG (no data: prefix).
+  const data = b64.replace(/^data:[^,]+,/, "");
+  return { type: "image" as const, source: { type: "base64" as const, media_type: "image/jpeg" as const, data } };
 }
 
-async function runAttentionAnalysis(params: {
-  url: string;
-  title?: string;
-  heroText?: string;
-  screenshot: string;
-}): Promise<PageAttention> {
-  const system = `You are a senior conversion + landing-page designer. You are shown the ABOVE-THE-FOLD mobile screenshot of a web page (what a visitor sees in the first ~3 seconds before scrolling). Judge the FIRST IMPRESSION only — not SEO, not performance.
+const GOAL_ATTENTION_LENS: Record<AuditGoal, string> = {
+  sales:
+    "The page's goal is SALES / CONVERSION. Judge the fold on how well it DRIVES ACTION: is there a prominent, action-clear primary CTA above the fold? Is the value proposition obvious in 3 seconds? Is there friction or distraction between the visitor and the action? Are there trust/proof signals near the CTA? Suggested check ids: value-prop, primary-cta, friction, trust-proof.",
+  presentation:
+    "The page's goal is PRESENTATION / BRAND. Judge the fold on FIRST IMPRESSION and craft: does it grab attention, does it feel like a distinct brand (not a template), can a stranger tell who this is and what it's about, is the visual hierarchy and polish strong? Suggested check ids: attention-grab, brand-feel, clarity-5s, visual-hierarchy.",
+};
 
-Return ONLY a JSON object, nothing else:
+/** Judge ONE page on BOTH its desktop and mobile above-the-fold shots. */
+async function runPageAttention(capture: PageCapture, goal: AuditGoal): Promise<PageAttention | null> {
+  if (!capture.desktop && !capture.mobile) return null;
+
+  const system = `You are a senior conversion + landing-page designer. You are shown the ABOVE-THE-FOLD screenshot(s) of a web page — what a visitor sees in the first ~3 seconds before scrolling — at one or both of DESKTOP and MOBILE widths. Judge the FIRST IMPRESSION only, separately for each viewport you are given. Not SEO, not performance.
+
+${GOAL_ATTENTION_LENS[goal]}
+
+Return ONLY a JSON object, nothing else. Include a key ONLY for the viewport(s) actually provided:
 {
-  "score": 0-100,
-  "verdict": "one punchy sentence on the first impression",
-  "checks": [
-    { "id": "attention-grab", "label": "Attention grab", "status": "ok"|"warn"|"fail", "detail": "what the eye lands on first", "fix": "one concrete change" },
-    { "id": "clarity-5s", "label": "5-second clarity", "status": "ok"|"warn"|"fail", "detail": "can a stranger tell what this is/does instantly?", "fix": "..." },
-    { "id": "visual-hierarchy", "label": "Visual hierarchy", "status": "ok"|"warn"|"fail", "detail": "is the eye guided in a clear order toward the action?", "fix": "..." },
-    { "id": "cta", "label": "Primary CTA", "status": "ok"|"warn"|"fail", "detail": "is there a prominent, action-clear CTA above the fold?", "fix": "..." }
-  ]
+  "desktop": {
+    "score": 0-100,
+    "verdict": "one punchy sentence on the desktop first impression",
+    "checks": [
+      { "id": "kebab-id", "label": "Short label", "status": "ok"|"warn"|"fail", "detail": "what you actually see", "fix": "one concrete change" }
+    ]
+  },
+  "mobile": { "score": 0-100, "verdict": "...", "checks": [ ... ] }
 }
 
-Be specific and visual — reference what you actually see (headline, button, image, clutter, whitespace). 'score' reflects how well the fold captures attention AND communicates value in 3s. Calibrate: 50 = average, 75 = strong, 85+ = exceptional.`;
+Give 3-4 checks per viewport. Be specific and visual — reference the actual headline, button, image, clutter, whitespace. Desktop and mobile can score differently (a fold that works on desktop often breaks on mobile). Calibrate: 50 = average, 75 = strong, 85+ = exceptional.`;
 
-  const user = `URL: ${params.url}
-Page title: ${params.title ?? "(unknown)"}
-Hero/visible text (for context): ${(params.heroText ?? "").slice(0, 600)}
+  const content: any[] = [];
+  if (capture.desktop) {
+    content.push({ type: "text", text: "DESKTOP above-the-fold (1440px):" });
+    content.push(base64ToImageBlock(capture.desktop));
+  }
+  if (capture.mobile) {
+    content.push({ type: "text", text: "MOBILE above-the-fold (390px):" });
+    content.push(base64ToImageBlock(capture.mobile));
+  }
+  content.push({
+    type: "text",
+    text: `URL: ${capture.url}
+Page title: ${capture.title || "(unknown)"}
+Visible text (for context): ${(capture.heroText || "").slice(0, 600)}
 
-Judge the screenshot's first impression. Return the JSON now.`;
+Judge the first impression for each viewport shown. Return the JSON now.`,
+  });
 
   const r = await createMessage({
     model: HAIKU_MODEL,
-    max_tokens: 900,
+    max_tokens: 1400,
     system,
-    messages: [
-      {
-        role: "user",
-        content: [dataUriToImageBlock(params.screenshot), { type: "text", text: user }],
-      },
-    ],
+    messages: [{ role: "user", content }],
   });
   const text = r.content[0]?.type === "text" ? r.content[0].text : "{}";
   const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
   let parsed: any = {};
   try { parsed = JSON.parse(cleaned); } catch { /* fall through */ }
 
+  function viewport(raw: any): ViewportAttention | undefined {
+    if (!raw || typeof raw !== "object") return undefined;
+    return {
+      score: typeof raw.score === "number" ? Math.max(0, Math.min(100, Math.round(raw.score))) : 50,
+      verdict: typeof raw.verdict === "string" ? raw.verdict : "Could not read the first impression.",
+      checks: Array.isArray(raw.checks) ? raw.checks.slice(0, 4) : [],
+    };
+  }
+
+  // Upload the screenshots to Blob in parallel so the report stays small.
+  const safeKey = capture.url.replace(/[^a-z0-9]+/gi, "-").slice(0, 60);
+  const [desktopUrl, mobileUrl] = await Promise.all([
+    capture.desktop ? uploadShot(capture.desktop, `${safeKey}-d`) : Promise.resolve(undefined),
+    capture.mobile ? uploadShot(capture.mobile, `${safeKey}-m`) : Promise.resolve(undefined),
+  ]);
+
+  const desktop = capture.desktop ? viewport(parsed.desktop) : undefined;
+  const mobile = capture.mobile ? viewport(parsed.mobile) : undefined;
+  if (desktop) desktop.screenshot = desktopUrl;
+  if (mobile) mobile.screenshot = mobileUrl;
+
+  const scores = [desktop?.score, mobile?.score].filter((s): s is number => typeof s === "number");
+  const score = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 50;
+  // Back-compat top-level fields favour mobile (the original single-viewport axis).
+  const primaryVp = mobile ?? desktop;
+
   return {
-    url: params.url,
-    score: typeof parsed.score === "number" ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 50,
-    verdict: typeof parsed.verdict === "string" ? parsed.verdict : "Could not read the first impression.",
-    checks: Array.isArray(parsed.checks) ? parsed.checks.slice(0, 4) : [],
-    screenshot: params.screenshot,
+    url: capture.url,
+    score,
+    verdict: primaryVp?.verdict ?? "",
+    checks: primaryVp?.checks ?? [],
+    screenshot: primaryVp?.screenshot,
+    desktop,
+    mobile,
   };
 }
 
-/** Discover up to `max` key same-origin pages from the homepage nav links. */
-function discoverPages(homeUrl: string, html: string, max: number): string[] {
-  const origin = new URL(homeUrl).origin;
-  const found = new Map<string, number>(); // url -> priority (lower = better)
-  const linkRe = /<a\b[^>]*href=["']([^"'#?]+)[^"']*["']/gi;
-  let m: RegExpExecArray | null;
-  while ((m = linkRe.exec(html)) !== null) {
-    let href = m[1].trim();
-    if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) continue;
-    try {
-      const u = new URL(href, homeUrl);
-      if (u.origin !== origin) continue;
-      const path = u.pathname.replace(/\/$/, "") || "/";
-      if (path === "/") continue; // homepage handled separately
-      if (/\.(jpg|jpeg|png|gif|svg|webp|pdf|zip|mp4|css|js)$/i.test(path)) continue;
-      const depth = path.split("/").filter(Boolean).length;
-      // Prefer shallow, "key" pages (pricing/about/features/contact/product).
-      const keyBoost = /(pricing|about|feature|product|service|contact|how|use-case|solution)/i.test(path) ? -2 : 0;
-      const prio = depth + keyBoost;
-      const clean = `${origin}${path}`;
-      if (!found.has(clean) || found.get(clean)! > prio) found.set(clean, prio);
-    } catch {
-      /* skip bad href */
-    }
-  }
-  return [...found.entries()]
-    .sort((a, b) => a[1] - b[1])
-    .slice(0, max)
-    .map(([u]) => u);
-}
-
-/** Minimal PSI call that only extracts the Lighthouse screenshot for a URL. */
-async function getScreenshotOnly(url: string): Promise<string | undefined> {
+/** Upload a base64 JPEG to Blob, return its public URL (undefined on failure). */
+async function uploadShot(b64: string, key: string): Promise<string | undefined> {
   try {
-    const apiKey = import.meta.env.PSI_API_KEY ?? process.env.PSI_API_KEY;
-    if (!apiKey) return undefined;
-    const params = new URLSearchParams({ url, strategy: "mobile", key: apiKey, category: "performance" });
-    const r = await fetch(`${PSI_ENDPOINT}?${params}`);
-    if (!r.ok) return undefined;
-    const data = (await r.json()) as any;
-    return (data.lighthouseResult?.audits?.["final-screenshot"]?.details?.data as string | undefined) ?? undefined;
+    const token = process.env.BLOB_READ_WRITE_TOKEN ?? (import.meta as any).env?.BLOB_READ_WRITE_TOKEN;
+    if (!token) return undefined;
+    const bytes = Buffer.from(b64.replace(/^data:[^,]+,/, ""), "base64");
+    const blob = await put(`audits/${key}.jpg`, bytes, {
+      access: "public",
+      contentType: "image/jpeg",
+      token,
+      addRandomSuffix: true,
+    });
+    return blob.url;
   } catch {
     return undefined;
   }
 }
 
+// ── Page discovery (sitemap.xml first, nav links as fallback) ───────────────
+async function fetchSitemapUrls(origin: string): Promise<string[]> {
+  async function loadXml(u: string): Promise<string> {
+    const r = await fetch(u, { redirect: "follow", headers: { "User-Agent": "GrappesAuditBot/1.0" } });
+    if (!r.ok) throw new Error(String(r.status));
+    return r.text();
+  }
+  const out = new Set<string>();
+  try {
+    const xml = await loadXml(`${origin}/sitemap.xml`);
+    const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]);
+    // Sitemap index → fetch a few child sitemaps.
+    if (/<sitemapindex/i.test(xml)) {
+      const children = locs.filter((u) => /\.xml(\?|$)/i.test(u)).slice(0, 5);
+      const childXmls = await Promise.allSettled(children.map(loadXml));
+      for (const c of childXmls) {
+        if (c.status === "fulfilled") {
+          for (const m of c.value.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)) out.add(m[1]);
+        }
+      }
+    } else {
+      for (const u of locs) out.add(u);
+    }
+  } catch {
+    /* no sitemap — caller falls back to nav links */
+  }
+  return [...out];
+}
+
+const ASSET_RE = /\.(jpg|jpeg|png|gif|svg|webp|avif|pdf|zip|mp4|css|js|json|xml|ico|woff2?|ttf)$/i;
+const KEY_PAGE_RE = /(pricing|about|feature|product|service|contact|how|use-case|solution|portfolio|work|shop|store|book|demo|sign|order)/i;
+
+/** Gather same-origin links from the homepage HTML. */
+function linksFromHtml(homeUrl: string, html: string): string[] {
+  const origin = new URL(homeUrl).origin;
+  const out = new Set<string>();
+  const linkRe = /<a\b[^>]*href=["']([^"'#?]+)[^"']*["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(html)) !== null) {
+    const href = m[1].trim();
+    if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) continue;
+    try {
+      const u = new URL(href, homeUrl);
+      if (u.origin !== origin) continue;
+      out.add(u.toString());
+    } catch { /* skip */ }
+  }
+  return [...out];
+}
+
 /**
- * Whole-site attention: the submitted page + a few key discovered pages, each
- * screenshotted and judged. PSI screenshot fetches and vision calls run in
- * PARALLEL so wall-time stays close to a single page (audit runs in-request).
+ * Build the crawl list: homepage first, then key pages, then by depth, deduped
+ * by path, capped at `max`. Returns the list plus whether the site had more.
+ */
+function buildCrawlList(homeUrl: string, candidates: string[], max: number): { pages: string[]; truncated: boolean } {
+  const origin = new URL(homeUrl).origin;
+  const byPath = new Map<string, string>(); // path -> full url
+  byPath.set("/", homeUrl); // homepage always included
+  for (const raw of candidates) {
+    try {
+      const u = new URL(raw, homeUrl);
+      if (u.origin !== origin) continue;
+      const path = u.pathname.replace(/\/+$/, "") || "/";
+      if (ASSET_RE.test(path)) continue;
+      if (!byPath.has(path)) byPath.set(path, `${origin}${path}`);
+    } catch { /* skip */ }
+  }
+  const all = [...byPath.entries()].sort((a, b) => {
+    if (a[0] === "/") return -1;
+    if (b[0] === "/") return 1;
+    const ka = KEY_PAGE_RE.test(a[0]) ? 0 : 1;
+    const kb = KEY_PAGE_RE.test(b[0]) ? 0 : 1;
+    if (ka !== kb) return ka - kb;
+    return a[0].split("/").length - b[0].split("/").length;
+  });
+  return {
+    pages: all.slice(0, max).map(([, u]) => u),
+    truncated: all.length > max,
+  };
+}
+
+/**
+ * Whole-site attention: every page (capped at MAX_AUDIT_PAGES), each captured
+ * at desktop AND mobile (with the cookie banner dismissed) and judged on both
+ * folds. Captures run with bounded concurrency; the per-page vision calls run
+ * in parallel after capture.
  */
 async function runSiteAttention(params: {
   homeUrl: string;
-  homeScreenshot?: string;
-  homeTitle: string;
-  homeHeroText: string;
   html: string;
+  goal: AuditGoal;
   maxPages?: number;
 }): Promise<AttentionReport | undefined> {
-  const max = params.maxPages ?? 4;
-  const subPaths = discoverPages(params.homeUrl, params.html, max - 1);
+  const max = params.maxPages ?? MAX_AUDIT_PAGES;
+  const origin = new URL(params.homeUrl).origin;
 
-  // Fetch sub-page screenshots in parallel; homepage reuses the perf screenshot.
-  const subShots = await Promise.all(subPaths.map((u) => getScreenshotOnly(u)));
+  const sitemapUrls = await fetchSitemapUrls(origin);
+  const navUrls = linksFromHtml(params.homeUrl, params.html);
+  const { pages: crawlUrls, truncated } = buildCrawlList(
+    params.homeUrl,
+    [...sitemapUrls, ...navUrls],
+    max,
+  );
 
-  const targets: { url: string; title?: string; heroText?: string; screenshot: string }[] = [];
-  if (params.homeScreenshot)
-    targets.push({ url: params.homeUrl, title: params.homeTitle, heroText: params.homeHeroText, screenshot: params.homeScreenshot });
-  subPaths.forEach((u, i) => {
-    const shot = subShots[i];
-    if (shot) targets.push({ url: u, screenshot: shot });
-  });
+  const captures = await capturePages(crawlUrls, { concurrency: 3 });
+  const usable = captures.filter((c) => c.desktop || c.mobile);
+  if (usable.length === 0) return undefined;
 
-  if (targets.length === 0) return undefined;
+  const pageResults = await Promise.all(usable.map((c) => runPageAttention(c, params.goal)));
+  const pages = pageResults.filter((p): p is PageAttention => p !== null);
+  if (pages.length === 0) return undefined;
 
-  const pages = await Promise.all(targets.map((t) => runAttentionAnalysis(t)));
-  const primary = pages[0];
+  // Primary = the submitted homepage if present, else the first page.
+  const homePath = (() => { try { return new URL(params.homeUrl).pathname.replace(/\/+$/, "") || "/"; } catch { return "/"; } })();
+  const primary = pages.find((p) => { try { return (new URL(p.url).pathname.replace(/\/+$/, "") || "/") === homePath; } catch { return false; } }) ?? pages[0];
   const siteScore = Math.round(pages.reduce((a, p) => a + p.score, 0) / pages.length);
 
   return {
@@ -515,11 +645,19 @@ async function runSiteAttention(params: {
     checks: primary.checks,
     pages,
     siteScore,
+    goal: params.goal,
+    pagesCrawled: pages.length,
+    pagesTruncated: truncated,
   };
 }
 
 // ── Main orchestrator ───────────────────────────────────────────────────────
-export async function runAudit(rawUrl: string): Promise<AuditReport> {
+export async function runAudit(
+  rawUrl: string,
+  opts?: { goal?: AuditGoal },
+): Promise<AuditReport> {
+  const goal: AuditGoal = opts?.goal === "presentation" ? "presentation" : "sales";
+
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -551,7 +689,7 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
   const [perfResult, robotsResult, contentResult] = await Promise.allSettled([
     runPSI(url.toString()),
     checkRobotsAndSitemap(url.toString()),
-    html ? runContentAnalysis({ url: url.toString(), title: htmlChecks.title, mainText: htmlChecks.mainText })
+    html ? runContentAnalysis({ url: url.toString(), title: htmlChecks.title, mainText: htmlChecks.mainText, goal })
          : Promise.reject(new Error("html unavailable")),
   ]);
 
@@ -569,23 +707,22 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
   if (contentResult.status === "fulfilled") content = contentResult.value;
   else errors.content = contentResult.reason instanceof Error ? contentResult.reason.message : String(contentResult.reason);
 
-  // Attention lens — submitted page + a few key pages (parallel), each judged
-  // on its above-the-fold screenshot. Needs the Lighthouse screenshot + HTML.
+  // Attention lens — every page (capped), each captured at desktop + mobile
+  // (cookie banner dismissed) and judged on both folds for the chosen goal.
   let attention: AttentionReport | undefined;
-  if (perf?.screenshot && html) {
+  if (html) {
     try {
       attention = await runSiteAttention({
         homeUrl: url.toString(),
-        homeScreenshot: perf.screenshot,
-        homeTitle: htmlChecks.title,
-        homeHeroText: htmlChecks.mainText,
         html,
+        goal,
       });
+      if (!attention) errors.attention = "Could not capture any page screenshot.";
     } catch (e) {
       errors.attention = e instanceof Error ? e.message : String(e);
     }
-  } else if (!errors.perf) {
-    errors.attention = "No screenshot available from Lighthouse.";
+  } else {
+    errors.attention = "Page HTML unavailable — skipped attention analysis.";
   }
 
   // Compute category scores
@@ -601,6 +738,7 @@ export async function runAudit(rawUrl: string): Promise<AuditReport> {
   return {
     url: url.toString(),
     fetchedAt: new Date().toISOString(),
+    goal,
     perf,
     onpage: htmlChecks.onpage,
     technical: htmlChecks.technical,

@@ -17,9 +17,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
   }
 
   let url: string | undefined;
+  let goal: "sales" | "presentation" = "sales";
   try {
-    const body = (await request.json()) as { url?: string };
+    const body = (await request.json()) as { url?: string; goal?: string };
     url = body.url?.trim();
+    if (body.goal === "presentation") goal = "presentation";
   } catch {
     return json({ error: "Bad JSON body." }, 400);
   }
@@ -58,7 +60,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
   // ── 3. Run the audit (synchronous; ~10-15s) ─────────────────────────
   try {
-    const report = await runAudit(url);
+    const report = await runAudit(url, { goal });
     await client
       .from("seo_audits")
       .update({

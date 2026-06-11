@@ -42,6 +42,8 @@ const contentScore = row.content_score ?? null;
 const perf = report?.perf as PerfReport | undefined;
 const content = report?.content as ContentReport | undefined;
 const attention = report?.attention as AttentionReport | undefined;
+const goal = (report?.goal ?? attention?.goal) as 'sales' | 'presentation' | undefined;
+const goalLabel = goal === 'presentation' ? 'Presentation / brand' : goal === 'sales' ? 'Sales / conversion' : null;
 const onpageChecks = (report?.onpage ?? []) as AuditCheck[];
 const technicalChecks = (report?.technical ?? []) as AuditCheck[];
 
@@ -85,6 +87,11 @@ function metricFormat(value: number, unit: string): string {
         Status: <span style={`color:${status === 'complete' ? '#6ee7a3' : status === 'failed' ? '#ff8a8a' : '#f6c547'};font-weight:600;`}>{status}</span>
         &nbsp;·&nbsp; {new Date(row.created_at).toLocaleString()}
       </p>
+      {goalLabel && (
+        <span style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;font-weight:600;letter-spacing:0.04em;color:#9af5ff;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.28);border-radius:999px;padding:4px 12px;">
+          {goal === 'presentation' ? '✨' : '🎯'} Optimised for {goalLabel}
+        </span>
+      )}
     </header>
 
     {status === 'running' && (
@@ -128,55 +135,78 @@ function metricFormat(value: number, unit: string): string {
           ))}
         </div>
 
-        {/* Attention / first impression — per page */}
+        {/* Attention / first impression — every page, desktop + mobile */}
         {attention && (() => {
           const pages = attention.pages && attention.pages.length > 0
             ? attention.pages
             : [{ url: row.url, score: attention.score, verdict: attention.verdict, checks: attention.checks, screenshot: perf?.screenshot }];
           const siteScore = attention.siteScore ?? attention.score;
+
+          // Render one viewport (desktop or mobile) as a screenshot + verdict + checks.
+          const renderViewport = (vp: any, label: string, fallbackShot?: string) => {
+            const shot = vp?.screenshot ?? fallbackShot;
+            const score = vp?.score;
+            const verdict = vp?.verdict;
+            const checks = (vp?.checks ?? []) as AuditCheck[];
+            if (!shot && score === undefined) return null;
+            return (
+              <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+                  <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.5);">{label}</span>
+                  {score !== undefined && <span style={`font-size:18px;font-weight:600;line-height:1;color:${scoreColor(score)};`}>{score}<span style="font-size:10px;color:rgba(255,255,255,0.35);">/100</span></span>}
+                </div>
+                {shot && (
+                  <img src={shot} alt={`${label} screenshot`} loading="lazy" style={`width:100%;max-height:${label === 'Mobile' ? '320px' : '200px'};object-fit:cover;object-position:top;border-radius:8px;border:1px solid rgba(255,255,255,0.1);display:block;margin-bottom:10px;`} />
+                )}
+                {verdict && <p style="font-size:12.5px;color:rgba(255,255,255,0.8);margin:0 0 8px;line-height:1.45;">{verdict}</p>}
+                {checks.length > 0 && (
+                  <ul class="check-list">
+                    {checks.map(c => {
+                      const s = statusBg(c.status);
+                      return (
+                        <li class="check-item" style={`background:${s.bg};border-color:${s.border};padding:9px 11px;`}>
+                          <span class="check-pill" style={`background:${s.color};color:#0a0a0a;`}>{statusIcon(c.status)}</span>
+                          <div class="check-body">
+                            <div class="check-label">{c.label}</div>
+                            {c.detail && <div class="check-detail">{c.detail}</div>}
+                            {c.status !== 'ok' && c.fix && <div class="check-detail" style="color:rgba(167,139,250,0.85);margin-top:3px;">Fix: {c.fix}</div>}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          };
+
           return (
             <section style="margin-bottom:28px;">
-              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
-                <h2 class="section-h" style="margin-bottom:0;">First impression — attention</h2>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <h2 class="section-h" style="margin-bottom:0;">First impression: desktop & mobile</h2>
                 <span style="font-size:12px;color:rgba(255,255,255,0.5);">
-                  Site avg <strong style={`color:${scoreColor(siteScore)};`}>{siteScore}</strong> · {pages.length} page{pages.length > 1 ? 's' : ''}
+                  Site avg <strong style={`color:${scoreColor(siteScore)};`}>{siteScore}</strong> · {pages.length} page{pages.length > 1 ? 's' : ''}{attention.pagesTruncated ? ' (capped at 30)' : ''}
                 </span>
               </div>
               <div style="display:flex;flex-direction:column;gap:14px;margin-top:12px;">
-                {pages.map(pg => {
+                {pages.map((pg: any) => {
                   let pagePath = pg.url;
                   try { pagePath = new URL(pg.url).pathname || '/'; } catch {}
+                  const hasViewports = pg.desktop || pg.mobile;
                   return (
                     <div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.18);border-radius:16px;padding:16px;">
-                      <div style="display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:start;">
-                        {pg.screenshot && (
-                          <img src={pg.screenshot} alt={`Screenshot of ${pagePath}`} style="width:140px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);display:block;" />
-                        )}
-                        <div>
-                          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
-                            <span style={`font-family:'Inter',sans-serif;font-size:32px;font-weight:300;line-height:1;color:${scoreColor(pg.score)};`}>{pg.score}</span>
-                            <code style="font-size:12px;color:rgba(255,255,255,0.55);">{pagePath}</code>
-                          </div>
-                          <p style="font-size:13.5px;color:rgba(255,255,255,0.8);margin:8px 0 0;line-height:1.45;">{pg.verdict}</p>
-                          {pg.checks.length > 0 && (
-                            <ul class="check-list" style="margin-top:12px;">
-                              {pg.checks.map(c => {
-                                const s = statusBg(c.status);
-                                return (
-                                  <li class="check-item" style={`background:${s.bg};border-color:${s.border};`}>
-                                    <span class="check-pill" style={`background:${s.color};color:#0a0a0a;`}>{statusIcon(c.status)}</span>
-                                    <div class="check-body">
-                                      <div class="check-label">{c.label}</div>
-                                      {c.detail && <div class="check-detail">{c.detail}</div>}
-                                      {c.status !== 'ok' && c.fix && <div class="check-detail" style="color:rgba(167,139,250,0.85);margin-top:3px;">Fix: {c.fix}</div>}
-                                    </div>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
+                      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                        <span style={`font-family:'Inter',sans-serif;font-size:28px;font-weight:300;line-height:1;color:${scoreColor(pg.score)};`}>{pg.score}</span>
+                        <code style="font-size:12.5px;color:rgba(255,255,255,0.65);">{pagePath}</code>
                       </div>
+                      {hasViewports ? (
+                        <div class="vp-grid">
+                          {renderViewport(pg.desktop, 'Desktop')}
+                          {renderViewport(pg.mobile, 'Mobile')}
+                        </div>
+                      ) : (
+                        renderViewport({ screenshot: pg.screenshot, score: pg.score, verdict: pg.verdict, checks: pg.checks }, 'Page', pg.screenshot)
+                      )}
                     </div>
                   );
                 })}
@@ -401,5 +431,7 @@ function metricFormat(value: number, unit: string): string {
     .check-detail { font-size: 12.5px; color: rgba(255,255,255,0.6); margin-top: 3px; line-height: 1.45; }
     .check-fix { font-size: 12.5px; color: rgba(255,255,255,0.7); margin-top: 6px; line-height: 1.5; }
     .check-fix strong { color: rgba(255,255,255,0.95); font-weight: 700; }
+    .vp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+    @media (max-width: 640px) { .vp-grid { grid-template-columns: 1fr; } }
   </style>
 </Dashboard>
