@@ -6,8 +6,9 @@
 //      Style transfer requires the V3 vector model (V4 does not yet support
 //      style_id), so we route those generations through `recraftv3_vector`.
 //   2. POST to /v1/images/generations:
-//        - default model: `recraftv4_vector` (Recraft V4 Vector, native SVG)
-//        - with refs:     `recraftv3_vector` + style_id + style="vector_illustration"
+//        - default model: `recraftv4_vector` + style="vector_illustration"
+//        - with refs:     `recraftv3_vector` + style_id (NO `style` — the two
+//          are mutually exclusive; sending both is a 400)
 //      response_format=url (default), so we fetch the SVG bytes back.
 //   3. Render a PNG companion from the SVG via sharp (native SVG input).
 //   4. Both files go to Vercel Blob under kits/<id>/logo-<ts>.{svg,png}.
@@ -225,14 +226,16 @@ async function generateSvgFromRecraft(input: GenerateLogoInput): Promise<{ svg: 
     prompt,
     n: 1,
     response_format: "url",
-    style: "vector_illustration",
   };
   if (styleId) {
     // Style transfer only available on V3 (per Recraft docs as of 2026-02).
+    // `style` and `style_id` are mutually exclusive — sending both is a 400,
+    // so a reference style_id replaces the named style entirely.
     body.model = "recraftv3_vector";
     body.style_id = styleId;
   } else {
     body.model = "recraftv4_vector";
+    body.style = "vector_illustration";
   }
 
   // Color constraint: when the user explicitly forced a color (primaryColor)
