@@ -47,14 +47,22 @@ export const POST: APIRoute = async ({ locals, request }) => {
   }
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
+    // domcontentloaded (not networkidle0): the template pulls DM Sans from Google
+    // Fonts, and waiting for the network to fully idle can hang the headless
+    // browser past the timeout. We load the DOM, then give fonts a bounded window
+    // to settle (falls back to system fonts if they never arrive).
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await Promise.race([
+      page.evaluate(() => (document as any).fonts?.ready).catch(() => {}),
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
     });
 
-    return new Response(pdf, {
+    return new Response(pdf as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
@@ -64,7 +72,8 @@ export const POST: APIRoute = async ({ locals, request }) => {
     });
   } catch (err) {
     console.error('[offers/pdf] generation failed:', err);
-    return json({ error: 'Could not generate PDF.' }, 500);
+    const detail = err instanceof Error ? err.message : String(err);
+    return json({ error: `Could not generate PDF: ${detail}` }, 500);
   } finally {
     await browser.close();
   }

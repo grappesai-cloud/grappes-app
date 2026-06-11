@@ -198,6 +198,41 @@ const authUser = Astro.locals.user!;
     #ol-frame { position: absolute; top: 0; left: 0; border: 0; display: block; transform-origin: top left; background: #0b0b0f; }
   </style>
 
+  <!-- Global so the repeatable rows built in JS (services / pricing / etc.) get
+       the same styling. Astro scopes <style> to build-time DOM only; the
+       dynamically-created inputs would otherwise render as raw native fields. -->
+  <style is:global>
+    #ol-form .ol-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    #ol-form .ol-field:last-child { margin-bottom: 0; }
+    #ol-form .ol-field > span { font-size: 11.5px; font-weight: 600; color: var(--c-text-dim); letter-spacing: 0.02em; }
+    #ol-form .ol-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    #ol-form input, #ol-form textarea {
+      width: 100%; background: rgba(0,0,0,0.25); border: 1px solid var(--c-border);
+      border-radius: 10px; padding: 10px 12px; color: #fff;
+      font-family: var(--font-sans); font-size: 13.5px; resize: vertical;
+      transition: border-color .2s ease;
+    }
+    #ol-form input:focus, #ol-form textarea:focus { outline: none; border-color: var(--c-aqua-100); }
+    #ol-form input::placeholder, #ol-form textarea::placeholder { color: rgba(255,255,255,0.28); }
+
+    #ol-form .ol-item {
+      position: relative; border: 1px solid var(--c-border); border-radius: 12px;
+      padding: 14px 14px 14px; margin-bottom: 12px; background: rgba(255,255,255,0.02);
+    }
+    #ol-form .ol-item:last-child { margin-bottom: 0; }
+    #ol-form .ol-item-del {
+      position: absolute; top: 10px; right: 10px;
+      width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+      background: rgba(255,51,52,0.12); border: 1px solid rgba(255,51,52,0.25);
+      color: #ff6b6b; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    }
+    #ol-form .ol-item-del:hover { background: rgba(255,51,52,0.22); }
+    /* leave room for the delete button on the first field of each card */
+    #ol-form .ol-item > .ol-field:first-of-type { padding-right: 32px; }
+    #ol-form .ol-mini { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+  </style>
+
   <script>
     import { renderOfferHTML, SAMPLE_OFFER } from '../../../lib/offer-template';
     import type { Offer } from '../../../lib/offer-template';
