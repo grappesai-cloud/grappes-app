@@ -52,28 +52,25 @@ function hexToRgb(hex: string): [number, number, number] | null {
   return [(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
 }
 
+// Kept compact: Recraft caps the prompt at 1000 chars, so the rule list is
+// terse on purpose while still carrying every hard constraint.
 const BASE_RULES = [
-  "flat vector style, single or two-tone solid color silhouette",
-  "soft off-white #FAFAFA background — no harsh pure white",
-  "NO gradients, NO drop shadows, NO inner shadows, NO outer glow, NO bevels, NO 3D",
-  "NO photorealism, NO photographs, NO textures, NO noise",
-  "thick clean shapes, recognizable at 32px favicon scale",
-  "high contrast against the background — large solid shapes",
-  "negative space allowed",
+  "flat vector silhouette, 1-2 solid colors",
+  "off-white #FAFAFA background",
+  "no gradients, shadows, 3D, photo or texture",
+  "bold high-contrast shapes, readable at 32px",
 ];
 const ICON_ONLY_RULES = [
   ...BASE_RULES,
-  "NO text, NO letters, NO numbers, NO wordmark — icon mark only",
+  "icon mark only, no text or letters",
 ];
 const WORDMARK_RULES = [
   ...BASE_RULES,
-  "wordmark / lettermark — the brand name is the logo, set in a strong custom-style letterform",
-  "letters must be SHARP and READABLE, not decorative noise",
+  "brand name as the logo in a sharp, readable custom letterform",
 ];
 const COMBO_RULES = [
   ...BASE_RULES,
-  "combination mark — an icon + the brand name set together with strong hierarchy",
-  "the icon and the wordmark should feel like one mark, not two unrelated shapes",
+  "icon + brand name together as one mark with clear hierarchy",
 ];
 type LogoType = "icon" | "wordmark" | "combination";
 function rulesFor(t: LogoType): string {
@@ -125,43 +122,46 @@ function recraftApiKey(): string {
  * much better than gpt-image-1, but we still ship the literal rules so the
  * user's description always lands in the output.
  */
+/** Recraft hard-caps the prompt at 1000 chars; keep every field within budget. */
+const PROMPT_MAX = 1000;
+function clampText(s: string, max: number): string {
+  const t = s.trim();
+  return t.length > max ? t.slice(0, max).trimEnd() : t;
+}
+
 function buildPrompt(input: GenerateLogoInput): string {
+  const logoType: LogoType = input.logoType ?? "icon";
+  const brand = input.brandName?.trim();
+  // The free-text brief is the unbounded part — cap it so the fixed scaffolding
+  // (color + rules) always fits inside Recraft's 1000-char limit.
+  const desc = clampText(input.description ?? "", 360);
+
   let colorHint: string;
   if (input.primaryColor) {
     // primaryColor wins over paletteColors. We also recolor the SVG post-hoc
-    // since Recraft treats colors as a soft signal, but the prompt still
-    // helps the model pick contrast / mood appropriate to this hue.
-    colorHint = `Color: monochrome mark in EXACTLY this color: ${input.primaryColor}. The entire mark must use ONLY this single color, no other hues, no shading, no accents.`;
+    // (Recraft treats colors as a soft signal), but the prompt still helps.
+    colorHint = `Single color only: ${input.primaryColor} (no other hues, no shading).`;
   } else if (input.paletteColors && input.paletteColors.length > 0) {
     const cs = input.paletteColors.slice(0, 3).join(", ");
-    colorHint = `Use the brand's existing palette for the mark's fill: ${cs}. Prefer ONE of these as the dominant color (pick the boldest, most saturated one).`;
+    colorHint = `Palette: ${cs}; dominant = boldest, most saturated.`;
   } else {
     const accent = pickAccent();
-    colorHint = `Use a single bold accent color for the mark: ${accent.name} (${accent.hex}). NEVER default to black. NEVER use grey.`;
+    colorHint = `Single bold accent: ${accent.name} ${accent.hex}; never black or grey.`;
   }
-  const styleHint = input.style ? `Style: ${input.style}.` : "";
+  const styleHint = input.style ? ` Style: ${clampText(input.style, 80)}.` : "";
+  const moodHint = input.mood ? ` Mood: ${clampText(input.mood, 60)}.` : "";
 
-  const logoType: LogoType = input.logoType ?? "icon";
-  const brand = input.brandName?.trim();
-  const moodHint = input.mood ? `Mood: ${input.mood}.` : "";
+  let typeIntro: string;
+  if (logoType === "wordmark") {
+    typeIntro = `WORDMARK logo for "${brand ?? desc}": the name "${brand ?? ""}" as readable text in a strong custom letterform.${desc ? ` Brief: ${desc}.` : ""}`;
+  } else if (logoType === "combination") {
+    typeIntro = `COMBINATION mark for "${brand ?? desc}": an icon paired with the readable name "${brand ?? ""}" as one unit.${desc ? ` Concept: ${desc}.` : ""}`;
+  } else {
+    typeIntro = `ICON-ONLY logo mark, no text, for: "${desc || brand}"${brand ? ` (brand "${brand}")` : ""}.`;
+  }
 
-  const typeIntro = (() => {
-    if (logoType === "wordmark") {
-      return `Design a WORDMARK logo for the brand "${brand ?? input.description}". The brand name "${brand ?? ""}" must appear as readable text in a strong, custom-feeling letterform. ${input.description ? `Additional brief: ${input.description}.` : ""}`;
-    }
-    if (logoType === "combination") {
-      return `Design a COMBINATION mark for the brand "${brand ?? input.description}" — an icon paired with the readable brand name "${brand ?? ""}". The icon and the wordmark should sit together as one mark. ${input.description ? `Concept: ${input.description}.` : ""}`;
-    }
-    return `Design an ICON-ONLY logo mark (no text) for: "${input.description}"${brand ? ` (brand: "${brand}")` : ""}.`;
-  })();
-
-  return `${typeIntro}
-${colorHint}
-${styleHint}
-${moodHint}
-STRICT VISUAL RULES: ${rulesFor(logoType)}.
-The result will be delivered as a native vector SVG, so keep it as a clean silhouette with strong contrast against the off-white background.
-Take the user's description literally — if they asked for a specific element, motif, or concept, it MUST appear in the output. Do not substitute it with something generic.`;
+  const prompt = `${typeIntro} ${colorHint}${styleHint}${moodHint} Rules: ${rulesFor(logoType)}. Honor the description literally.`;
+  return clampText(prompt, PROMPT_MAX);
 }
 
 /**
