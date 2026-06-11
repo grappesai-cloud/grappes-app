@@ -5,13 +5,23 @@
 
 import { createMessage, HAIKU_MODEL } from './anthropic';
 import { db } from './db';
-import { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST, OPUS_MODEL, OPUS_INPUT_COST, OPUS_OUTPUT_COST } from './generation';
+import { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST, OPUS_MODEL, OPUS_INPUT_COST, OPUS_OUTPUT_COST, GEN_MODEL, GEN_INPUT_COST, GEN_OUTPUT_COST } from './generation';
 import { EFFECT_RUNTIMES, EFFECTS_DOCS } from './effects';
 import { INVERTED_CORNERS_JS, INVERTED_CORNERS_DOCS } from './inverted-corners';
 
 // Re-export for launch.ts convenience
-export { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST };
+export { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST, GEN_MODEL };
 export const FULL_PAGE_KEY = '__html__full';
+
+// Extract the text block from a message response. With adaptive thinking on
+// Opus, content[0] can be a `thinking` block (empty text when display is
+// omitted), so never assume the text is at index 0 — scan for it.
+function messageText(response: any): string {
+  const blocks = response?.content;
+  if (!Array.isArray(blocks)) return '';
+  const textBlock = blocks.find((b: any) => b?.type === 'text' && typeof b.text === 'string');
+  return textBlock?.text ?? '';
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -94,12 +104,28 @@ These runtime functions are auto-injected if you call them. Using zero is fine �
 
 ## Technical
 
-- <!DOCTYPE html> through </html>. <meta charset>, viewport, <title>, og tags.
-- One <h1>. All <img> with alt. <html lang>.
+- <!DOCTYPE html> through </html>. <meta charset>, viewport, <title> (50 to 60 chars), <meta name="description"> (120 to 160 chars), <html lang>.
+- SEO meta: og:title, og:description, og:type="website", og:image (use the hero or OG asset if one exists), and twitter:card="summary_large_image". Do not invent a canonical URL: it is injected later.
 - Wrap content areas: <!-- SECTION:name --> <div data-section="name">...</div> <!-- /SECTION:name -->
 - Mobile hamburger. @media (prefers-reduced-motion: reduce). Plain JS only.
 - Anchor navigation uses native CSS smooth scroll (html { scroll-behavior: smooth }) — do NOT load Lenis or any smooth-scroll JS library.
 - For icons use inline SVGs or Unicode — no external icon library needed.
+
+## Accessibility (WCAG AA — non-negotiable, not optional polish)
+
+- Exactly ONE <h1>. Heading levels descend in order (h1, then h2, then h3); never skip a level just to get a font size, style the size with CSS instead.
+- Color contrast: body text at least 4.5:1 against its actual background, large/display text at least 3:1. Choose foreground/background pairs that pass. Never ship faint gray text on white or low-contrast text over a busy image.
+- Every <img> has a real, descriptive alt. Use alt="" only for purely decorative images.
+- Every form field has a <label> tied via for/id (visible, or visually-hidden but present). Inputs have name attributes. The submit button has descriptive text, not just an icon.
+- Interactive things are real <button> or <a> (not clickable <div>s). Keep a visible :focus-visible outline on every focusable element; if you restyle it, replace it, never remove it.
+- Decorative SVG/canvas gets aria-hidden="true". Use <nav> and <main> landmarks. Include a skip-to-content link as the first focusable element.
+
+## Performance
+
+- Google Fonts <link> already carries font-display: swap and preconnect. Keep 2 to 3 families max.
+- Hero / LCP image: fetchpriority="high" and NO loading="lazy". Every other (below-the-fold) <img>: loading="lazy" and decoding="async".
+- Give every <img> an explicit width/height or a CSS aspect-ratio so the layout does not shift while images load (protect CLS).
+- Defer non-critical <script> with the defer attribute. No external JS libraries beyond GSAP core.
 - Sections must not visually bleed into each other by accident. If you use position:absolute or oversized elements, ensure they stay within their section's bounds (overflow:hidden or clip). Intentional overlap between sections is fine — accidental overlap is a bug.
 - Full-bleed canvas / generated animated backgrounds MUST be sized explicitly, or they render as a tiny 300×150 box in the top-left corner — a <canvas>'s drawing buffer defaults to 300×150 and is completely independent of its CSS size. For ANY canvas (or WebGL) background:
   - Put it inside a \`position: relative\` parent (the hero/section). Style the canvas \`position:absolute; inset:0; width:100%; height:100%; display:block;\` and layer the real content above it with \`z-index\`.
@@ -162,7 +188,8 @@ Think: "What would a creative agency with a $50K budget design?" Not three cards
 - Every word of copy: specific to THIS brand. No generic text.
 - Be bold. Make something that stops the scroll.
 - NEVER use em dashes (—) or en dashes (–) in ANY user-visible copy: headlines, body text, taglines, nav labels, buttons, alt text, captions, footer. Use commas, periods, colons, or a new sentence instead. Zero exceptions. This rule overrides any stylistic instinct you have toward em-dashes.
-- NEVER FABRICATE REAL-WORLD ARTIFACTS: do not invent track titles, album names, book titles, product SKUs, case-study client names, project names, award names, press outlet names, or any other "thing" that would exist as a real product/release in the world. Only mention these if they are explicitly in the brief (or marked [EXACT]). Inventing them feels like a lie when the visitor recognizes them as fake — and they will. For density around real assets (audio embeds, links, images), use the artist's voice/quotes/tagline/dates from the brief instead.`;
+- NEVER FABRICATE REAL-WORLD ARTIFACTS: do not invent track titles, album names, book titles, product SKUs, case-study client names, project names, award names, press outlet names, or any other "thing" that would exist as a real product/release in the world. Only mention these if they are explicitly in the brief (or marked [EXACT]). Inventing them feels like a lie when the visitor recognizes them as fake — and they will. For density around real assets (audio embeds, links, images), use the artist's voice/quotes/tagline/dates from the brief instead.
+- DISPLAY-ONLY, NO FAKE FUNCTIONALITY: this is a marketing site with NO backend store, CMS, calendar, payment, or auth. Never render controls that imply a working backend that does not exist. Specifically forbidden: "Add to cart" / "Buy now" / checkout / quantity steppers / cart icons; a blog index with "Read more" links to article pages that do not exist; event "Register" / ticket-purchase buttons; "Download" buttons for files we do not host; login / sign-up / account / member-area UI. If the brand sells products, render a SHOWCASE (image, name, price as plain text, short description) whose call to action is "Inquire", "Order via email/WhatsApp", or the contact form, never a cart. A restaurant menu is display-only (no online ordering). Every visible control MUST do something real: scroll to a section, open mailto:/tel:, submit the contact form, or trigger the booking element (data-book). The ONLY interactive backends that exist are the contact form and the booking widget, both handled for you.`;
 
 // ─── Reference Pool ──────────────────────────────────────────────────────────
 
@@ -467,10 +494,22 @@ CRITICAL — DO NOT INVENT TRACKS: Render ONLY the embeds in the URL list above 
     ? `\n## ⚠️ NO EDITORIAL PHOTOS — TYPOGRAPHY-FOCUSED DESIGN\n\nThe client requested no editorial photography (no hero photos, no section photos, no gallery). Do NOT use any photographic <img> for sections, heroes, galleries, or backgrounds. Stock photo URLs (Unsplash, Pexels, etc.) are forbidden.\n\nBUT — uploaded brand assets ARE allowed and SHOULD be used:\n- Logo (in nav and footer) — required if uploaded\n- OG image (for social sharing meta tag) — required if uploaded\n- Video (if uploaded) — embed as specified\n\nFor sections without an uploaded brand asset, build the visual experience with typography, color, geometric CSS shapes, borders, gradients, and whitespace.\n`
     : '';
 
+  // Unsupported-feature guardrail. These flags get set during onboarding but the
+  // platform has no backend for them, so spell out exactly how to render each as
+  // display-only — otherwise the generator emits dead cart/checkout/blog/register UI.
+  const features = (brief?.features ?? {}) as Record<string, any>;
+  const featureNotes: string[] = [];
+  if (features.ecommerce) featureNotes.push('- The brand sells products but there is NO store backend. Render products as a showcase/catalog (image, name, price as plain text, short description). The CTA is "Inquire" or "Order via email/WhatsApp" or the contact form. No add-to-cart, cart icon, checkout, or quantity controls.');
+  if (features.blog) featureNotes.push('- A blog/news section was requested but there is NO CMS. Either omit it, or render a short static "Latest" teaser whose items link to the contact section or an external profile. No article archive with "Read more" links to pages that do not exist.');
+  if (features.booking || brief?.preferences?.primary_goal === 'book') featureNotes.push('- Booking: render the booking CTA as a plain element with data-book="true" (the popup is wired post-generation). Do NOT embed a third-party booking iframe yourself. Put a mailto/contact fallback next to it.');
+  const featuresBlock = featureNotes.length > 0
+    ? `\n## Functional Constraints (display-only — no backend exists for these)\n\n${featureNotes.join('\n')}\n`
+    : '';
+
   return `## Client Brief
 
 ${briefJson}
-${languageDirective}${noPhotosBlock}
+${languageDirective}${noPhotosBlock}${featuresBlock}
 ${sacredBlock ? `\n## Sacred Content (use EXACTLY as written)\n\n${sacredBlock}` : ''}
 ${creativeContextBlock}
 ${assetLines ? `\n## Uploaded Assets\n${noPhotos ? brandAssetLines : assetLines}` : ''}
@@ -750,6 +789,72 @@ export function injectBacklink(html: string, opts?: { brandingRemoved?: boolean 
     return result.slice(0, bodyClose) + backlink + '\n' + result.slice(bodyClose);
   }
   return result + backlink;
+}
+
+// ─── Inject Structured Data (JSON-LD) ────────────────────────────────────────
+// Deterministic schema.org markup from the brief. URL-independent (no canonical),
+// so it is safe to inject at generation time. Improves SEO/rich-result eligibility,
+// which the generator prompt cannot guarantee on its own.
+
+export function injectStructuredData(html: string, brief: Record<string, any>): string {
+  if (html.includes('application/ld+json')) return html; // never double-inject
+  const biz = (brief?.business ?? {}) as Record<string, any>;
+  const name = typeof biz.name === 'string' ? biz.name.trim() : '';
+  if (!name) return html;
+
+  const entityType = biz.entity_type === 'person' ? 'Person' : 'Organization';
+  const social = (brief?.social ?? {}) as Record<string, any>;
+  const sameAs = [social.instagram, social.linkedin, social.twitter, social.facebook]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  const contact = (brief?.contact ?? {}) as Record<string, any>;
+
+  const data: Record<string, any> = { '@context': 'https://schema.org', '@type': entityType, name };
+  if (typeof biz.description === 'string' && biz.description.trim()) data.description = biz.description.trim().slice(0, 300);
+  if (entityType === 'Person' && typeof biz.tagline === 'string' && biz.tagline.trim()) data.jobTitle = biz.tagline.trim();
+  if (sameAs.length) data.sameAs = sameAs;
+  if (typeof contact.email === 'string' && contact.email.trim()) data.email = contact.email.trim();
+  if (typeof contact.phone === 'string' && contact.phone.trim()) data.telephone = contact.phone.trim();
+  if (typeof contact.address === 'string' && contact.address.trim()) data.address = contact.address.trim();
+
+  const snippet = `\n<script type="application/ld+json">${JSON.stringify(data)}</script>`;
+  const headClose = html.indexOf('</head>');
+  if (headClose !== -1) return html.slice(0, headClose) + snippet + '\n' + html.slice(headClose);
+  return html;
+}
+
+// ─── Broken-image check ──────────────────────────────────────────────────────
+// Best-effort HEAD check of http(s) <img> sources. Only definitive 4xx/5xx
+// responses count as broken — network blips / timeouts are kept (we never drop a
+// good image on a transient error). Returns the list of broken URLs to surface as
+// a warning so the user can fix them before the visitor sees a broken image.
+
+export async function findBrokenImages(html: string): Promise<string[]> {
+  const srcs = new Set<string>();
+  const re = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const src = m[1].trim();
+    if (/^https?:\/\//i.test(src)) srcs.add(src);
+  }
+  const urls = [...srcs];
+  const broken: string[] = [];
+  const CONCURRENCY = 6;
+  for (let i = 0; i < urls.length; i += CONCURRENCY) {
+    const batch = urls.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map(async (url) => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch(url, { method: 'HEAD', signal: ctrl.signal });
+        clearTimeout(t);
+        return res.status >= 400 ? url : null;
+      } catch {
+        return null; // network error / timeout — keep the image, don't false-flag
+      }
+    }));
+    for (const r of results) if (r) broken.push(r);
+  }
+  return broken;
 }
 
 // ─── Inject Canvas-Fit Safety Net ────────────────────────────────────────────
@@ -1096,13 +1201,15 @@ export async function generateSite(params: {
   let combinedHtml = '';
 
   const response = await createMessage({
-    model: SONNET_MODEL,
+    model: GEN_MODEL,
     max_tokens: MAX_TOKENS,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'high' },
     system: CREATIVE_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-  });
+  } as any);
 
-  const firstRaw = response.content[0]?.type === 'text' ? response.content[0].text : '';
+  const firstRaw = messageText(response);
   totalInputTokens += response.usage?.input_tokens ?? 0;
   totalOutputTokens += response.usage?.output_tokens ?? 0;
   combinedHtml = firstRaw;
@@ -1118,17 +1225,19 @@ export async function generateSite(params: {
     console.log(`[creative-generation] Truncated after ${combinedHtml.length} chars — continuation ${i + 1}/${MAX_CONTINUATIONS}`);
 
     const contResponse = await createMessage({
-      model: SONNET_MODEL,
+      model: GEN_MODEL,
       max_tokens: MAX_TOKENS,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       system: CREATIVE_SYSTEM_PROMPT,
       messages: [
         { role: 'user', content: userPrompt },
         { role: 'assistant', content: combinedHtml },
         { role: 'user', content: 'Continue EXACTLY where you left off. Do not repeat any HTML already written. Complete the remaining sections and close all tags through </html>.' },
       ],
-    });
+    } as any);
 
-    const contRaw = contResponse.content[0]?.type === 'text' ? contResponse.content[0].text : '';
+    const contRaw = messageText(contResponse);
     totalInputTokens += contResponse.usage?.input_tokens ?? 0;
     totalOutputTokens += contResponse.usage?.output_tokens ?? 0;
     combinedHtml += contRaw.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
@@ -1163,13 +1272,55 @@ export async function generateSite(params: {
 
   console.log(`[creative-generation] Complete: ${html.length} chars, ${totalOutputTokens} output tokens`);
 
-  const cost = totalInputTokens * SONNET_INPUT_COST + totalOutputTokens * SONNET_OUTPUT_COST + opusCost;
+  const cost = totalInputTokens * GEN_INPUT_COST + totalOutputTokens * GEN_OUTPUT_COST + opusCost;
 
   return {
     html,
     cost,
     tokens: { input: totalInputTokens, output: totalOutputTokens },
     opusPlanFailed,
+  };
+}
+
+// ─── Repair pass (guarded) ───────────────────────────────────────────────────
+// Given concrete QA issues, ask the gen model for the COMPLETE corrected HTML.
+// The CALLER must re-measure and only keep the result if it objectively improves
+// (see launch.ts) — this function just produces a candidate, it does not decide.
+export async function repairSite(params: {
+  html: string;
+  issues: string[];
+  brief: BriefData;
+}): Promise<{ html: string; cost: number; tokens: { input: number; output: number } }> {
+  const { html, issues, brief } = params;
+  const locale = (brief?.business?.locale as string | undefined) || 'en';
+
+  const system = `You are fixing specific, listed QA defects in an EXISTING, already-designed HTML website. You are NOT redesigning it.
+
+Rules:
+- Return the COMPLETE corrected HTML file, from <!DOCTYPE html> to </html>. Output ONLY the HTML, no explanation, no code fences.
+- Change ONLY what is needed to resolve the listed issues. Preserve the existing design, layout, copy, colors, fonts, sections, scripts, and section markers (<!-- SECTION:name -->) exactly.
+- Keep all content in its current language (${locale}). Do not translate or reword correct copy.
+- Do NOT use em dashes or en dashes. Do NOT add scroll-driven animation, stock photos, or fake functionality (cart/checkout/blog-archive/login).
+- If an issue is a hidden/collapsed/empty section, make it visible and ensure it has real content and height. If it is a missing <title>/meta/h1/alt or a duplicate id, add or fix it. If it is placeholder text, replace it with real, brand-specific copy.`;
+
+  const userMsg = `Fix these issues in the HTML below and return the full corrected file.\n\nISSUES:\n${issues.map((i) => `- ${i}`).join('\n')}\n\nCURRENT HTML:\n${html}`;
+
+  const response = await createMessage({
+    model: GEN_MODEL,
+    max_tokens: 64000,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'high' },
+    system,
+    messages: [{ role: 'user', content: userMsg }],
+  } as any);
+
+  const repaired = extractHtml(messageText(response));
+  const input = response.usage?.input_tokens ?? 0;
+  const output = response.usage?.output_tokens ?? 0;
+  return {
+    html: repaired,
+    cost: input * GEN_INPUT_COST + output * GEN_OUTPUT_COST,
+    tokens: { input, output },
   };
 }
 

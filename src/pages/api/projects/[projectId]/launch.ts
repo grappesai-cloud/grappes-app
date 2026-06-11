@@ -11,13 +11,18 @@ import {
   injectBookingWidget,
   injectBacklink,
   injectFormHandler,
+  injectStructuredData,
+  findBrokenImages,
   applyBriefContent,
   grammarCheckHtml,
+  repairSite,
   FULL_PAGE_KEY,
   SONNET_MODEL,
+  GEN_MODEL,
   type AssetData,
 } from '../../../../lib/creative-generation';
 import { runStructuralQA } from '../../../../lib/structural-qa';
+import { runVisualQAOnContent } from '../../../../lib/visual-qa';
 import { runPostQA } from '../../../../lib/post-qa';
 
 import { json } from '../../../../lib/api-utils';
@@ -487,10 +492,24 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
     }
     html = injectEffectRuntimes(html);
     html = injectCanvasFit(html);
+    html = injectStructuredData(html, freshBrief.data);
     html = injectAnalytics(html, freshBrief.data, projectId);
     html = injectBookingWidget(html, freshBrief.data);
     html = injectBacklink(html, { brandingRemoved });
     html = injectFormHandler(html, projectId);
+
+    // Broken-image safety net — flag (don't drop) any <img> that 404s so the
+    // user can fix it before a visitor sees a broken image. Non-fatal.
+    try {
+      const broken = await findBrokenImages(html);
+      if (broken.length > 0) {
+        generationWarnings.push(
+          `${broken.length} image(s) returned an error and may appear broken: ${broken.slice(0, 5).join(', ')}${broken.length > 5 ? ', and more' : ''}. Re-upload or replace them in the editor.`
+        );
+      }
+    } catch (e) {
+      console.warn('[launch] broken-image check failed (non-fatal):', e);
+    }
   }
 
   // Language enforcement pass (Haiku). Sonnet's language directive is strong
@@ -513,8 +532,56 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
   }
 
   // Structural QA (in-memory, instant)
-  const structuralReport = runStructuralQA(html);
-  const allIssues = structuralReport.checks.filter(c => !c.passed).map(c => `[structural] ${c.name}: ${c.message}`);
+  let structuralReport = runStructuralQA(html);
+  let allIssues = structuralReport.checks.filter(c => !c.passed).map(c => `[structural] ${c.name}: ${c.message}`);
+
+  // ── Pre-deploy visual QA + guarded auto-repair (single-page only) ────────
+  // Catches hidden/collapsed/overflowing sections BEFORE the visitor sees them.
+  // If concrete issues exist, attempt ONE repair and keep it ONLY when it
+  // objectively lowers the combined (structural + visual) issue count — a blind
+  // regenerate can never make the site worse here. Fully non-fatal.
+  let previsReport: any = null;
+  if (!isMultiPage) {
+    try {
+      previsReport = await runVisualQAOnContent({ fullHtml: html, projectId });
+      const visualIssues = (previsReport?.failedSections ?? []).map((s: string) => `[visual] section fails layout check (hidden/collapsed/overflow): ${s}`);
+      const structuralIssues = structuralReport.checks.filter(c => !c.passed).map(c => `${c.name}: ${c.message}`);
+      const fixable = [...structuralIssues, ...visualIssues];
+
+      if (fixable.length >= 1) {
+        const beforeScore = structuralReport.checks.filter(c => !c.passed).length + (previsReport?.failedSections?.length ?? 0);
+        const repaired = await repairSite({ html, issues: fixable, brief: freshBrief.data });
+        const candidate = repaired.html;
+        if (candidate.includes('</html>') && candidate.length >= html.length * 0.6) {
+          const reStruct = runStructuralQA(candidate);
+          const reVisual = await runVisualQAOnContent({ fullHtml: candidate, projectId }).catch(() => null);
+          const afterScore = reStruct.checks.filter(c => !c.passed).length + (reVisual?.failedSections?.length ?? 0);
+          if (afterScore < beforeScore) {
+            console.log(`[launch] Repair accepted: issue score ${beforeScore} -> ${afterScore}`);
+            html = candidate;
+            structuralReport = reStruct;
+            previsReport = reVisual ?? previsReport;
+            allIssues = reStruct.checks.filter(c => !c.passed).map(c => `[structural] ${c.name}: ${c.message}`);
+            totalCost += repaired.cost;
+            totalInputTokens += repaired.tokens.input;
+            totalOutputTokens += repaired.tokens.output;
+          } else {
+            console.log(`[launch] Repair discarded (no improvement: ${beforeScore} -> ${afterScore})`);
+          }
+        } else {
+          console.log('[launch] Repair discarded (incomplete or stub output)');
+        }
+      }
+
+      if (previsReport && !previsReport.passed && previsReport.failedSections?.length) {
+        generationWarnings.push(
+          `Layout check flagged ${previsReport.failedSections.length} section(s) that may render hidden, collapsed, or overflowing: ${previsReport.failedSections.slice(0, 4).join(', ')}. Review and iterate if needed.`
+        );
+      }
+    } catch (e) {
+      console.warn('[launch] Pre-deploy visual QA / repair failed (non-fatal):', e);
+    }
+  }
 
   // ── Step 8: Save to DB as FULL_PAGE_KEY ─────────────────────────────────
   // Save BEFORE post-QA so the site is persisted even if Haiku QA times out.
@@ -526,6 +593,7 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
     '__structural-qa.json': JSON.stringify(structuralReport, null, 2),
     '__qa_status': allIssues.length === 0 ? 'passed' : 'failed',
   };
+  if (previsReport) files['__previs-qa.json'] = JSON.stringify(previsReport, null, 2);
 
   // Store multi-page files
   if (multiPageFiles && multiPageFiles.length >= 1) {
@@ -557,7 +625,7 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
   await db.costs.create({
     project_id: projectId,
     type: 'generation',
-    model: SONNET_MODEL,
+    model: GEN_MODEL,
     input_tokens: totalInputTokens,
     output_tokens: totalOutputTokens,
     cost_usd: totalCost,

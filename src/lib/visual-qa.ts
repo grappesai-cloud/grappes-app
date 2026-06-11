@@ -4,6 +4,7 @@
 // Results are stored back into generated_files so the QA API can serve them.
 
 import { db } from './db';
+import { launchBrowser } from './browser';
 
 export interface SectionIssue {
   type: string;
@@ -201,14 +202,6 @@ export async function runVisualQAOnContent(params: {
 }): Promise<VisualQAReport> {
   const { fullHtml, projectId } = params;
 
-  let puppeteer: any;
-  try {
-    puppeteer = (await import('puppeteer' as string)).default;
-  } catch {
-    console.warn('[visual-qa] Puppeteer not available — skipping visual QA');
-    return { url: '', projectId, auditedAt: new Date().toISOString(), viewports: [], passed: true, failedSections: [], totalChecked: 0 };
-  }
-
   const VIEWPORTS = [
     { label: 'desktop', width: 1440, height: 900 },
     { label: 'mobile',  width: 390,  height: 844 },
@@ -231,10 +224,13 @@ export async function runVisualQAOnContent(params: {
     // Will be added to each viewport's pageIssues below
   }
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  let browser: any;
+  try {
+    browser = await launchBrowser();
+  } catch (e) {
+    console.warn('[visual-qa] Browser unavailable — skipping pre-deploy visual QA:', e);
+    return { url: 'content://(pre-deploy)', projectId, auditedAt: new Date().toISOString(), viewports: [], passed: true, failedSections: [], totalChecked: 0 };
+  }
 
   try {
     for (const vp of VIEWPORTS) {
@@ -326,17 +322,6 @@ export async function runVisualQAOnContent(params: {
 // ─── Main export ───────────────────────────────────────────────────────────────
 
 export async function runVisualQA(projectId: string, url: string): Promise<VisualQAReport> {
-  // Dynamic import — puppeteer is a dev/optional dependency
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let puppeteer: any;
-  try {
-    // @ts-ignore — optional peer dependency
-    puppeteer = (await import('puppeteer' as string)).default;
-  } catch {
-    console.warn('[visual-qa] Puppeteer not available — skipping visual QA');
-    return { url, projectId, auditedAt: new Date().toISOString(), viewports: [], passed: true, failedSections: [], totalChecked: 0 };
-  }
-
   const VIEWPORTS = [
     { label: 'desktop', width: 1440, height: 900 },
     { label: 'mobile',  width: 390,  height: 844 },
@@ -352,10 +337,7 @@ export async function runVisualQA(projectId: string, url: string): Promise<Visua
     totalChecked: 0,
   };
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     for (const vp of VIEWPORTS) {
@@ -465,10 +447,7 @@ export async function captureFailedSectionScreenshots(params: {
     result[id] = { desktop: null, mobile: null };
   }
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     for (const vp of VIEWPORTS) {
@@ -582,21 +561,10 @@ export interface PageVisualQAResult {
 }
 
 export async function runPageVisualQA(html: string): Promise<PageVisualQAResult> {
-  let puppeteer: any;
-  try {
-    puppeteer = (await import('puppeteer' as string)).default;
-  } catch {
-    console.warn('[visual-qa] Puppeteer not available — skipping page visual QA');
-    return { passed: true, issues: [], screenshots: { desktop: '', mobile: '' } };
-  }
-
   const issues: string[] = [];
   const screenshots: { desktop: string; mobile: string } = { desktop: '', mobile: '' };
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     // ── Desktop viewport ──────────────────────────────────────────────────

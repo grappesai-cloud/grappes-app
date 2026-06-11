@@ -8,9 +8,16 @@ export const SONNET_MODEL        = 'claude-sonnet-4-6';
 export const SONNET_INPUT_COST   = 0.000003;  // $3  / 1M tokens
 export const SONNET_OUTPUT_COST  = 0.000015;  // $15 / 1M tokens
 
-export const OPUS_MODEL          = 'claude-opus-4-6';
-export const OPUS_INPUT_COST     = 0.000015;  // $15 / 1M tokens
-export const OPUS_OUTPUT_COST    = 0.000075;  // $75 / 1M tokens
+export const OPUS_MODEL          = 'claude-opus-4-8';
+export const OPUS_INPUT_COST     = 0.000005;  // $5  / 1M tokens
+export const OPUS_OUTPUT_COST    = 0.000025;  // $25 / 1M tokens
+
+// Model used for the heavy HTML generation + repair pass. Moved from Sonnet to
+// Opus 4.8 (adaptive thinking) for higher design quality; the cost delta is
+// ~1.6x output, not 5x — the stale $15/$75 figures above were wrong.
+export const GEN_MODEL           = OPUS_MODEL;
+export const GEN_INPUT_COST      = OPUS_INPUT_COST;
+export const GEN_OUTPUT_COST     = OPUS_OUTPUT_COST;
 
 // ─── Site architecture derived from brief ────────────────────────────────────
 
