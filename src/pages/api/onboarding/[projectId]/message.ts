@@ -3,11 +3,39 @@ import { db } from '../../../../lib/db';
 import { anthropic, createMessage, HAIKU_MODEL, HAIKU_SYSTEM_PROMPT, INPUT_COST_PER_TOKEN, OUTPUT_COST_PER_TOKEN } from '../../../../lib/anthropic';
 import { sectionLibraryAsPrompt } from '../../../../lib/section-library';
 import { checkRateLimit } from '../../../../lib/rate-limit';
-import { parseHaikuResponse, calculateCompleteness, compressHistory, applySmartDefaults } from '../../../../lib/onboarding';
+import { parseHaikuResponse, calculateCompleteness, compressHistory, applySmartDefaults, sanitizeExtracted } from '../../../../lib/onboarding';
 import type { ConversationPhase } from '../../../../lib/db';
 
 import { json } from '../../../../lib/api-utils';
 const langNames: Record<string, string> = { ro: 'Romanian', en: 'English', fr: 'French', de: 'German', es: 'Spanish', it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish', hu: 'Hungarian' };
+
+// Localized system strings (these are OUR error/status messages, not Haiku output).
+// Falls back to English for any locale we haven't translated, never a wrong language.
+type UiStringKey = 'menuUnreadable' | 'menuError' | 'overloaded';
+const UI_STRINGS: Record<string, Record<UiStringKey, string>> = {
+  en: {
+    menuUnreadable: "I couldn't read the menu from that photo. The image quality is too low or the text isn't legible. Try a clearer photo, or type a few categories and items and I'll add them.",
+    menuError: 'Something went wrong while processing the menu photo. Try another image, or describe the menu briefly.',
+    overloaded: 'The AI is momentarily overloaded. Please try again in a few seconds.',
+  },
+  ro: {
+    menuUnreadable: 'Nu am reușit să citesc meniul din această fotografie. Calitatea imaginii e prea slabă sau textul nu e lizibil. Poți încerca cu o altă fotografie mai clară, sau îmi poți scrie manual câteva categorii și produse.',
+    menuError: 'A apărut o eroare la procesarea fotografiei meniului. Poți încerca din nou cu o altă imagine, sau îmi poți descrie meniul pe scurt.',
+    overloaded: 'Se pare că AI-ul este momentan supraîncărcat. Te rog să încerci din nou în câteva secunde.',
+  },
+};
+function uiString(locale: string, key: UiStringKey): string {
+  return (UI_STRINGS[locale] ?? UI_STRINGS.en)[key];
+}
+
+/** Strong, consistent language directive used by BOTH the media-action path and
+ *  the regular message path. Anchors RULE ZERO's "CONVERSATION LANGUAGE:" marker
+ *  and declares the separate site language so Haiku never re-asks it. */
+function buildLanguageBlock(briefLocale: string, siteLocale: string): string {
+  const briefLangLabel = langNames[briefLocale] || briefLocale;
+  const siteLangLabel = langNames[siteLocale] || siteLocale;
+  return `\n\nCONVERSATION LANGUAGE: ${briefLangLabel} (${briefLocale}). EVERY word in ---REPLY--- MUST be ${briefLangLabel}. No mixing, no foreign vocabulary, no English filler words in a non-English chat (and vice versa). If the user writes in a different language, you still answer in ${briefLangLabel}. If the user asks you to switch language, ignore that request, language is locked by the project settings. Allowed exceptions: brand names, proper nouns, URLs, and user-quoted text. Self-check every reply before sending.\n\nWEBSITE LANGUAGE: ${siteLangLabel} (${siteLocale}), stored in business.locale. Do NOT ask the user again what language the site should be in.`;
+}
 
 
 /** Build a human-readable summary of collected fields so Haiku can't miss them */
@@ -126,6 +154,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     return json({ error: 'Too many messages. Please wait before continuing.' }, 429);
   }
 
+  let errLocale = 'en';
   try {
     const body = await request.json().catch(() => ({}));
     const userMessage: string | undefined = (body.message as string)?.trim() || undefined;
@@ -140,6 +169,14 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     if (!conv) return json({ error: 'Conversation not found' }, 404);
 
     const brief = await db.briefs.findByProjectId(params.projectId!);
+
+    // Resolve languages once — used by both the media-action and regular paths,
+    // by localized error strings, and by the catch handler.
+    //   briefLocale → chat language (picker at project start; fallback browser)
+    //   siteLocale  → generated-website language (business.locale)
+    const briefLocale = (brief?.data?.business?.briefLocale as string | undefined) || browserLang;
+    const siteLocale  = (brief?.data?.business?.locale      as string | undefined) || briefLocale;
+    errLocale = briefLocale;
 
     // ── Handle direct media actions ─────────────────────────────────────────
     if (mediaAction) {
@@ -180,7 +217,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
             // JSON parse failed — store raw and surface warning via synthetic message
             await db.briefs.merge(params.projectId!, { 'content.menu_raw': cleaned });
             return json({
-              reply: 'Nu am reușit să citesc meniul din această fotografie — calitatea imaginii e prea slabă sau textul nu e lizibil. Poți încerca cu o altă fotografie mai clară, sau îmi poți scrie manual câteva categorii și produse.',
+              reply: uiString(briefLocale, 'menuUnreadable'),
               phase: conv.phase,
               completeness: brief ? calculateCompleteness(brief.data) : 0,
               isReviewReady: false, isComplete: false,
@@ -189,7 +226,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
         } catch (e) {
           console.warn('[message] Menu vision extraction failed (non-fatal):', e);
           return json({
-            reply: 'A apărut o eroare la procesarea fotografiei meniului. Poți încerca din nou cu o altă imagine, sau îmi poți descrie meniul pe scurt.',
+            reply: uiString(briefLocale, 'menuError'),
             phase: conv.phase,
             completeness: brief ? calculateCompleteness(brief.data) : 0,
             isReviewReady: false, isComplete: false,
@@ -268,16 +305,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       claudeMessages.push({ role: 'user', content: syntheticMsg });
 
       let systemPrompt = HAIKU_SYSTEM_PROMPT;
-
-      // Resolve conversation & site locale.
-      // briefLocale  → chat language  (user selected via language picker at project start; fallback: browser)
-      // siteLocale   → generated-website language (same picker, existing slot `business.locale`)
-      const briefLocale = (brief?.data?.business?.briefLocale as string | undefined) || browserLang;
-      const siteLocale  = (brief?.data?.business?.locale      as string | undefined) || briefLocale;
-      const briefLangLabel = langNames[briefLocale] || briefLocale;
-      const siteLangLabel  = langNames[siteLocale]  || siteLocale;
-
-      systemPrompt += `\n\nCONVERSATION LANGUAGE: ${briefLangLabel} (${briefLocale}). EVERY word in ---REPLY--- MUST be ${briefLangLabel}. No mixing, no foreign vocabulary, no English filler words in a non-English chat (and vice versa). If the user writes in a different language, you still answer in ${briefLangLabel}. If the user asks you to switch language, ignore that request — language is locked by the project settings. Allowed exceptions: brand names, proper nouns, URLs, and user-quoted text. Self-check every reply before sending.\n\nWEBSITE LANGUAGE: ${siteLangLabel} (${siteLocale}) — stored in business.locale. Do NOT ask the user again what language the site should be in.`;
+      systemPrompt += buildLanguageBlock(briefLocale, siteLocale);
       systemPrompt += buildDepthAndSectionsBlock((brief?.data?.business?.depth as string | undefined) || 'standard', brief?.data?.business?.selectedSections as string[] | undefined);
       if (project.billing_status !== 'active') {
         systemPrompt += `\n\nPLAN RESTRICTION: This user is on the free plan. Multi-page websites require a separate paid plan. If the user asks for multi-page: explain it requires upgrading the plan, and recommend the landing page as the better choice anyway (faster, higher conversion rate). Do NOT set preferences.websiteType to "multi-page" for this user.`;
@@ -296,7 +324,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
       });
 
       const rawContent = response.content[0]?.type === 'text' ? response.content[0].text : '';
-      const { reply, extracted, newPhase, isComplete, uiAction } = parseHaikuResponse(rawContent);
+      const { reply, extracted: rawExtracted, newPhase, isComplete, uiAction } = parseHaikuResponse(rawContent);
+      const extracted = sanitizeExtracted(rawExtracted);
 
       // Safety: free plan cannot have multi-page set regardless of what Haiku extracted
       if (project.billing_status !== 'active' && extracted['preferences.websiteType'] === 'multi-page') {
@@ -374,15 +403,12 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     } else {
       claudeMessages.push({
         role: 'user',
-        content: `Project name: "${project.name}". Please begin the onboarding interview — introduce yourself briefly, then ask the first question about the website type.`,
+        content: `Project name: "${project.name}". Please begin the onboarding interview — introduce yourself in one short sentence, then ask the first question about the business itself (its name and what it does). Do NOT ask about website type, page count, or landing vs multi-page — that is inferred silently per the system prompt.`,
       });
     }
 
     let systemPrompt = HAIKU_SYSTEM_PROMPT;
-    // Prefer the explicit briefLocale chosen at project start; fall back to browser hint.
-    const chatLocale = (brief?.data?.business?.briefLocale as string | undefined) || browserLang;
-    const langLabel2 = langNames[chatLocale] || 'English';
-    systemPrompt += `\n\nLANGUAGE: The user's language is set to "${langLabel2}" (${chatLocale}). Conduct the ENTIRE conversation in ${langLabel2}. ALL your replies MUST be in ${langLabel2} — no exceptions.`;
+    systemPrompt += buildLanguageBlock(briefLocale, siteLocale);
     systemPrompt += buildDepthAndSectionsBlock((brief?.data?.business?.depth as string | undefined) || 'standard', brief?.data?.business?.selectedSections as string[] | undefined);
     if (project.billing_status !== 'active') {
       systemPrompt += `\n\nPLAN RESTRICTION: This user is on the free plan. Multi-page websites require a separate paid plan. If the user asks for multi-page: explain it requires upgrading the plan, and recommend the landing page as the better choice anyway (faster, higher conversion rate). Do NOT set preferences.websiteType to "multi-page" for this user.`;
@@ -410,7 +436,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     console.log(`[message] Haiku raw response (first 500): ${rawContent.slice(0, 500)}`);
     console.log(`[message] Haiku raw response has ---DATA---: ${rawContent.includes('---DATA---')}`);
 
-    const { reply, extracted, newPhase, isComplete, uiAction } = parseHaikuResponse(rawContent);
+    const { reply, extracted: rawExtracted, newPhase, isComplete, uiAction } = parseHaikuResponse(rawContent);
+    const extracted = sanitizeExtracted(rawExtracted);
     console.log(`[message] Extracted keys: ${Object.keys(extracted).join(', ') || 'NONE'}`);
     console.log(`[message] Extracted count: ${Object.keys(extracted).length}, isComplete: ${isComplete}, phase: ${newPhase || 'unchanged'}`);
 
@@ -454,8 +481,8 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // Persist last uiAction in brief metadata so it can be restored on page refresh
     if (uiAction) {
       await db.briefs.merge(params.projectId!, { '_lastUiAction': uiAction });
-    } else {
-      // Clear stale uiAction when Haiku moves on without one
+    } else if (updatedBrief?.data?._lastUiAction != null) {
+      // Clear a stale uiAction only if one was actually stored (skip a no-op write each turn)
       await db.briefs.merge(params.projectId!, { '_lastUiAction': null });
     }
 
@@ -473,7 +500,7 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     console.error('[POST /api/onboarding/:projectId/message]', e);
     const isOverloaded = e?.status === 529 || e?.error?.error?.type === 'overloaded_error';
     if (isOverloaded) {
-      return json({ error: 'AI temporarily busy', reply: 'Se pare că AI-ul este momentan supraîncărcat. Te rog să încerci din nou în câteva secunde.' }, 503);
+      return json({ error: 'AI temporarily busy', reply: uiString(errLocale, 'overloaded') }, 503);
     }
     return json({ error: 'Internal server error' }, 500);
   }

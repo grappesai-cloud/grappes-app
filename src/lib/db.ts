@@ -364,8 +364,10 @@ export const db = {
 
     /**
      * Merge extracted data (dot-path keys) into the existing brief.
-     * Arrays are appended; scalars overwrite.
-     * Implements ONBOARDING.md Section 4.4.
+     * Dot-paths are expanded into a nested patch and deep-merged server-side by
+     * merge_brief_data → jsonb_deep_merge (migration 0028): nested objects merge
+     * key-by-key (sibling fields survive across turns), while scalars, arrays and
+     * JSON null on the patch overwrite. Atomic via FOR UPDATE lock.
      */
     async merge(projectId: string, extracted: Record<string, any>): Promise<Brief> {
       // Flatten dot-path keys into a nested JSONB object for atomic merge

@@ -165,6 +165,15 @@ export function parseHaikuResponse(raw: string): {
   // Safety: strip any remaining ---DATA--- or JSON that leaked into reply
   reply = reply.replace(/---DATA---[\s\S]*/g, '').replace(/---END---[\s\S]*/g, '').trim();
 
+  // Safety net for when Haiku omits the markers entirely and dumps the data
+  // object into the reply. Strip fenced code blocks, then cut from the first
+  // "{" that opens an object containing one of our schema keys (a dot-path like
+  // "business.name", or a special key). High-precision: onboarding replies are
+  // prose, so a brace immediately followed by such a key is a leaked payload.
+  reply = reply.replace(/```[\s\S]*?```/g, '').trim();
+  const leakIdx = reply.search(/\{\s*"(?:[a-z_]+\.[a-z_.]+|_phase|_complete|uiAction)"/i);
+  if (leakIdx !== -1) reply = reply.slice(0, leakIdx).trim();
+
   let extracted: Record<string, any> = {};
   let newPhase: ConversationPhase | undefined;
   let isComplete = false;
@@ -201,6 +210,45 @@ export function parseHaikuResponse(raw: string): {
   }
 
   return { reply, extracted, newPhase, isComplete, uiAction };
+}
+
+// ─── Validate / sanitize Haiku extraction ────────────────────────────────────
+// Haiku occasionally emits malformed values (a colour NAME instead of a hex, an
+// out-of-enum string). Drop those so they never reach the brief or the
+// generator. Unknown keys pass through untouched.
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const HEX_FIELDS = ['branding.colors.primary', 'branding.colors.secondary', 'branding.colors.accent'];
+const ENUMS: Record<string, string[]> = {
+  'preferences.websiteType': ['landing', 'multi-page'],
+  'preferences.complexity': ['essential', 'complete', 'showcase'],
+  'business.entity_type': ['person', 'organization'],
+  'content.copy_ownership': ['user', 'generate', 'hybrid'],
+  'content.pricing_mode': ['list', 'tiered', 'inquire', 'none'],
+  'integrations.analytics': ['ga', 'plausible', 'fathom', 'none'],
+  'integrations.booking': ['calcom', 'calendly', 'none'],
+  'integrations.chat': ['crisp', 'tawk', 'intercom', 'none'],
+  'branding.voice.formality': ['formal', 'casual', 'neutral'],
+};
+
+export function sanitizeExtracted(extracted: Record<string, any>): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [key, value] of Object.entries(extracted)) {
+    // Colours must be valid hex; drop names like "dark red" so the generator
+    // never receives an unusable colour (smart defaults / Opus choose instead).
+    if (HEX_FIELDS.includes(key)) {
+      if (typeof value === 'string' && HEX_RE.test(value.trim())) clean[key] = value.trim();
+      continue;
+    }
+    // Enum fields: drop out-of-range values (normalised to lowercase).
+    if (ENUMS[key]) {
+      if (typeof value === 'string' && ENUMS[key].includes(value.trim().toLowerCase())) {
+        clean[key] = value.trim().toLowerCase();
+      }
+      continue;
+    }
+    clean[key] = value;
+  }
+  return clean;
 }
 
 // ─── Smart defaults by industry ──────────────────────────────────────────────
@@ -416,6 +464,12 @@ export function applySmartDefaults(data: Record<string, any>): Record<string, an
   }
   if (!hasValue(result?.media?.has_logo)) {
     setNestedValue(result, 'media.has_logo', !!result?.branding?.logo);
+  }
+
+  // Strip transient/UI-only keys (e.g. _lastUiAction) so they never reach the
+  // generator prompt or any downstream consumer of the finalized brief.
+  for (const k of Object.keys(result)) {
+    if (k.startsWith('_')) delete result[k];
   }
 
   return result;

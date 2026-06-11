@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateCompleteness, parseHaikuResponse, applySmartDefaults } from '../src/lib/onboarding';
+import { calculateCompleteness, parseHaikuResponse, applySmartDefaults, sanitizeExtracted } from '../src/lib/onboarding';
 
 describe('calculateCompleteness', () => {
   it('returns 0 for empty data', () => {
@@ -105,5 +105,68 @@ describe('applySmartDefaults', () => {
     };
     const result = applySmartDefaults(data);
     expect(result.features?.contact_form).toBeDefined();
+  });
+
+  it('strips transient underscore-prefixed keys so they never reach generation', () => {
+    const data = {
+      business: { name: 'Acme', industry: 'tech' },
+      _lastUiAction: { type: 'upload', variant: 'logo' },
+      _scratch: 'x',
+    };
+    const result = applySmartDefaults(data);
+    expect(result._lastUiAction).toBeUndefined();
+    expect(result._scratch).toBeUndefined();
+    expect(result.business.name).toBe('Acme');
+  });
+});
+
+describe('sanitizeExtracted', () => {
+  it('keeps valid hex colours, drops colour names', () => {
+    const out = sanitizeExtracted({
+      'branding.colors.primary': '#8B0000',
+      'branding.colors.secondary': 'dark red',
+      'branding.colors.accent': '#fff',
+    });
+    expect(out['branding.colors.primary']).toBe('#8B0000');
+    expect(out['branding.colors.accent']).toBe('#fff');
+    expect('branding.colors.secondary' in out).toBe(false);
+  });
+
+  it('keeps in-enum values (normalised), drops out-of-enum', () => {
+    const out = sanitizeExtracted({
+      'preferences.websiteType': 'multi-page',
+      'content.copy_ownership': 'GENERATE',
+      'content.pricing_mode': 'bananas',
+    });
+    expect(out['preferences.websiteType']).toBe('multi-page');
+    expect(out['content.copy_ownership']).toBe('generate');
+    expect('content.pricing_mode' in out).toBe(false);
+  });
+
+  it('passes unknown keys through untouched', () => {
+    const out = sanitizeExtracted({ 'business.name': 'Acme', 'content.headline': 'Hi' });
+    expect(out['business.name']).toBe('Acme');
+    expect(out['content.headline']).toBe('Hi');
+  });
+});
+
+describe('parseHaikuResponse — JSON leak guard', () => {
+  it('strips a leaked dot-path JSON blob when markers are missing', () => {
+    const raw = 'Sună bine? {"branding.colors.primary": "#8B0000", "content.headline": "Hello"}';
+    const result = parseHaikuResponse(raw);
+    expect(result.reply).toBe('Sună bine?');
+    expect(result.reply).not.toContain('{');
+  });
+
+  it('strips a leaked special-key blob', () => {
+    const raw = 'Gata! {"_complete": true}';
+    const result = parseHaikuResponse(raw);
+    expect(result.reply).toBe('Gata!');
+  });
+
+  it('does not touch normal prose containing a brace but no schema key', () => {
+    const raw = 'Use the format {name} in your copy.';
+    const result = parseHaikuResponse(raw);
+    expect(result.reply).toContain('{name}');
   });
 });
