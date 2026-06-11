@@ -1187,14 +1187,16 @@ export async function generateSite(params: {
   console.log(`[creative-generation] Brief size: ${JSON.stringify(brief).length} chars`);
   console.log(`[creative-generation] Assets: ${assets.length}`);
 
-  // Single Sonnet call — 64K output is enough for a full site.
-  // MAX_CONTINUATIONS=3 fits within Vercel Pro's 800s function budget. On
-  // Hobby plans (300s cap) this should be lowered to 1 — content-rich briefs
-  // (multiple videos, gallery, audio embeds) can otherwise hit 4 Sonnet
-  // calls and timeout. The salvage path below keeps a truncated site ship-
-  // pable when continuations still don't close </html>.
-  const MAX_TOKENS = 64000;
-  const MAX_CONTINUATIONS = 3;
+  // Let Opus take what it needs: max_tokens is a hard per-response ceiling the
+  // model is not aware of, so we set it to Opus 4.8's real maximum (128K) and
+  // rely on the model stopping naturally at end_turn. A full site is ~30-60K
+  // tokens of HTML, so it almost always finishes well under the cap in ONE
+  // clean call (no continuation seam). MAX_CONTINUATIONS=1 is a rare safety net
+  // for a pathological site that truly exceeds 128K; the salvage path below
+  // still closes tags if even that does not reach </html>. Streaming (in
+  // createMessage) is required at this size and fits Vercel's 800s budget.
+  const MAX_TOKENS = 128000;
+  const MAX_CONTINUATIONS = 1;
 
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
