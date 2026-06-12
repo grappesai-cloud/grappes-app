@@ -8,6 +8,7 @@ import { runStaticChecks, type CodeFile, type Finding, type TSC, type Severity }
 import { runDeepEngines } from './deep-engines';
 import { verifyFindings } from './verify-findings';
 import type { EvidenceItem } from './evidence';
+import { buildTscMatrix, type TscMatrix } from './tsc-matrix';
 import { tagFindings, type TaggedFinding } from './framework-map';
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
@@ -59,6 +60,7 @@ export interface CodeAuditReport {
     authz?: { routes: number; methods: number; publicMutating: number; idorRisk: number };
   };
   evidence?: EvidenceItem[];
+  tscMatrix?: TscMatrix;
   disclaimer: string;
 }
 
@@ -264,6 +266,7 @@ export async function runCodeAudit(files: CodeFile[], opts: { repoUrl?: string }
     roadmap,
     stats: { filesScanned: staticResult.filesScanned, linesScanned: staticResult.linesScanned, sca: deep?.sca, authz: deep?.authz },
     evidence: deep?.evidence,
+    tscMatrix: buildTscMatrix(findings, deep?.evidence ?? []),
     disclaimer: DISCLAIMER,
   };
 }
