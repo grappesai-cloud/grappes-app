@@ -33,8 +33,11 @@ export const maxDuration = 800;
 
 // ── GET — poll status ──────────────────────────────────────────────────────────
 
-// If a generation has been stuck for > 10 min, the Lambda died — auto-reset to failed
-const STALE_GENERATION_MS = 10 * 60 * 1000;
+// If a generation has been stuck for longer than the function's own budget
+// (maxDuration = 800s ≈ 13m20s) the Lambda died — auto-reset to failed.
+// MUST stay above maxDuration: a shorter window falsely kills a slow-but-still
+// -running generation mid-flight when a status poll trips the watchdog.
+const STALE_GENERATION_MS = 14 * 60 * 1000;
 
 export const GET: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
