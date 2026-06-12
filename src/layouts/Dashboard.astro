@@ -1,7 +1,4 @@
 ---
-import SupportChatWidget from '../components/SupportChatWidget.astro';
-import OnboardingTour from '../components/OnboardingTour.astro';
-
 interface Props {
   title?: string;
   projectId?: string;
@@ -16,29 +13,6 @@ if (!user) {
 
 const currentPath = new URL(Astro.request.url).pathname;
 const inProject = !!projectId;
-
-const studioTourSteps = [
-  { selector: '.tile-grid', title: 'Your studio', body: 'Every AI tool you have access to lives here. Click a tile to open it.' },
-  { selector: '.studio-aside', title: 'Recent activity', body: 'A unified feed of your latest work across all tools.' },
-  { selector: '#sup-btn', title: 'Need help?', body: 'Tap the chat button anytime to message our team, we read every message.' },
-];
-
-const sitesTourSteps = [
-  { selector: 'a[href="/dashboard/new"]', title: 'Start a new site', body: 'Click + New Project to launch a guided onboarding for a fresh website.' },
-  { selector: '.pc-card', title: 'Open a project', body: 'Click any project card to open the editor and continue working.' },
-];
-
-const projectSubpageTourSteps = [
-  { selector: 'a[href$="/deploy"]', title: 'Deploy tab', body: 'Manage deployments, rollbacks, and the live URL of your site.' },
-  { selector: 'a[href$="/inbox"]', title: 'Inbox tab', body: 'Read messages submitted via your site\'s contact form.' },
-  { selector: '#sup-btn', title: 'Support', body: 'Hit a wall? Open the chat and we\'ll help you out.' },
-];
-
-const isStudioHome = currentPath === '/dashboard' || currentPath === '/dashboard/';
-const isSitesPage = currentPath === '/dashboard/sites' || currentPath === '/dashboard/sites/';
-const isProjectSubpage = inProject;
-const tourId = isStudioHome ? 'studio' : isSitesPage ? 'sites' : isProjectSubpage ? 'project-subpage' : '';
-const tourSteps = isStudioHome ? studioTourSteps : isSitesPage ? sitesTourSteps : isProjectSubpage ? projectSubpageTourSteps : [];
 ---
 
 <!DOCTYPE html>
@@ -159,8 +133,5 @@ const tourSteps = isStudioHome ? studioTourSteps : isSitesPage ? sitesTourSteps 
     <main style="max-width:1200px;margin:0 auto;padding:100px 40px 120px;">
       <slot />
     </main>
-
-    <SupportChatWidget />
-    {tourId && <OnboardingTour tourId={tourId} steps={tourSteps} helpButtonLabel="Tour" />}
   </body>
 </html>

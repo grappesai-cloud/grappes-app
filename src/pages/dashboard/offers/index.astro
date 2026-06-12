@@ -12,10 +12,30 @@ const authUser = Astro.locals.user!;
     main { padding-top: 40px !important; padding-bottom: 60px !important; }
   </style>
 
+  <a href="/dashboard" class="ol-back">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    <span>Înapoi</span>
+  </a>
+
   <div class="ol-head">
     <span class="ol-eyebrow">Offer Lab</span>
     <h2 class="ol-title">Construiește o ofertă</h2>
     <p class="ol-sub">Completează detaliile, vezi oferta în timp real, descarc-o ca PDF în brandul Grappes. Ciorna se salvează local în browser.</p>
+  </div>
+
+  <!-- AI intake: describe the offer conversationally instead of filling the form -->
+  <div class="ol-ai" id="ol-ai">
+    <button type="button" class="ol-ai-toggle" id="ol-ai-toggle" aria-expanded="false">
+      <span class="ol-ai-toggle-txt">✨ Nu ai chef să completezi? Descrie oferta în cuvinte și o construiește AI</span>
+      <span class="ol-ai-chev" aria-hidden="true">▾</span>
+    </button>
+    <div class="ol-ai-body" id="ol-ai-body" hidden>
+      <div class="ol-ai-msgs" id="ol-ai-msgs"></div>
+      <form class="ol-ai-form" id="ol-ai-form">
+        <textarea id="ol-ai-input" rows="2" placeholder="ex. Ofertă website + branding pentru un restaurant de fine dining, buget ~3500 EUR în 2 tranșe."></textarea>
+        <button type="submit" class="btn-primary" id="ol-ai-send">Trimite</button>
+      </form>
+    </div>
   </div>
 
   <div class="ol-grid">
@@ -115,6 +135,45 @@ const authUser = Astro.locals.user!;
     }
     .ol-title { font-size: 30px; font-weight: 300; letter-spacing: -0.03em; margin: 0 0 8px; }
     .ol-sub { color: var(--c-text-muted); font-size: 14px; max-width: 60ch; margin: 0; line-height: 1.6; }
+
+    /* Back */
+    .ol-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 13px; font-weight: 600; color: var(--c-text-muted);
+      text-decoration: none; margin-bottom: 18px;
+      padding: 7px 13px 7px 10px; border-radius: 999px;
+      border: 1px solid var(--c-border); background: var(--c-surface);
+      transition: color .2s ease, border-color .2s ease, transform .2s ease;
+    }
+    .ol-back:hover { color: #fff; border-color: var(--c-aqua-100); transform: translateX(-2px); }
+
+    /* AI intake */
+    .ol-ai { margin-bottom: 24px; border: 1px solid var(--c-border); border-radius: 16px; background: var(--c-surface); overflow: hidden; }
+    .ol-ai-toggle {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 15px 18px; cursor: pointer; background: linear-gradient(90deg, rgba(6,191,221,0.08), transparent);
+      border: 0; color: #fff; font-family: var(--font-sans); font-size: 14px; font-weight: 600; text-align: left;
+    }
+    .ol-ai-toggle:hover { background: linear-gradient(90deg, rgba(6,191,221,0.14), transparent); }
+    .ol-ai-chev { color: var(--c-aqua-100); transition: transform .25s ease; font-size: 13px; }
+    .ol-ai[data-open="true"] .ol-ai-chev { transform: rotate(180deg); }
+    .ol-ai-body { padding: 0 16px 16px; }
+    .ol-ai-msgs { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding: 12px 2px; }
+    .ol-ai-msg { max-width: 85%; padding: 10px 13px; border-radius: 13px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
+    .ol-ai-msg--user { align-self: flex-end; background: var(--c-aqua-100); color: #04232a; border-bottom-right-radius: 4px; }
+    .ol-ai-msg--bot { align-self: flex-start; background: rgba(255,255,255,0.05); border: 1px solid var(--c-border); border-bottom-left-radius: 4px; }
+    .ol-ai-use {
+      align-self: flex-start; margin-top: 2px; font-size: 13px; font-weight: 700; cursor: pointer;
+      color: #04232a; background: var(--c-aqua-100); border: 0; border-radius: 999px; padding: 8px 16px;
+    }
+    .ol-ai-use:hover { filter: brightness(1.08); }
+    .ol-ai-form { display: flex; gap: 10px; align-items: flex-end; }
+    .ol-ai-form textarea {
+      flex: 1; background: rgba(0,0,0,0.25); border: 1px solid var(--c-border); border-radius: 10px;
+      padding: 10px 12px; color: #fff; font-family: var(--font-sans); font-size: 13.5px; resize: vertical;
+    }
+    .ol-ai-form textarea:focus { outline: none; border-color: var(--c-aqua-100); }
+    .ol-ai-form .btn-primary { white-space: nowrap; }
 
     .ol-grid {
       display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -445,6 +504,78 @@ const authUser = Astro.locals.user!;
       if (!confirm('Resetezi ciorna la exemplul implicit?')) return;
       state = structuredClone(SAMPLE_OFFER);
       save(); syncTop(); renderAllLists(); renderPreview();
+    });
+
+    // ── AI intake chat ───────────────────────────────────────────────────
+    const aiEl = $('#ol-ai');
+    const aiToggle = $('#ol-ai-toggle') as HTMLButtonElement;
+    const aiBody = $('#ol-ai-body') as HTMLElement;
+    const aiMsgs = $('#ol-ai-msgs') as HTMLElement;
+    const aiForm = $('#ol-ai-form') as HTMLFormElement;
+    const aiInput = $('#ol-ai-input') as HTMLTextAreaElement;
+    const aiSend = $('#ol-ai-send') as HTMLButtonElement;
+    const aiHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+
+    function addMsg(role: 'user' | 'bot', text: string): HTMLElement {
+      const m = el('div', `ol-ai-msg ol-ai-msg--${role}`);
+      m.textContent = text;
+      aiMsgs.appendChild(m); aiMsgs.scrollTop = aiMsgs.scrollHeight;
+      return m;
+    }
+    const addBot = (t: string) => addMsg('bot', t);
+
+    function applyOffer(o: any) {
+      o = o || {};
+      if (typeof o.client === 'string') state.client = o.client;
+      if (typeof o.title === 'string') state.title = o.title;
+      if (typeof o.intro === 'string') state.intro = o.intro;
+      if (Array.isArray(o.services)) state.services = o.services.map((s: any) => ({ title: s.title || '', subtitle: s.subtitle || '', items: Array.isArray(s.items) ? s.items : [] }));
+      if (Array.isArray(o.pricing)) state.pricing = o.pricing.map((p: any) => ({ label: p.label || '', note: p.note || '', amount: Number(p.amount) || 0, currency: p.currency || 'EUR' }));
+      if (Array.isArray(o.installments)) state.installments = o.installments.map((t: any) => ({ label: t.label || '', detail: t.detail || '', amount: Number(t.amount) || 0, currency: t.currency || 'EUR' }));
+      if (Array.isArray(o.notes)) state.notes = o.notes;
+      save(); syncTop(); renderAllLists(); renderPreview();
+    }
+
+    aiToggle.addEventListener('click', () => {
+      const opening = aiBody.hasAttribute('hidden');
+      if (opening) {
+        aiBody.removeAttribute('hidden'); aiEl.setAttribute('data-open', 'true'); aiToggle.setAttribute('aria-expanded', 'true');
+        if (aiMsgs.childElementCount === 0) addBot('Descrie oferta în câteva cuvinte: cine e clientul, ce servicii incluzi și, dacă vrei, prețul. O construiesc eu și o pun în formular.');
+        aiInput.focus();
+      } else {
+        aiBody.setAttribute('hidden', ''); aiEl.removeAttribute('data-open'); aiToggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    aiForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = aiInput.value.trim();
+      if (!text || aiSend.disabled) return;
+      addMsg('user', text); aiHistory.push({ role: 'user', content: text });
+      aiInput.value = ''; aiSend.disabled = true;
+      const thinking = addBot('…');
+      try {
+        const res = await fetch('/api/offers/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: aiHistory }) });
+        const data = await res.json().catch(() => ({}));
+        thinking.remove();
+        if (!res.ok) { addBot(data.error || 'A apărut o eroare. Încearcă din nou.'); return; }
+        addBot(data.reply); aiHistory.push({ role: 'assistant', content: data.reply });
+        if (data.offer && data.done) {
+          const useBtn = el('button', 'ol-ai-use', 'Folosește oferta în formular') as HTMLButtonElement;
+          useBtn.type = 'button';
+          useBtn.addEventListener('click', () => {
+            applyOffer(data.offer);
+            useBtn.textContent = '✓ Pus în formular'; useBtn.disabled = true;
+            aiBody.setAttribute('hidden', ''); aiEl.removeAttribute('data-open'); aiToggle.setAttribute('aria-expanded', 'false');
+            document.getElementById('ol-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+          aiMsgs.appendChild(useBtn); aiMsgs.scrollTop = aiMsgs.scrollHeight;
+        }
+      } catch {
+        thinking.remove(); addBot('Conexiune întreruptă. Încearcă din nou.');
+      } finally {
+        aiSend.disabled = false; aiInput.focus();
+      }
     });
 
     // ── Init ─────────────────────────────────────────────────────────────
