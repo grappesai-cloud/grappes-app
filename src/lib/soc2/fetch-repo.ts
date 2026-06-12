@@ -31,7 +31,8 @@ function ghHeaders(): Record<string, string> {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'grappes-soc2-lab',
   };
-  const token = import.meta.env.GITHUB_TOKEN;
+  // `import.meta.env` is undefined under plain node (workers/scripts) — guard it.
+  const token = (import.meta as any).env?.GITHUB_TOKEN ?? process.env.GITHUB_TOKEN;
   if (token) h.Authorization = `Bearer ${token}`;
   return h;
 }
@@ -72,8 +73,12 @@ export async function fetchPublicRepo(input: string): Promise<{ label: string; f
   let total = 0;
   for (const n of candidates) {
     if (total >= MAX_TOTAL_BYTES) break;
-    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${n.path}`;
-    const r = await fetch(rawUrl, { headers: { 'User-Agent': 'grappes-soc2-lab' } });
+    // Use the authenticated Contents API (raw media type) so PRIVATE repos work
+    // too — raw.githubusercontent.com 404s for private repos without a token.
+    const r = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURI(n.path)}?ref=${branch}`,
+      { headers: { ...ghHeaders(), Accept: 'application/vnd.github.raw' } },
+    );
     if (!r.ok) continue;
     let content = await r.text();
     if (content.length > MAX_FILE_BYTES) content = content.slice(0, MAX_FILE_BYTES);

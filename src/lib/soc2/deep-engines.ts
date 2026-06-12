@@ -27,9 +27,11 @@ async function defaultBranch(owner: string, repo: string): Promise<string> {
 }
 
 async function rawFile(owner: string, repo: string, branch: string, path: string): Promise<string | null> {
-  const res = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`, {
-    headers: { 'User-Agent': 'grappes-soc2-lab' },
-  });
+  // Authenticated Contents API (raw media type) so PRIVATE repos resolve too.
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURI(path)}?ref=${branch}`,
+    { headers: { ...ghHeaders(), Accept: 'application/vnd.github.raw' } },
+  );
   return res.ok ? res.text() : null;
 }
 
