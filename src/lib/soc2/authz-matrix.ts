@@ -47,6 +47,15 @@ function hasOwnershipCheck(body: string): boolean {
   return /user_id\s*[!=]==?\s*user\.id|\.user_id\s*!==\s*|project\.user_id|\.eq\(\s*['"]user_id['"]\s*,\s*user\.id|where[^)]*user_id|belongsTo|assertOwner|ownerId\s*[!=]==/.test(body);
 }
 
+/** Heuristic: does the handler actually LOAD a resource using the URL id? An
+ *  endpoint that never reads an object by the path id can't be IDOR — this is
+ *  what cut korbee's IDOR candidates from noise to the real ones. */
+function loadsById(body: string): boolean {
+  const usesParam = /params\.[a-zA-Z]+|\bparams\[|context\.params|locals\.params/.test(body);
+  const loadsByKey = /findById\s*\(|findUnique|findFirst|\.eq\(\s*['"]id['"]|eq\(\s*[\w.]+\.id\s*,|where[^)]*\bid\b\s*[,:=]|getById|loadById|\bfrom\(['"][^'"]+['"]\)[\s\S]{0,80}\.eq\(/i.test(body);
+  return usesParam && loadsByKey;
+}
+
 export interface AuthzResult {
   findings: Finding[];
   matrix: RouteEntry[];
@@ -63,6 +72,7 @@ export function runAuthzMatrix(files: CodeFile[]): AuthzResult {
     const dynamicId = /\[[^\]]+\]/.test(f.path);
     const auth = classifyAuth(f.content);
     const ownershipCheck = hasOwnershipCheck(f.content);
+    const loads = loadsById(f.content);
 
     METHOD_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
@@ -90,8 +100,10 @@ export function runAuthzMatrix(files: CodeFile[]): AuthzResult {
         });
       }
 
-      // 2) Object-by-id handler, user-authed but no ownership comparison → IDOR.
-      if (dynamicId && auth === 'user' && !ownershipCheck && method !== 'GET') {
+      // 2) Object-by-id handler that actually LOADS by the URL id, user-authed,
+      //    but no ownership comparison → IDOR. Requiring a real load-by-id cuts
+      //    the false positives from routes that merely have a dynamic segment.
+      if (dynamicId && auth === 'user' && loads && !ownershipCheck && method !== 'GET') {
         findings.push({
           id: `authz-idor-${label.replace(/[^a-z0-9]/gi, '-')}-${method}`,
           title: `Possible IDOR: ${method} ${label} authenticates but may not check object ownership`,
