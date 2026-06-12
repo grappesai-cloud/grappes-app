@@ -25,6 +25,8 @@ export interface Finding {
   // Set by the adversarial verification pass (verify-findings.ts).
   confidence?: number;   // 0..1 — how sure we are this is real (post-verification)
   cvss?: number;         // 0..10 — CVSS-style base score for vuln-type findings
+  epss?: number;         // 0..1 — EPSS probability of exploitation in the next 30 days
+  reachable?: boolean;   // is the vulnerable package actually imported by the code?
   verified?: boolean;    // true once the verification pass has reviewed it
   control?: string;      // specific SOC 2 control ref, e.g. "CC6.1"
 }

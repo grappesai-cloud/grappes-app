@@ -52,6 +52,16 @@ function parseNpmLock(content: string): Dep[] {
   return out.filter((d) => { const k = `${d.name}@${d.version}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
+/** Direct (top-level) dependencies — a cheap reachability proxy: your code can
+ *  import these, whereas a deep transitive dep is a dependency-of-a-dependency. */
+function directDeps(content: string): Set<string> {
+  try {
+    const lock = JSON.parse(content);
+    const root = lock.packages?.[''] ?? {};
+    return new Set([...Object.keys(root.dependencies ?? {}), ...Object.keys(root.devDependencies ?? {}), ...Object.keys(root.optionalDependencies ?? {})]);
+  } catch { return new Set(); }
+}
+
 function pickLockfile(files: CodeFile[]): CodeFile | null {
   return files.find((f) => /(^|\/)package-lock\.json$/.test(f.path))
       ?? files.find((f) => /(^|\/)npm-shrinkwrap\.json$/.test(f.path))
@@ -124,6 +134,22 @@ async function osvDetails(id: string): Promise<OsvVuln | null> {
   } catch { return null; }
 }
 
+/** EPSS exploitation-probability (0..1) per CVE, via the free FIRST.org API. */
+async function epssScores(cves: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const real = [...new Set(cves.filter((c) => /^CVE-/.test(c)))];
+  for (let i = 0; i < real.length; i += 80) {
+    const chunk = real.slice(i, i + 80);
+    try {
+      const res = await fetch(`https://api.first.org/data/v1/epss?cve=${chunk.join(',')}`);
+      if (!res.ok) continue;
+      const json = (await res.json()) as { data?: { cve: string; epss: string }[] };
+      for (const d of json.data ?? []) out.set(d.cve, parseFloat(d.epss));
+    } catch { /* EPSS optional */ }
+  }
+  return out;
+}
+
 export async function runSca(files: CodeFile[]): Promise<ScaResult> {
   const lock = pickLockfile(files);
   if (!lock) {
@@ -139,6 +165,7 @@ export async function runSca(files: CodeFile[]): Promise<ScaResult> {
   }
   const deps = parseNpmLock(lock.content);
   if (deps.length === 0) return { findings: [], stats: { dependencies: 0, vulnerable: 0, lockfile: lock.path } };
+  const direct = directDeps(lock.content);
 
   const hits = await osvBatch(deps);
   const uniqueIds = [...new Set([...hits.values()].flat())];
@@ -150,6 +177,7 @@ export async function runSca(files: CodeFile[]): Promise<ScaResult> {
   }
 
   const findings: Finding[] = [];
+  const findingCves = new Map<string, string[]>();
   const depByKey = new Map(deps.map((d) => [`${d.name}@${d.version}`, d]));
   let vulnerable = 0;
   for (const [key, ids] of hits.entries()) {
@@ -164,24 +192,43 @@ export async function runSca(files: CodeFile[]): Promise<ScaResult> {
       const s = severityOf(v);
       if (order.indexOf(s.severity) > order.indexOf(worst.severity)) worst = s;
     }
-    const cveList = vulns.map((v) => (v.aliases?.find((a) => a.startsWith('CVE-')) ?? v.id)).slice(0, 6).join(', ');
+    const cves = vulns.map((v) => v.aliases?.find((a) => a.startsWith('CVE-')) ?? v.id);
+    const cveList = cves.slice(0, 6).join(', ');
+    const fid = `sca-${dep.name.replace(/[^a-z0-9]/gi, '-')}-${dep.version}`;
+    findingCves.set(fid, cves);
     const fix = vulns.map((v) => fixedVersion(v, dep)).filter(Boolean) as string[];
     const fixHint = fix.length ? `Upgrade ${dep.name} to ${fix.sort().pop()} or later.` : `Upgrade ${dep.name} to a non-vulnerable version (no fixed version published yet — consider a replacement or mitigation).`;
     findings.push({
-      id: `sca-${dep.name.replace(/[^a-z0-9]/gi, '-')}-${dep.version}`,
+      id: fid,
       title: `Vulnerable dependency: ${dep.name}@${dep.version} (${vulns.length} known ${vulns.length === 1 ? 'CVE' : 'CVEs'})`,
       severity: worst.severity,
       cvss: worst.cvss,
       criterion: 'security',
       control: 'CC7.1',
       source: 'sca',
-      detail: `${dep.name}@${dep.version} has known vulnerabilities: ${cveList}. ${vulns[0]?.summary ?? ''}`.trim(),
+      reachable: direct.has(dep.name),
+      detail: `${dep.name}@${dep.version}${direct.has(dep.name) ? '' : ' (transitive dependency — not imported directly)'} has known vulnerabilities: ${cveList}. ${vulns[0]?.summary ?? ''}`.trim(),
       fix: fixHint,
       evidence: `${lock.path} → ${dep.name}@${dep.version}`,
     });
   }
-  // Sort by severity desc.
+  // EPSS enrichment: attach the real-world exploitation likelihood so a high-CVSS
+  // CVE that nobody actually exploits is ranked below a lower-CVSS one that is.
+  const allCves = [...new Set([...findingCves.values()].flat())];
+  const epss = await epssScores(allCves);
+  for (const f of findings) {
+    const maxEpss = Math.max(0, ...(findingCves.get(f.id) ?? []).map((c) => epss.get(c) ?? 0));
+    if (maxEpss > 0) {
+      f.epss = maxEpss;
+      f.detail += ` EPSS ${(maxEpss * 100).toFixed(1)}% (exploitation likelihood, next 30 days).`;
+      if ((f.severity === 'high' || f.severity === 'critical') && maxEpss < 0.01) {
+        f.detail += ' Low real-world exploit likelihood — can be triaged below actively-exploited CVEs.';
+      }
+    }
+  }
+
+  // Rank by severity, then by EPSS within a severity tier.
   const order: Severity[] = ['info', 'low', 'medium', 'high', 'critical'];
-  findings.sort((a, b) => order.indexOf(b.severity) - order.indexOf(a.severity));
+  findings.sort((a, b) => (order.indexOf(b.severity) - order.indexOf(a.severity)) || ((b.epss ?? 0) - (a.epss ?? 0)));
   return { findings, stats: { dependencies: deps.length, vulnerable, lockfile: lock.path } };
 }
