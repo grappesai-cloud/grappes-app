@@ -10,6 +10,7 @@ import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { listAccounts, publishPost, zernioConfigured } from '../../../lib/social/zernio';
 import { getProfile } from '../../../lib/social/profile';
+import { consumeCredit, refundCredit } from '../../../lib/credits';
 
 export const prerender = false;
 
@@ -64,6 +65,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: 'None of the chosen platforms are connected.' }, 400);
   }
 
+  // Consume 1 Social credit per post (admin-granted). Refunded if publishing fails.
+  if ((await consumeCredit(user.id, 'social')) === null) {
+    return json({ error: 'Nu mai ai credite Social.', code: 'no_credits' }, 402);
+  }
+
   try {
     const result = await publishPost({
       content: caption,
@@ -74,6 +80,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ ok: true, result });
   } catch (err) {
     console.error('[social/post]', err);
+    await refundCredit(user.id, 'social');
     return json({ error: 'Publishing failed.' }, 500);
   }
 };

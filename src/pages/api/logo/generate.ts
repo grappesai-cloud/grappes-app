@@ -8,6 +8,7 @@ import { createAdminClient } from "../../../lib/supabase";
 import { checkRateLimit } from "../../../lib/rate-limit";
 import { json } from "../../../lib/api-utils";
 import { generateLogo, type GenerateLogoInput } from "../../../lib/logo-gen";
+import { consumeCredit, refundCredit } from "../../../lib/credits";
 
 export const maxDuration = 90;
 
@@ -49,6 +50,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: "Describe the icon or add a reference photo (at least one)." }, 400);
   }
 
+  // Consume 1 Logo credit (admin-granted, white-label). Refunded if generation fails.
+  if ((await consumeCredit(user.id, "logo")) === null) {
+    return json({ error: "Nu mai ai credite Logo.", code: "no_credits" }, 402);
+  }
+
   const input: GenerateLogoInput = {
     assetPrefix: `logos/${user.id}`,
     description: description || `Logo for ${brandName}`,
@@ -84,12 +90,14 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
     if (error || !data) {
       console.error("[api/logo/generate] insert failed:", error);
+      await refundCredit(user.id, "logo");
       return json({ error: "Could not save logo." }, 500);
     }
 
     return json({ id: data.id, png_url: data.png_url, svg_url: data.svg_url });
   } catch (e: any) {
     console.error("[api/logo/generate] pipeline failed:", e);
+    await refundCredit(user.id, "logo");
     return json({ error: "Logo generation failed: " + (e?.message ?? "unknown") }, 500);
   }
 };

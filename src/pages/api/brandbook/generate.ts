@@ -8,6 +8,7 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { createAdminClient } from '../../../lib/supabase';
 import { generateBrandBookContent, DEFAULT_DONTS, type BrandBookInput } from '../../../lib/brandbook-gen';
 import { fetchWebsiteContext } from '../../../lib/website-context';
+import { consumeCredit, refundCredit } from '../../../lib/credits';
 
 interface GenerateBody {
   name?: string;
@@ -80,11 +81,17 @@ export const POST: APIRoute = async ({ locals, request }) => {
     logoUrl,
   };
 
+  // Consume 1 Brand Book credit (admin-granted). Refunded if generation/save fails.
+  if ((await consumeCredit(user.id, 'brandbook')) === null) {
+    return json({ error: 'Nu mai ai credite Brand Book.', code: 'no_credits' }, 402);
+  }
+
   let content;
   try {
     content = await generateBrandBookContent(input);
   } catch (err) {
     console.error('[brandbook/generate] copy generation failed:', err);
+    await refundCredit(user.id, 'brandbook');
     return json({ error: 'Generation failed, please try again.' }, 502);
   }
 
@@ -117,6 +124,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
   if (error) {
     console.error('[brandbook/generate] insert failed:', error);
+    await refundCredit(user.id, 'brandbook');
     return json({ error: 'Could not save the brand book.' }, 500);
   }
 

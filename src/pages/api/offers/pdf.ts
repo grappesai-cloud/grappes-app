@@ -7,6 +7,7 @@ import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { renderOfferHTML, type Offer } from '../../../lib/offer-template';
 import { launchBrowser } from '../../../lib/browser';
+import { consumeCredit, refundCredit } from '../../../lib/credits';
 
 function slugify(s: string): string {
   return (s || 'oferta')
@@ -36,6 +37,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: 'Offer needs a client and at least one service.' }, 400);
   }
 
+  // Consume 1 Offer credit (admin-granted). Refunded below if rendering fails.
+  if ((await consumeCredit(user.id, 'offer')) === null) {
+    return json({ error: 'Nu mai ai credite Offer.', code: 'no_credits' }, 402);
+  }
+
   const html = renderOfferHTML(offer);
 
   let browser: any;
@@ -43,6 +49,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     browser = await launchBrowser();
   } catch (err) {
     console.error('[offers/pdf] browser launch failed:', err);
+    await refundCredit(user.id, 'offer');
     return json({ error: 'PDF engine unavailable.' }, 503);
   }
   try {
@@ -72,6 +79,7 @@ export const POST: APIRoute = async ({ locals, request }) => {
     });
   } catch (err) {
     console.error('[offers/pdf] generation failed:', err);
+    await refundCredit(user.id, 'offer');
     const detail = err instanceof Error ? err.message : String(err);
     return json({ error: `Could not generate PDF: ${detail}` }, 500);
   } finally {
