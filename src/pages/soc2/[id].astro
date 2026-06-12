@@ -30,7 +30,7 @@ const SEV_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low
 const SEV_COLOR: Record<string, string> = {
   critical: '#ff6b6b', high: '#ff8a8a', medium: '#f6c547', low: '#7dd3fc', info: 'rgba(255,255,255,0.5)',
 };
-const findings = (report?.findings ?? []).slice().sort(
+const findings = [...(report?.findings ?? []), ...(report?.sast?.findings ?? [])].sort(
   (x: any, y: any) => (SEV_ORDER[x.severity] ?? 9) - (SEV_ORDER[y.severity] ?? 9),
 );
 const roadmap = report?.roadmap ?? [];
@@ -129,6 +129,51 @@ function scoreColor(s: number | null): string {
           <p style="font-size:11.5px;color:rgba(255,255,255,0.35);margin:10px 0 24px;">
             {report.stats.filesScanned} file{report.stats.filesScanned === 1 ? '' : 's'} · {report.stats.linesScanned} lines reviewed · {findings.length} finding{findings.length === 1 ? '' : 's'}
           </p>
+        )}
+
+        {report.stats && (report.stats.sca || report.stats.authz || report.sast) && (
+          <p style="font-size:11.5px;color:rgba(255,255,255,0.45);margin:-14px 0 22px;line-height:1.7;">
+            {report.stats.sca && (<span>OSV: {report.stats.sca.dependencies} deps · {report.stats.sca.vulnerable} vulnerable</span>)}
+            {report.stats.sca && report.stats.authz && (<span> · </span>)}
+            {report.stats.authz && (<span>authz: {report.stats.authz.routes} routes · {report.stats.authz.publicMutating} unauth · {report.stats.authz.idorRisk} IDOR</span>)}
+            {report.sast && (<span> · SAST: {report.sast.stats?.semgrep ?? 0} semgrep · {report.sast.stats?.secrets ?? 0} secrets</span>)}
+          </p>
+        )}
+
+        {report.tscMatrix && (
+          <section style="margin:14px 0 26px;">
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;">
+              <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0;">TSC completeness</h3>
+              <span style="margin-left:auto;font-size:11.5px;color:rgba(255,255,255,0.45);">{report.tscMatrix.overallCoverage}% coverage</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              {report.tscMatrix.rows.map((r: any) => (
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <span style="width:200px;flex-shrink:0;font-size:12px;color:rgba(255,255,255,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{r.label}</span>
+                  <div style="flex:1;height:7px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden;">
+                    <div style={`height:100%;width:${r.coverage}%;background:${scoreColor(r.coverage)};border-radius:99px;`}></div>
+                  </div>
+                  <span style="width:96px;text-align:right;font-size:11px;color:rgba(255,255,255,0.5);">{r.findings} find · {r.coverage}%</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {report.evidence && report.evidence.length > 0 && (
+          <section style="margin:14px 0 26px;">
+            <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin:0 0 12px;">Control evidence (from GitHub)</h3>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              {report.evidence.map((e: any) => (
+                <div style="display:flex;align-items:center;gap:10px;font-size:12.5px;">
+                  <span style={`width:9px;height:9px;border-radius:99px;flex-shrink:0;background:${e.status === 'present' ? '#34d399' : e.status === 'absent' ? '#f87171' : 'rgba(255,255,255,0.3)'};`}></span>
+                  <span style="color:rgba(255,255,255,0.4);width:54px;flex-shrink:0;">{e.control}</span>
+                  <span style="color:rgba(255,255,255,0.8);">{e.title}</span>
+                  <span style="margin-left:auto;color:rgba(255,255,255,0.4);font-size:11px;">{e.status}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {report.coverage && (
