@@ -55,6 +55,12 @@ jobs:
           ./gitleaks detect --source target --report-format json \
             --report-path "${{ github.workspace }}/gitleaks.json" --no-banner || true
 
+      - name: trufflehog (verified-live secrets, full history)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b . v3.82.0 || true
+          ./trufflehog git "file://target" --only-verified --json --no-update \
+            > "${{ github.workspace }}/trufflehog.json" 2>/dev/null || true
+
       - name: Normalize + write results to the assessment
         working-directory: _app
         env:
@@ -63,5 +69,6 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SEMGREP_SARIF: ${{ github.workspace }}/semgrep.sarif
           GITLEAKS_JSON: ${{ github.workspace }}/gitleaks.json
+          TRUFFLEHOG_JSON: ${{ github.workspace }}/trufflehog.json
           TARGET: ${{ github.event.client_payload.target_repo || github.event.inputs.target_repo }}
         run: npx tsx scripts/run-soc2-sast.mts

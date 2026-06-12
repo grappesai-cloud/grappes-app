@@ -17,6 +17,34 @@ function readJson(path: string): any | null {
   try { return JSON.parse(fs.readFileSync(path, 'utf8')); } catch { return null; }
 }
 
+function readJsonl(path: string): any[] {
+  try {
+    return fs.readFileSync(path, 'utf8').split('\n').filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch { return []; }
+}
+
+// trufflehog --only-verified: every entry is a secret CONFIRMED still valid
+// against its provider. These bypass the FP filter + adversarial verification —
+// they are proven-live, not candidates.
+function trufflehogFindings(lines: any[]): Finding[] {
+  return lines.filter((x) => x.Verified).slice(0, 100).map((x, i) => {
+    const md = x.SourceMetadata?.Data?.Git ?? x.SourceMetadata?.Data?.Filesystem ?? {};
+    const file = md.file ?? '';
+    const line = md.line ?? '';
+    return {
+      id: `sast-livesecret-${x.DetectorName ?? 'secret'}-${i}`,
+      title: `VERIFIED LIVE secret: ${x.DetectorName ?? 'credential'} (${file}${line ? `:${line}` : ''})`,
+      severity: 'critical' as Severity,
+      criterion: 'security' as const, control: 'CC6.7', source: 'sast' as const,
+      confidence: 0.98, verified: true,
+      detail: `A ${x.DetectorName ?? 'credential'} was found AND confirmed still valid — it authenticates against the provider. This is an active, exploitable exposure, not a guess.`,
+      fix: 'Rotate this credential NOW, then purge it from git history (git filter-repo / BFG) and enable push protection.',
+      evidence: `${file}${line ? `:${line}` : ''}${md.commit ? ` (commit ${String(md.commit).slice(0, 8)})` : ''}`,
+    };
+  });
+}
+
 function semgrepFindings(sarif: any): Finding[] {
   const out: Finding[] = [];
   for (const run of sarif?.runs ?? []) {
@@ -92,11 +120,16 @@ async function main() {
     console.warn('[sast] adversarial verification skipped:', (e as any)?.message ?? e);
   }
 
+  // Verified-live secrets bypass the FP filter + verification — they are proven.
+  const live = trufflehogFindings(readJsonl(process.env.TRUFFLEHOG_JSON || 'trufflehog.json'));
+  findings = [...live, ...findings];
+
   const stats = {
     semgrep: (sarif?.runs?.[0]?.results ?? []).length,
     secrets: rawSecrets,
+    liveSecrets: live.length,
     findings: findings.length,
-    filteredFp: beforeVerify - findings.length,
+    filteredFp: beforeVerify - (findings.length - live.length),
     ranAt: new Date().toISOString(),
   };
   console.log(`[sast] ${stats.semgrep} semgrep, ${rawSecrets} raw secrets -> ${beforeVerify} findings -> ${findings.length} after verification`);
