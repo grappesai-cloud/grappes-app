@@ -837,6 +837,14 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     var assetType = type === 'zip' ? 'section' : type;
     var contentType = file.type || (type === 'zip' ? 'application/zip' : 'application/octet-stream');
 
+    // Build the final blob path here: the @vercel/blob client decides the path
+    // from upload()'s first arg (a server-side `pathname` override is ignored),
+    // so it must already be project-scoped for /finalize to accept it.
+    var folder = kind === 'zip' ? '_uploads' : (kind === 'video' ? 'video' : assetType);
+    var ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    var uuid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(16).slice(2));
+    var blobPath = 'assets/' + projectId + '/' + folder + '/' + uuid + '.' + ext;
+
     // 1) Stream directly to Vercel Blob via client-direct upload.
     //    The /sign-upload endpoint generates a short-lived token; the file
     //    bypasses the function body limit entirely.
@@ -845,7 +853,7 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
       // CDN ESM import — bare specifier '@vercel/blob/client' isn't resolved
       // inside Astro define:vars scripts (they bypass Vite bundling).
       var mod = await import('/vendor/vercel-blob-client.js');
-      blob = await mod.upload(file.name, file, {
+      blob = await mod.upload(blobPath, file, {
         access: 'public',
         handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',
         clientPayload: JSON.stringify({ kind: kind, assetType: assetType }),

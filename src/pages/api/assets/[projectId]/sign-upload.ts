@@ -59,21 +59,20 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
         const allow = MIME_BY_KIND[kind];
         const assetType = payload.assetType ?? 'section';
 
-        // Choose final pathname: <projectId>/<folder>/<uuid>.<ext>
-        const rawExt = pathname.split('.').pop()?.toLowerCase() || '';
-        const ext = allow.exts.includes(rawExt) ? rawExt : allow.exts[0];
-        const uuid = crypto.randomUUID();
-        const folder = kind === 'zip' ? '_uploads' : (kind === 'video' ? 'video' : assetType);
-        const finalPathname = `assets/${projectId}/${folder}/${uuid}.${ext}`;
+        // The @vercel/blob client decides the final pathname from the first arg of
+        // upload() — a server-returned `pathname` override is NOT honored, so the
+        // client now builds a project-scoped path (assets/<projectId>/...). Enforce
+        // that prefix here so a token can't be used to write outside this project.
+        if (!pathname.startsWith(`assets/${projectId}/`)) {
+          throw new Error('Upload path must be within this project');
+        }
 
         return {
           allowedContentTypes: allow.mimes,
           maximumSizeInBytes: MAX_BYTES[kind],
-          tokenPayload: JSON.stringify({ projectId, kind, assetType, finalPathname }),
-          // Override the upload destination so files land at our chosen path.
+          tokenPayload: JSON.stringify({ projectId, kind, assetType, pathname }),
           addRandomSuffix: false,
-          allowOverwrite: true, // fresh UUID path; tolerate a retry after a flaky write
-          pathname: finalPathname,
+          allowOverwrite: true, // client UUID path; tolerate a retry after a flaky write
         } as any;
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
