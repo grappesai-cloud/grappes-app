@@ -422,8 +422,10 @@ if (hasPreview) {
     }
 
     .bb-logo-img {
-      width: 36px; height: 36px; object-fit: contain; object-position: left;
-      background: rgba(255,255,255,0.06); border-radius: 6px; padding: 4px;
+      width: 44px; height: 44px; object-fit: contain; object-position: left;
+      /* white tile: shows dark/mono marks cleanly and lets a logo's own white
+         background blend in instead of reading as a stark box on the dark panel */
+      background: #fff; border-radius: 6px; padding: 4px;
     }
 
     .bb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
