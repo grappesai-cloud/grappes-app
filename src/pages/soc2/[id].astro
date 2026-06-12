@@ -55,10 +55,47 @@ function scoreColor(s: number | null): string {
     </a>
 
     {a.status === 'running' && (
-      <div style="text-align:center;padding:60px 0;color:rgba(255,255,255,0.6);">
+      <div id="soc2-running" data-id={a.id} style="text-align:center;padding:60px 0;color:rgba(255,255,255,0.6);">
         <span style={`display:inline-block;width:20px;height:20px;border:2px solid ${ACCENT}33;border-top-color:${ACCENT};border-radius:50%;animation:spin 0.8s linear infinite;`}></span>
-        <p style="margin-top:14px;font-size:14px;">Assessment running… refresh in a moment.</p>
+        <p style="margin-top:14px;font-size:14px;">
+          {a.mode === 'live' ? 'Deep scan running in the background…' : 'Assessment running…'}
+        </p>
+        <p id="soc2-running-note" style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.4);">
+          This page updates automatically when it finishes — no need to refresh.
+        </p>
       </div>
+    )}
+
+    {a.status === 'running' && (
+      <script is:inline define:vars={{ assessmentId: a.id }}>
+        // Poll the status endpoint while the assessment is running and reload
+        // the page the moment it flips to complete/failed. Backs off over time
+        // and stops after ~15 minutes so a stuck deep scan doesn't poll forever.
+        (function () {
+          const started = Date.now();
+          const MAX_MS = 15 * 60 * 1000;
+          let delay = 4000;
+          async function poll() {
+            if (Date.now() - started > MAX_MS) {
+              const note = document.getElementById('soc2-running-note');
+              if (note) note.textContent = 'Still running. Refresh this page to check again.';
+              return;
+            }
+            try {
+              const r = await fetch('/api/soc2/status?id=' + encodeURIComponent(assessmentId), {
+                headers: { accept: 'application/json' },
+              });
+              if (r.ok) {
+                const d = await r.json();
+                if (d.status && d.status !== 'running') { window.location.reload(); return; }
+              }
+            } catch (_) { /* transient — keep polling */ }
+            delay = Math.min(delay + 1000, 12000); // gentle backoff, cap at 12s
+            setTimeout(poll, delay);
+          }
+          setTimeout(poll, delay);
+        })();
+      </script>
     )}
 
     {a.status === 'failed' && (

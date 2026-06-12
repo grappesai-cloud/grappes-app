@@ -7,7 +7,7 @@ import { runCodeAudit } from '../../../lib/soc2/code-audit';
 import { fetchPublicRepo } from '../../../lib/soc2/fetch-repo';
 import type { CodeFile } from '../../../lib/soc2/static-checks';
 import { createAdminClient } from '../../../lib/supabase';
-import { checkRateLimit } from '../../../lib/rate-limit';
+import { checkPersistentRateLimit, recordPersistentRateLimit } from '../../../lib/rate-limit';
 import { json } from '../../../lib/api-utils';
 
 const CREDIT_COST = 1;
@@ -17,9 +17,13 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to run a code audit.' }, 401);
 
-  if (!checkRateLimit(`soc2-code:${user.id}`, 5, 60_000)) {
+  // Cross-instance rate limit — these runs are paid + Claude-backed, so bound
+  // them in the DB rather than per-serverless-instance memory.
+  const rlKey = `soc2-code:${user.id}`;
+  if (!(await checkPersistentRateLimit(rlKey, 5, 60_000))) {
     return json({ error: 'Slow down — try again in a moment.' }, 429);
   }
+  await recordPersistentRateLimit(rlKey);
 
   let code: string | undefined;
   let repo: string | undefined;

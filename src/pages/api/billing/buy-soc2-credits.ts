@@ -1,18 +1,29 @@
 // ── Buy a SOC 2 Lab credits pack ───────────────────────────────────────────
-// Mirror of buy-audit-credits. Webhook handler credits the balance.
-// Code audits cost 1 credit; live pentest runs cost more (charged at run time).
+// Webhook handler credits the balance (+10 pack on a `soc2_credits` checkout).
+//
+// Grappes is white-label by default: SOC 2 credits are provisioned by an admin
+// (see grant-soc2-credits + migration 0029), NOT self-served. This Stripe path
+// is therefore OFF unless a deployment explicitly opts in by setting
+// SOC2_SELF_SERVE_CREDITS=1 (and configuring the Stripe price). The hub UI reads
+// the same flag, so the two never contradict each other.
 
 import type { APIRoute } from "astro";
 import Stripe from "stripe";
 import { db } from "../../../lib/db";
 import { checkRateLimit } from "../../../lib/rate-limit";
 import { json } from "../../../lib/api-utils";
+import { soc2SelfServeBilling } from "../../../lib/soc2/billing";
 
 const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? "https://grappes.dev";
 
 export const POST: APIRoute = async ({ locals }) => {
   const user = locals.user;
   if (!user) return json({ error: "Unauthorized" }, 401);
+
+  // White-label deployments provision credits via an admin, not Stripe.
+  if (!soc2SelfServeBilling()) {
+    return json({ error: "Self-serve purchase is disabled. Contact your administrator to top up SOC 2 credits." }, 403);
+  }
 
   if (!checkRateLimit(`buy-soc2-credits:${user.id}`, 5, 60_000)) {
     return json({ error: "Too many requests. Please wait a moment." }, 429);

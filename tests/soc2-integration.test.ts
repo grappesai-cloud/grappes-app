@@ -59,7 +59,9 @@ describe.skipIf(!LIVE)('SOC 2 Lab — local integration (no worker)', () => {
     }
     expect(report.scores.overall).toBeLessThan(80); // clearly not clean
     expect(report.disclaimer).toMatch(/not a SOC 2/i);
-  }, 60_000);
+    // Every finding carries the SOC 2 / ISO 27001 / NIST crosswalk.
+    expect(report.findings.every(f => f.frameworks?.soc2?.length && f.frameworks?.iso27001?.length)).toBe(true);
+  }, 120_000); // the holistic Claude pass with a rich prompt can exceed 60s
 
   it('live recon: produces a TSC report against a real domain', async () => {
     const { runLiveScan } = await import('../src/lib/soc2/live-scan');

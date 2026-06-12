@@ -7,6 +7,7 @@
 
 import { createMessage } from '../anthropic';
 import type { Finding, TSC, Severity } from './static-checks';
+import { frameworksFor, type TaggedFinding } from './framework-map';
 import {
   CONTROL_CATEGORIES,
   CONTROL_BY_ID,
@@ -40,7 +41,7 @@ export interface ControlsReport {
     integrity: number;
     privacy: number;
   };
-  findings: Finding[];
+  findings: TaggedFinding[];
   roadmap: RoadmapItem[];
   coverage: {
     total: number;        // applicable controls (na excluded)
@@ -88,14 +89,16 @@ function scoreCriterion(answers: Answers, criterion: TSC): number {
   return clampScore((earned / possible) * 100);
 }
 
-// Each 'no' / 'partial' becomes a finding, ordered most-severe first.
-function buildFindings(answers: Answers): Finding[] {
-  const out: Finding[] = [];
+// Each 'no' / 'partial' becomes a finding, ordered most-severe first. Findings
+// carry the framework crosswalk: the SOC 2 tag is the control's exact AICPA ref,
+// with ISO 27001 / NIST cross-references derived from the criterion.
+function buildFindings(answers: Answers): TaggedFinding[] {
+  const out: TaggedFinding[] = [];
   for (const ctl of CONTROL_CATEGORIES.flatMap(c => c.controls)) {
     const ans = answers[ctl.id];
     if (ans !== 'no' && ans !== 'partial') continue;
     const severity = ans === 'partial' ? SOFTER[ctl.severity] : ctl.severity;
-    out.push({
+    const base: Finding = {
       id: `ctl-${ctl.id}`,
       title: ctl.question.replace(/\?$/, ''),
       severity,
@@ -108,7 +111,8 @@ function buildFindings(answers: Answers): Finding[] {
         : 'Implement this control, write it down, and keep evidence (config, tickets, logs) that it operates.',
       evidence: `${ctl.ref} · ${ctl.criterion}`,
       source: 'questionnaire',
-    });
+    };
+    out.push({ ...base, frameworks: { ...frameworksFor(base), soc2: [ctl.ref] } });
   }
   return out.sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
 }

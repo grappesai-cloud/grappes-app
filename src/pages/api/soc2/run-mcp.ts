@@ -7,7 +7,7 @@ import type { APIRoute } from 'astro';
 import { runMcpScan } from '../../../lib/soc2/mcp-scan';
 import { fetchPublicRepo } from '../../../lib/soc2/fetch-repo';
 import { createAdminClient } from '../../../lib/supabase';
-import { checkRateLimit } from '../../../lib/rate-limit';
+import { checkPersistentRateLimit, recordPersistentRateLimit } from '../../../lib/rate-limit';
 import { json } from '../../../lib/api-utils';
 
 const CREDIT_COST = 1;
@@ -20,9 +20,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to run an MCP security scan.' }, 401);
 
-  if (!checkRateLimit(`soc2-mcp:${user.id}`, 5, 60_000)) {
+  const rlKey = `soc2-mcp:${user.id}`;
+  if (!(await checkPersistentRateLimit(rlKey, 5, 60_000))) {
     return json({ error: 'Slow down — try again in a moment.' }, 429);
   }
+  await recordPersistentRateLimit(rlKey);
 
   let manifest: string | undefined;
   let repo: string | undefined;

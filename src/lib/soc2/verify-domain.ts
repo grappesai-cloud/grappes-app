@@ -10,6 +10,28 @@ import { randomBytes } from 'node:crypto';
 
 export type VerifyMethod = 'dns_txt' | 'file';
 
+// Domain-ownership authorization is point-in-time: a domain can change hands, and
+// pentest/authorization norms expect periodic re-attestation. A verification is
+// only honored for this many days; after that the user must re-verify before the
+// live scanner will touch the domain again.
+export const VERIFICATION_TTL_DAYS = 90;
+
+/** True if a `verified_at` timestamp is older than the TTL (or missing). */
+export function isVerificationExpired(verifiedAt: string | null | undefined, now: number = Date.now()): boolean {
+  if (!verifiedAt) return true;
+  const ts = new Date(verifiedAt).getTime();
+  if (!Number.isFinite(ts)) return true;
+  return now - ts > VERIFICATION_TTL_DAYS * 86_400_000;
+}
+
+/** Whole days remaining before a verification expires (negative if already expired). */
+export function verificationDaysLeft(verifiedAt: string | null | undefined, now: number = Date.now()): number {
+  if (!verifiedAt) return 0;
+  const ts = new Date(verifiedAt).getTime();
+  if (!Number.isFinite(ts)) return 0;
+  return Math.ceil((ts + VERIFICATION_TTL_DAYS * 86_400_000 - now) / 86_400_000);
+}
+
 // A registrable hostname: labels of [a-z0-9-], a dot, a TLD. No scheme/path/port.
 const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 

@@ -6,15 +6,17 @@
 import type { APIRoute } from 'astro';
 import { runCheck, type VerifyMethod } from '../../../../lib/soc2/verify-domain';
 import { createAdminClient } from '../../../../lib/supabase';
-import { checkRateLimit } from '../../../../lib/rate-limit';
+import { checkPersistentRateLimit, recordPersistentRateLimit } from '../../../../lib/rate-limit';
 import { json } from '../../../../lib/api-utils';
 
 export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in first.' }, 401);
-  if (!checkRateLimit(`soc2-verify-check:${user.id}`, 15, 60_000)) {
+  const rlKey = `soc2-verify-check:${user.id}`;
+  if (!(await checkPersistentRateLimit(rlKey, 15, 60_000))) {
     return json({ error: 'Too many checks — wait a moment for DNS to propagate.' }, 429);
   }
+  await recordPersistentRateLimit(rlKey);
 
   let id: string | undefined;
   try {

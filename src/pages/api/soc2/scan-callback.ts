@@ -7,6 +7,7 @@
 import type { APIRoute } from 'astro';
 import crypto from 'node:crypto';
 import { createAdminClient } from '../../../lib/supabase';
+import { tagFindings } from '../../../lib/soc2/framework-map';
 import { json } from '../../../lib/api-utils';
 
 const SEVERITY_WEIGHT: Record<string, number> = {
@@ -64,7 +65,9 @@ export const POST: APIRoute = async ({ request }) => {
   const result = envelope.result ?? {};
   const offensive: any[] = Array.isArray(result.findings) ? result.findings : [];
   const base = assessment.report ?? {};
-  const merged = [...(base.findings ?? []), ...offensive];
+  // Recon findings are already framework-tagged; tag the worker's offensive
+  // findings too (idempotent — existing tags are preserved).
+  const merged = tagFindings([...(base.findings ?? []), ...offensive]);
 
   const scores = {
     security: deriveScore(merged, 'security'),

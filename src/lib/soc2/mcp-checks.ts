@@ -68,9 +68,56 @@ const INJECTION_PHRASES = [
   /send (the |all )?(conversation|context|history|messages?) to/i,
 ];
 
-// Invisible / control unicode often used to smuggle instructions into
-// descriptions that a human reviewer won't see.
-const HIDDEN_UNICODE = /[​-‏‪-‮⁠-⁯﻿0-F]/;
+// Invisible / control unicode often used to smuggle instructions into a tool
+// description that a human reviewer will not see (the model still reads them).
+//
+// Ranges, deliberately explicit so this can not decay into "matches everything"
+// the way the previous hand-typed character class did:
+//   U+200B-U+200F  zero-width space/non-joiner/joiner, LTR/RTL marks
+//   U+202A-U+202E  bidirectional embeddings & overrides
+//   U+2060-U+206F  word joiner, invisible math operators, deprecated format
+//                  controls, bidi isolates
+//   U+FEFF         BOM / zero-width no-break space
+//   U+E0000-U+E007F Unicode Tags block - encodes invisible ASCII ("ASCII
+//                  smuggling"), the highest-signal hidden-instruction vector
+const HIDDEN_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x206f],
+  [0xfeff, 0xfeff],
+  [0xe0000, 0xe007f],
+];
+
+// A zero-width joiner (U+200D) sitting between two pictographic code points is a
+// legitimate emoji sequence (e.g. a multi-person emoji), not smuggling - skip it.
+function isPictographic(cp: number | undefined): boolean {
+  if (cp === undefined) return false;
+  return (
+    (cp >= 0x1f000 && cp <= 0x1faff) || // emoji & pictographs (incl. supplemental)
+    (cp >= 0x2600 && cp <= 0x27bf) ||   // misc symbols, dingbats
+    (cp >= 0x1f1e6 && cp <= 0x1f1ff) || // regional indicators (flags)
+    cp === 0xfe0f                        // emoji variation selector
+  );
+}
+
+// Return the distinct hidden/invisible code points present in `text` as
+// "U+XXXX" labels - empty when the text is clean. Code-point aware (handles
+// astral-plane tag characters correctly).
+export function findHiddenChars(text: string): string[] {
+  const found = new Set<string>();
+  const cps = Array.from(text);
+  for (let i = 0; i < cps.length; i++) {
+    const cp = cps[i].codePointAt(0)!;
+    if (!HIDDEN_RANGES.some(([lo, hi]) => cp >= lo && cp <= hi)) continue;
+    if (cp === 0x200d) {
+      const prev = cps[i - 1]?.codePointAt(0);
+      const next = cps[i + 1]?.codePointAt(0);
+      if (isPictographic(prev) && isPictographic(next)) continue; // emoji ZWJ
+    }
+    found.add("U+" + cp.toString(16).toUpperCase().padStart(4, "0"));
+  }
+  return [...found];
+}
 
 // Secret-looking values in env/args.
 const SECRET_KEY = /(api[_-]?key|secret|password|passwd|token|client[_-]?secret|private[_-]?key|access[_-]?key|auth|bearer|pat)/i;
@@ -206,16 +253,18 @@ export function runMcpStaticChecks(manifest: McpManifest): McpStaticResult {
     const tname = tool.name ?? 'unnamed-tool';
     const desc = typeof tool.description === 'string' ? tool.description : '';
 
-    // Hidden unicode in description
-    if (HIDDEN_UNICODE.test(desc)) {
+    // Hidden / invisible unicode in description — also scan the tool NAME, which
+    // is rendered to the model too.
+    const hidden = [...new Set([...findHiddenChars(desc), ...findHiddenChars(tname)])];
+    if (hidden.length) {
       push(findings, seen, {
         id: 'mcp-tool-poisoning',
         title: 'Tool description contains hidden/invisible characters',
         severity: 'critical',
         criterion: 'security',
-        detail: `Tool "${tname}" has zero-width or bidirectional control characters in its description — a classic tool-poisoning vector that smuggles instructions past human review while the model still reads them.`,
-        fix: 'Reject tools whose descriptions contain non-printable unicode. Render descriptions with control chars escaped during review.',
-        evidence: `tool:${tname}`,
+        detail: `Tool "${tname}" contains ${hidden.length} hidden code point(s) (${hidden.join(', ')}) — zero-width, bidirectional-control, or Unicode-Tags characters. This is a classic tool-poisoning vector that smuggles instructions past human review while the model still reads them.`,
+        fix: 'Reject tools whose descriptions/names contain non-printable unicode. Strip or escape control characters before the description is shown to a reviewer or sent to the model, and re-review on every version bump.',
+        evidence: `tool:${tname} — ${hidden.join(', ')}`,
       });
     }
 
@@ -250,13 +299,4 @@ export function runMcpStaticChecks(manifest: McpManifest): McpStaticResult {
   }
 
   return { findings, serversScanned: servers.length, toolsScanned: tools.length };
-}
-
-// Untrusted-source heuristic for a referenced repo/package string (used by the
-// orchestrator when the user links a repo rather than pasting a manifest).
-export function flagUntrustedSource(label: string): Finding | null {
-  // Best-effort: flag obviously personal / unscoped npm/pypi installs as a
-  // supply-chain note. This is informational, the Claude pass refines it.
-  if (!label) return null;
-  return null;
 }

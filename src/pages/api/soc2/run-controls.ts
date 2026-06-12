@@ -6,7 +6,7 @@ import type { APIRoute } from 'astro';
 import { runControlsAudit, type Answer, type Answers } from '../../../lib/soc2/controls-audit';
 import { CONTROL_BY_ID } from '../../../lib/soc2/controls-catalog';
 import { createAdminClient } from '../../../lib/supabase';
-import { checkRateLimit } from '../../../lib/rate-limit';
+import { checkPersistentRateLimit, recordPersistentRateLimit } from '../../../lib/rate-limit';
 import { json } from '../../../lib/api-utils';
 
 const CREDIT_COST = 1;
@@ -16,9 +16,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to run a controls assessment.' }, 401);
 
-  if (!checkRateLimit(`soc2-controls:${user.id}`, 5, 60_000)) {
+  const rlKey = `soc2-controls:${user.id}`;
+  if (!(await checkPersistentRateLimit(rlKey, 5, 60_000))) {
     return json({ error: 'Slow down — try again in a moment.' }, 429);
   }
+  await recordPersistentRateLimit(rlKey);
 
   let raw: Record<string, unknown> | undefined;
   try {

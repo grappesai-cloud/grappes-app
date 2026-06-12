@@ -11,6 +11,7 @@ import { promises as dns } from 'node:dns';
 import tls from 'node:tls';
 import { createMessage } from '../anthropic';
 import type { Finding, Severity, TSC } from './static-checks';
+import { tagFindings, type TaggedFinding } from './framework-map';
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
 const REQ_TIMEOUT = 8000;
@@ -33,7 +34,7 @@ export interface LiveScanReport {
     integrity: number;
     privacy: number;
   };
-  findings: Finding[];
+  findings: TaggedFinding[];
   roadmap: { priority: number; title: string; detail: string; criterion: TSC; effort: 'low' | 'medium' | 'high' }[];
   scanLog: ScanLogEntry[];
   disclaimer: string;
@@ -334,7 +335,13 @@ export async function runLiveScan(domain: string): Promise<LiveScanReport> {
       max_tokens: 2000,
       messages: [{
         role: 'user',
-        content: `You are a SOC 2 readiness assessor. Given these findings from an authorized recon scan of ${domain}, return ONLY JSON: {"summary":"2-3 sentence readiness summary","roadmap":[{"priority":1,"title":"...","detail":"1-2 sentences","criterion":"security|availability|confidentiality|integrity|privacy","effort":"low|medium|high"}]}. Max 8 roadmap items, worst first. Findings:\n${findings.map(x => `- [${x.severity}] ${x.title} (${x.criterion})`).join('\n') || '(none — clean scan)'}`,
+        content: `You are a SOC 2 readiness assessor turning an authorized external recon scan of ${domain} into a prioritized remediation plan. These findings come from a deterministic scanner (security headers, TLS, DNS email auth, exposed files, trust pages) — treat them as facts; do not invent new ones.
+
+Return ONLY JSON: {"summary":"2-3 sentence readiness summary citing the most material gaps","roadmap":[{"priority":1,"title":"...","detail":"the concrete fix AND the SOC 2 control it closes (e.g. CC6.7 encryption in transit)","criterion":"security|availability|confidentiality|integrity|privacy","effort":"low|medium|high"}]}.
+Order worst-first, group related header fixes into one item where sensible, and make each "detail" a concrete action (the exact header/record to add, e.g. "add 'Strict-Transport-Security: max-age=63072000; includeSubDomains; preload' at the edge/CDN"). Max 8 roadmap items.
+
+Findings:
+${findings.map(x => `- [${x.severity}] ${x.title} (${x.criterion})`).join('\n') || '(none — clean scan)'}`,
       }],
     });
     const text = msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('');
@@ -357,7 +364,7 @@ export async function runLiveScan(domain: string): Promise<LiveScanReport> {
     mode: 'live',
     summary,
     scores: { overall, ...scores },
-    findings,
+    findings: tagFindings(findings),
     roadmap,
     scanLog,
     disclaimer: DISCLAIMER,

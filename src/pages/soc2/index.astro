@@ -2,10 +2,13 @@
 import Dashboard from '../../layouts/Dashboard.astro';
 import { db } from '../../lib/db';
 import { createAdminClient } from '../../lib/supabase';
+import { soc2SelfServeBilling } from '../../lib/soc2/billing';
+import { isVerificationExpired, verificationDaysLeft } from '../../lib/soc2/verify-domain';
 
 const authUser = Astro.locals.user!;
 const dbUser = await db.users.findById(authUser.id);
 const soc2Credits = dbUser?.soc2_credits ?? 0;
+const selfServeBilling = soc2SelfServeBilling();
 const justPurchased = Astro.url.searchParams.get('credits_purchased') === '1';
 
 const ACCENT = '#34d399';
@@ -23,11 +26,14 @@ const recent = recentRaw ?? [];
 // Verified / pending domains for live pentest mode
 const { data: verRaw } = await client
   .from('soc2_domain_verifications')
-  .select('id, domain, method, status')
+  .select('id, domain, method, status, verified_at')
   .eq('user_id', authUser.id)
   .order('created_at', { ascending: false });
 const verifications = verRaw ?? [];
-const verifiedDomains = verifications.filter(v => v.status === 'verified');
+// A verification older than the TTL no longer authorizes a scan — surface those
+// as "expired" so the user re-verifies, and only offer the still-valid ones.
+const verifiedDomains = verifications.filter(v => v.status === 'verified' && !isVerificationExpired(v.verified_at));
+const expiredDomains = verifications.filter(v => v.status === 'verified' && isVerificationExpired(v.verified_at));
 
 function scoreColor(score: number | null): string {
   if (score === null || score === undefined) return 'rgba(255,255,255,0.4)';
@@ -130,9 +136,19 @@ function timeAgo(dateStr: string): string {
       {verifiedDomains.length > 0 && (
         <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;">
           {verifiedDomains.map(v => (
-            <span style={`display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT}14;border:1px solid ${ACCENT}33;border-radius:999px;padding:3px 9px;`}>
+            <span title={`Authorization valid — re-verify within ${verificationDaysLeft(v.verified_at)} days`} style={`display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:${ACCENT};background:${ACCENT}14;border:1px solid ${ACCENT}33;border-radius:999px;padding:3px 9px;`}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {v.domain}
+            </span>
+          ))}
+        </div>
+      )}
+      {expiredDomains.length > 0 && (
+        <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:6px;">
+          {expiredDomains.map(v => (
+            <span title="Verification expired — re-verify before scanning" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#f6c547;background:rgba(246,197,71,0.10);border:1px solid rgba(246,197,71,0.30);border-radius:999px;padding:3px 9px;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              {v.domain} · re-verify
             </span>
           ))}
         </div>
@@ -174,15 +190,49 @@ function timeAgo(dateStr: string): string {
     </div>
   </div>
 
-  {/* Out of credits — white-label: credits are provisioned by your administrator */}
+  {/* Out of credits — self-serve (Stripe) when enabled, else white-label admin top-up */}
   {soc2Credits <= 0 && (
     <div id="soc2-no-credits" style="max-width:760px;margin:0 auto 30px;">
       <div style={`background:${ACCENT}10;border:1px solid ${ACCENT}38;border-radius:14px;padding:18px;text-align:center;`}>
-        <p style="font-size:13.5px;color:rgba(255,255,255,0.7);margin:0;line-height:1.5;">
-          You're out of credits. Contact your administrator to top up your balance.
-        </p>
+        {selfServeBilling ? (
+          <>
+            <p style="font-size:13.5px;color:rgba(255,255,255,0.7);margin:0 0 12px;line-height:1.5;">
+              You're out of credits. Buy a pack of 10 to keep assessing.
+            </p>
+            <button id="buy-soc2-credits" type="button"
+              style={`appearance:none;border:none;cursor:pointer;background:${ACCENT};color:#04140d;font-size:13px;font-weight:700;letter-spacing:0.02em;border-radius:10px;padding:10px 20px;`}>
+              Buy 10 credits
+            </button>
+            <p id="buy-soc2-error" style="display:none;font-size:12px;color:#ff8a8a;margin:10px 0 0;"></p>
+          </>
+        ) : (
+          <p style="font-size:13.5px;color:rgba(255,255,255,0.7);margin:0;line-height:1.5;">
+            You're out of credits. Contact your administrator to top up your balance.
+          </p>
+        )}
       </div>
     </div>
+  )}
+
+  {selfServeBilling && (
+    <script is:inline>
+      document.getElementById('buy-soc2-credits')?.addEventListener('click', async function () {
+        const err = document.getElementById('buy-soc2-error');
+        this.disabled = true;
+        const label = this.textContent;
+        this.textContent = 'Redirecting…';
+        try {
+          const r = await fetch('/api/billing/buy-soc2-credits', { method: 'POST' });
+          const data = await r.json();
+          if (data.url) { window.location.href = data.url; return; }
+          if (err) { err.textContent = data.error || 'Could not start checkout.'; err.style.display = 'block'; }
+        } catch (_) {
+          if (err) { err.textContent = 'Network error. Please try again.'; err.style.display = 'block'; }
+        }
+        this.disabled = false;
+        this.textContent = label;
+      });
+    </script>
   )}
 
   {/* Recent assessments */}

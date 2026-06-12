@@ -5,8 +5,9 @@
 
 import type { APIRoute } from 'astro';
 import { runLiveScan } from '../../../lib/soc2/live-scan';
+import { isVerificationExpired, VERIFICATION_TTL_DAYS } from '../../../lib/soc2/verify-domain';
 import { createAdminClient } from '../../../lib/supabase';
-import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
+import { checkPersistentRateLimit, recordPersistentRateLimit, getClientIp } from '../../../lib/rate-limit';
 import { json } from '../../../lib/api-utils';
 
 const LIVE_CREDIT_COST = 3; // recon-only live scan
@@ -34,9 +35,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to run a scan.' }, 401);
 
-  if (!checkRateLimit(`soc2-live:${user.id}`, 3, 60_000)) {
+  const rlKey = `soc2-live:${user.id}`;
+  if (!(await checkPersistentRateLimit(rlKey, 3, 60_000))) {
     return json({ error: 'Slow down — only a few scans per minute.' }, 429);
   }
+  await recordPersistentRateLimit(rlKey);
 
   let verificationId: string | undefined;
   let consent = false;
@@ -62,13 +65,19 @@ export const POST: APIRoute = async ({ locals, request }) => {
   // ── Gate: domain must be verified AND owned by this user ────────────
   const { data: ver } = await client
     .from('soc2_domain_verifications')
-    .select('id, domain, status')
+    .select('id, domain, status, verified_at')
     .eq('id', verificationId)
     .eq('user_id', user.id)
     .single();
   if (!ver) return json({ error: 'Domain verification not found.' }, 404);
   if (ver.status !== 'verified') {
     return json({ error: 'This domain is not verified. Verify ownership before scanning.' }, 403);
+  }
+  // Authorization expires — a domain can change ownership after it was verified.
+  if (isVerificationExpired(ver.verified_at)) {
+    // Mark it expired so the hub stops offering it until the user re-verifies.
+    await client.from('soc2_domain_verifications').update({ status: 'pending', verified_at: null }).eq('id', ver.id);
+    return json({ error: `Domain verification expired (re-verify required every ${VERIFICATION_TTL_DAYS} days). Re-verify ownership before scanning.` }, 403);
   }
 
   const consentIp = getClientIp(request);
