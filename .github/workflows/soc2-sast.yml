@@ -1,0 +1,66 @@
+name: SOC2 SAST
+
+# Real semantic SAST that needs binaries (so it can't run on Vercel): Semgrep
+# (taint/data-flow OWASP + secrets rulesets) and gitleaks (secrets across the
+# FULL git history). Triggered by POST /api/soc2/run-code via a repository_dispatch
+# carrying the target repo + assessment id; the normalizer writes results straight
+# onto the assessment row in Neon (reuses the DATABASE_URL secret).
+
+on:
+  repository_dispatch:
+    types: [soc2-sast]
+  workflow_dispatch:
+    inputs:
+      target_repo: { description: "owner/repo to scan", required: true }
+      assessment_id: { description: "soc2_assessments id to write into", required: true }
+
+jobs:
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout app (normalizer script)
+        uses: actions/checkout@v4
+        with:
+          path: _app
+
+      - name: Checkout target repo (full history for gitleaks)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.client_payload.target_repo || github.event.inputs.target_repo }}
+          ref: ${{ github.event.client_payload.target_ref || '' }}
+          path: target
+          fetch-depth: 0
+          token: ${{ secrets.SOC2_TARGET_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: _app/package-lock.json
+
+      - name: Install normalizer deps
+        working-directory: _app
+        run: npm ci
+
+      - name: Semgrep
+        run: |
+          pipx install semgrep || pip install --user semgrep
+          semgrep scan --config p/owasp-top-ten --config p/secrets \
+            --sarif --output "${{ github.workspace }}/semgrep.sarif" target || true
+
+      - name: gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --source target --report-format json \
+            --report-path "${{ github.workspace }}/gitleaks.json" --no-banner || true
+
+      - name: Normalize + write results to the assessment
+        working-directory: _app
+        env:
+          ASSESSMENT_ID: ${{ github.event.client_payload.assessment_id || github.event.inputs.assessment_id }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEMGREP_SARIF: ${{ github.workspace }}/semgrep.sarif
+          GITLEAKS_JSON: ${{ github.workspace }}/gitleaks.json
+          TARGET: ${{ github.event.client_payload.target_repo || github.event.inputs.target_repo }}
+        run: npx tsx scripts/run-soc2-sast.mts

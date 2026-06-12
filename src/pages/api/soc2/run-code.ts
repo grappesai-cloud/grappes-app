@@ -5,6 +5,7 @@
 import type { APIRoute } from 'astro';
 import { runCodeAudit } from '../../../lib/soc2/code-audit';
 import { fetchPublicRepo } from '../../../lib/soc2/fetch-repo';
+import { dispatchSastScan } from '../../../lib/soc2/sast-dispatch';
 import type { CodeFile } from '../../../lib/soc2/static-checks';
 import { createAdminClient } from '../../../lib/supabase';
 import { checkPersistentRateLimit, recordPersistentRateLimit } from '../../../lib/rate-limit';
@@ -102,7 +103,13 @@ export const POST: APIRoute = async ({ locals, request }) => {
       })
       .eq('id', assessmentId);
 
-    return json({ id: assessmentId, remaining: newBalance, scores: report.scores });
+    // Kick the GitHub Actions SAST worker (Semgrep + gitleaks over the full git
+    // history); it writes its findings onto report.sast asynchronously. No-op for
+    // pasted code or when GitHub isn't configured — the in-function report is
+    // already saved and returned.
+    if (repo) await dispatchSastScan(repo, assessmentId).catch(() => false);
+
+    return json({ id: assessmentId, remaining: newBalance, scores: report.scores, sast: repo ? 'dispatched' : undefined });
   } catch (e) {
     console.error('[soc2/run-code] pipeline failed:', e);
     const message = e instanceof Error ? e.message : String(e);
