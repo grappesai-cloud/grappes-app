@@ -5,7 +5,9 @@
 
 import pino from 'pino';
 
-const isDev = process.env.NODE_ENV === 'development' || import.meta.env.DEV;
+// `import.meta.env` is injected by Vite/Astro but undefined under plain node
+// (e.g. the GitHub Actions generation worker), so guard the access.
+const isDev = process.env.NODE_ENV === 'development' || (import.meta as any).env?.DEV === true;
 
 export const logger = pino({
   level: isDev ? 'debug' : 'info',

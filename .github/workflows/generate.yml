@@ -1,0 +1,37 @@
+name: Generate website
+
+# Primary website-generation worker. Runs the full generate -> QA -> repair
+# pipeline on a GitHub runner (up to 6h per job) instead of a Vercel function
+# (capped at 800s). Triggered by POST /api/projects/[id]/launch via a
+# repository_dispatch; the Vercel cron is the fallback if this never fires.
+
+on:
+  repository_dispatch:
+    types: [generate]
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "Optional project id to generate (blank = oldest queued job)"
+        required: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run generation job
+        env:
+          PROJECT_ID: ${{ github.event.client_payload.project_id || github.event.inputs.project_id }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+        run: npx tsx scripts/run-generation-job.mts

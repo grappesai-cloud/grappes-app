@@ -3,6 +3,7 @@ import { db } from '../../../../lib/db';
 import { log } from '../../../../lib/logger';
 import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
 import { getPg } from '../../../../lib/supabase';
+import { e } from '../../../../lib/env';
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
@@ -103,7 +104,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
 
 // ── POST — fire generation pipeline ───────────────────────────────────────────
 
-export const POST: APIRoute = async ({ params, locals, request }) => {
+export const POST: APIRoute = async ({ params, locals }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
@@ -217,20 +218,34 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
     return json({ error: 'Could not start generation. Please try again.' }, 500);
   }
 
-  // Kick the worker so generation starts within seconds. Best-effort with a
-  // short timeout — if it never lands, the 1-minute cron drains the queue.
+  // Trigger the GitHub Actions worker — the primary executor, which runs with no
+  // 800s function cap (.github/workflows/generate.yml → run-generation-job.mts).
+  // Best-effort: if the dispatch fails or GitHub isn't configured, the Vercel
+  // cron (/api/cron/process-generation) drains the queue as the fallback.
   try {
-    const origin = new URL(request.url).origin;
-    const cronSecret = import.meta.env.CRON_SECRET;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
-    await fetch(`${origin}/api/cron/process-generation`, {
-      headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
-      signal: ctrl.signal,
-    }).catch(() => {});
-    clearTimeout(t);
+    const owner = e('GITHUB_ORG');
+    const token = e('GITHUB_TOKEN');
+    const repo = e('GITHUB_GEN_REPO') || 'grappes-app';
+    if (owner && token) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          accept: 'application/vnd.github+json',
+          'content-type': 'application/json',
+          'user-agent': 'grappes-app',
+        },
+        body: JSON.stringify({ event_type: 'generate', client_payload: { project_id: params.projectId } }),
+        signal: ctrl.signal,
+      }).catch(() => {});
+      clearTimeout(t);
+    } else {
+      console.warn('[launch] GITHUB_ORG/GITHUB_TOKEN not set — relying on the Vercel cron fallback');
+    }
   } catch {
-    // Non-fatal — the cron picks up the queued job.
+    // Non-fatal — the Vercel cron picks up the queued job.
   }
 
   return json({ started: true, status: 'generating' });
