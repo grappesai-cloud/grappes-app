@@ -4,6 +4,8 @@ import { log } from '../../../../lib/logger';
 import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
 import { getPg } from '../../../../lib/supabase';
 import { e } from '../../../../lib/env';
+import { put } from '@vercel/blob';
+import { normalizeLogoSvg, injectLogoContrastCss, type LogoTone } from '../../../../lib/logo-normalize';
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
@@ -31,6 +33,33 @@ import { runPostQA } from '../../../../lib/post-qa';
 import { json } from '../../../../lib/api-utils';
 // Vercel Fluid Compute — up to 800s
 export const maxDuration = 800;
+
+// Normalize an uploaded SVG logo: strip a baked full-canvas background (the
+// cause of an ugly box behind the mark on a contrasting theme) and report the
+// mark tone so the inject step can guarantee contrast. Re-uploads a cleaned copy
+// only when something was stripped. Fully non-fatal — falls back to the original.
+async function ingestLogoSvg(url: string): Promise<{ url: string; tone?: LogoTone }> {
+  try {
+    if (!/\.svg(\?|$)/i.test(url)) return { url };
+    const res = await fetch(url);
+    if (!res.ok) return { url };
+    const svg = await res.text();
+    if (!svg.includes('<svg')) return { url };
+    const norm = normalizeLogoSvg(svg);
+    if (!norm.changed) return { url, tone: norm.tone };
+    const token = process.env.BLOB_READ_WRITE_TOKEN ?? (import.meta as any).env?.BLOB_READ_WRITE_TOKEN;
+    if (!token) return { url, tone: norm.tone };
+    const pathname = new URL(url).pathname.replace(/^\//, '').replace(/\.svg$/i, '-norm.svg');
+    const blob = await put(pathname, norm.svg, {
+      access: 'public', contentType: 'image/svg+xml', addRandomSuffix: false, allowOverwrite: true, token,
+    });
+    console.log(`[launch] Logo had a baked background — stripped + re-uploaded as ${blob.url}`);
+    return { url: blob.url, tone: norm.tone };
+  } catch (err) {
+    console.warn('[launch] Logo normalization failed (non-fatal):', err);
+    return { url };
+  }
+}
 
 
 // ── GET — poll status ──────────────────────────────────────────────────────────
@@ -314,8 +343,10 @@ export async function runPipeline(projectId: string, opts: { wasLive?: boolean }
         // Keep the first logo as primary; second variant (e.g. light/dark)
         // gets stored as media.logoAlt so Sonnet can switch by background.
         if (!mergeMap['branding.logo']) {
-          mergeMap['branding.logo'] = asset.public_url;
-          assetData.push({ type: 'logo', url: asset.public_url });
+          const ingested = await ingestLogoSvg(asset.public_url);
+          mergeMap['branding.logo'] = ingested.url;
+          if (ingested.tone) mergeMap['branding.logoTone'] = ingested.tone;
+          assetData.push({ type: 'logo', url: ingested.url });
         } else if (!mergeMap['media.logoAlt']) {
           mergeMap['media.logoAlt'] = asset.public_url;
           assetData.push({ type: 'logo-alt', url: asset.public_url });
@@ -464,6 +495,7 @@ export async function runPipeline(projectId: string, opts: { wasLive?: boolean }
           pageHtml = injectBookingWidget(pageHtml, freshBrief.data);
           pageHtml = injectBacklink(pageHtml, { brandingRemoved });
           pageHtml = injectFormHandler(pageHtml, projectId);
+          pageHtml = injectLogoContrastCss(pageHtml, (freshBrief.data as any)?.branding?.logoTone as LogoTone | undefined);
 
           if (pageIdx === 0) homeHtml = pageHtml;
 
@@ -536,6 +568,7 @@ export async function runPipeline(projectId: string, opts: { wasLive?: boolean }
     html = injectBookingWidget(html, freshBrief.data);
     html = injectBacklink(html, { brandingRemoved });
     html = injectFormHandler(html, projectId);
+    html = injectLogoContrastCss(html, (freshBrief.data as any)?.branding?.logoTone as LogoTone | undefined);
 
     // Broken-image safety net — flag (don't drop) any <img> that 404s so the
     // user can fix it before a visitor sees a broken image. Non-fatal.
