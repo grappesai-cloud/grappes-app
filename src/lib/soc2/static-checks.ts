@@ -21,7 +21,12 @@ export interface Finding {
   detail: string;        // what's wrong
   fix: string;           // how to fix it
   evidence?: string;     // a redacted snippet / file:line / control ref
-  source: 'static' | 'ai' | 'questionnaire' | 'mcp';
+  source: 'static' | 'ai' | 'questionnaire' | 'mcp' | 'sca' | 'evidence' | 'authz' | 'sast';
+  // Set by the adversarial verification pass (verify-findings.ts).
+  confidence?: number;   // 0..1 — how sure we are this is real (post-verification)
+  cvss?: number;         // 0..10 — CVSS-style base score for vuln-type findings
+  verified?: boolean;    // true once the verification pass has reviewed it
+  control?: string;      // specific SOC 2 control ref, e.g. "CC6.1"
 }
 
 // A single file submitted for review

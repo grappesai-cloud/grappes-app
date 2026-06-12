@@ -85,7 +85,9 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
   // ── 3. Run the audit ────────────────────────────────────────────────
   try {
-    const report = await runCodeAudit(files);
+    // Pass the repo URL so the deep engines (SCA + authz) can fetch the full
+    // tree + lockfile; for pasted code (no repo) they're skipped.
+    const report = await runCodeAudit(files, { repoUrl: repo });
     await client
       .from('soc2_assessments')
       .update({

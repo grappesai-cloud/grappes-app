@@ -5,6 +5,7 @@
 
 import { createMessage } from '../anthropic';
 import { runStaticChecks, type CodeFile, type Finding, type TSC, type Severity } from './static-checks';
+import { runDeepEngines } from './deep-engines';
 import { tagFindings, type TaggedFinding } from './framework-map';
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
@@ -49,7 +50,12 @@ export interface CodeAuditReport {
   };
   findings: TaggedFinding[];
   roadmap: RoadmapItem[];
-  stats: { filesScanned: number; linesScanned: number };
+  stats: {
+    filesScanned: number;
+    linesScanned: number;
+    sca?: { dependencies: number; vulnerable: number; lockfile: string | null };
+    authz?: { routes: number; methods: number; publicMutating: number; idorRisk: number };
+  };
   disclaimer: string;
 }
 
@@ -164,17 +170,24 @@ function deriveScore(findings: Finding[], criterion: TSC): number {
   return clampScore(100 - penalty);
 }
 
-export async function runCodeAudit(files: CodeFile[]): Promise<CodeAuditReport> {
+export async function runCodeAudit(files: CodeFile[], opts: { repoUrl?: string } = {}): Promise<CodeAuditReport> {
   if (!files.length) throw new Error('No code provided');
 
   const { packed, used } = packFiles(files);
   const staticResult = runStaticChecks(used);
 
-  const msg = await createMessage({
-    model: SONNET_MODEL,
-    max_tokens: 8000,
-    messages: [{ role: 'user', content: buildPrompt(packed, staticResult.findings) }],
-  });
+  // Run the AI review and the deep engines (real OSV SCA + gray-box authz over
+  // the FULL repo) in parallel — both are independent and network-bound.
+  const [msg, deep] = await Promise.all([
+    createMessage({
+      model: SONNET_MODEL,
+      max_tokens: 8000,
+      messages: [{ role: 'user', content: buildPrompt(packed, staticResult.findings) }],
+    }),
+    opts.repoUrl
+      ? runDeepEngines(opts.repoUrl).catch((e) => { console.warn('[soc2] deep engines failed:', e); return null; })
+      : Promise.resolve(null),
+  ]);
 
   const text = msg.content
     .filter((b: any) => b.type === 'text')
@@ -198,7 +211,8 @@ export async function runCodeAudit(files: CodeFile[]): Promise<CodeAuditReport> 
 
   // Static findings first (they're concrete), then AI findings — each tagged
   // with its SOC 2 / ISO 27001 / NIST crosswalk.
-  const findings = tagFindings([...staticResult.findings, ...aiFindings]);
+  const deepFindings = deep?.findings ?? [];
+  const findings = tagFindings([...staticResult.findings, ...deepFindings, ...aiFindings]);
 
   const s = parsed.scores ?? {};
   const scores = {
@@ -208,6 +222,14 @@ export async function runCodeAudit(files: CodeFile[]): Promise<CodeAuditReport> 
     integrity: typeof s.integrity === 'number' ? clampScore(s.integrity) : deriveScore(findings, 'integrity'),
     privacy: typeof s.privacy === 'number' ? clampScore(s.privacy) : deriveScore(findings, 'privacy'),
   };
+
+  // Deep-engine findings (real CVEs, unauthenticated/IDOR routes) can only LOWER
+  // a criterion score, never raise it — the AI summary never saw them.
+  if (deep) {
+    for (const crit of ['security', 'availability', 'confidentiality', 'integrity', 'privacy'] as TSC[]) {
+      (scores as any)[crit] = Math.min((scores as any)[crit], deriveScore(findings, crit));
+    }
+  }
 
   // Security is weighted heaviest — it's the one required TSC for every SOC 2 report.
   const overall = clampScore(
@@ -234,7 +256,7 @@ export async function runCodeAudit(files: CodeFile[]): Promise<CodeAuditReport> 
     scores: { overall, ...scores },
     findings,
     roadmap,
-    stats: { filesScanned: staticResult.filesScanned, linesScanned: staticResult.linesScanned },
+    stats: { filesScanned: staticResult.filesScanned, linesScanned: staticResult.linesScanned, sca: deep?.sca, authz: deep?.authz },
     disclaimer: DISCLAIMER,
   };
 }
