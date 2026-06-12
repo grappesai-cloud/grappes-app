@@ -6,6 +6,8 @@
 import { createMessage } from '../anthropic';
 import { runStaticChecks, type CodeFile, type Finding, type TSC, type Severity } from './static-checks';
 import { runDeepEngines } from './deep-engines';
+import { verifyFindings } from './verify-findings';
+import type { EvidenceItem } from './evidence';
 import { tagFindings, type TaggedFinding } from './framework-map';
 
 const SONNET_MODEL = 'claude-sonnet-4-6';
@@ -56,6 +58,7 @@ export interface CodeAuditReport {
     sca?: { dependencies: number; vulnerable: number; lockfile: string | null };
     authz?: { routes: number; methods: number; publicMutating: number; idorRisk: number };
   };
+  evidence?: EvidenceItem[];
   disclaimer: string;
 }
 
@@ -212,7 +215,10 @@ export async function runCodeAudit(files: CodeFile[], opts: { repoUrl?: string }
   // Static findings first (they're concrete), then AI findings — each tagged
   // with its SOC 2 / ISO 27001 / NIST crosswalk.
   const deepFindings = deep?.findings ?? [];
-  const findings = tagFindings([...staticResult.findings, ...deepFindings, ...aiFindings]);
+  // Adversarial verification: a skeptical pass drops confident false positives
+  // and attaches confidence + CVSS before anything is scored or shown.
+  const verified = await verifyFindings([...staticResult.findings, ...deepFindings, ...aiFindings]);
+  const findings = tagFindings(verified);
 
   const s = parsed.scores ?? {};
   const scores = {
@@ -257,6 +263,7 @@ export async function runCodeAudit(files: CodeFile[], opts: { repoUrl?: string }
     findings,
     roadmap,
     stats: { filesScanned: staticResult.filesScanned, linesScanned: staticResult.linesScanned, sca: deep?.sca, authz: deep?.authz },
+    evidence: deep?.evidence,
     disclaimer: DISCLAIMER,
   };
 }

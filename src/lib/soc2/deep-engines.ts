@@ -7,6 +7,7 @@
 import { parseGitHubUrl } from './fetch-repo';
 import { runSca, type ScaResult } from './sca';
 import { runAuthzMatrix, type AuthzResult } from './authz-matrix';
+import { collectGithubEvidence, type EvidenceItem } from './evidence';
 import type { Finding, CodeFile } from './static-checks';
 
 const MAX_ROUTE_FILES = 400;
@@ -49,6 +50,7 @@ export interface DeepEnginesResult {
   findings: Finding[];
   sca: ScaResult['stats'];
   authz: AuthzResult['stats'];
+  evidence: EvidenceItem[];
 }
 
 /** Fetch lockfile + API routes for `repoUrl` and run the deep engines. */
@@ -87,10 +89,12 @@ export async function runDeepEngines(repoUrl: string): Promise<DeepEnginesResult
 
   const sca = await runSca(scaFiles.length ? scaFiles : []);
   const authz = runAuthzMatrix(routeFiles);
+  const evidence = await collectGithubEvidence(repoUrl).catch(() => null);
 
   return {
-    findings: [...sca.findings, ...authz.findings],
+    findings: [...sca.findings, ...authz.findings, ...(evidence?.findings ?? [])],
     sca: sca.stats,
     authz: authz.stats,
+    evidence: evidence?.items ?? [],
   };
 }
