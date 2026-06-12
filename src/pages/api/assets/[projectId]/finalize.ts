@@ -4,10 +4,12 @@
 // For zip archives it triggers extract-zip in-process.
 
 import type { APIRoute } from 'astro';
-import { del as blobDel } from '@vercel/blob';
+import { put as blobPut, del as blobDel } from '@vercel/blob';
+import sharp from 'sharp';
 import { db } from '../../../../lib/db';
 import type { AssetType } from '../../../../lib/db';
 import { json } from '../../../../lib/api-utils';
+import { isHeic, heicToJpeg } from '../../../../lib/heic';
 
 const VALID_ASSET_TYPES: AssetType[] = ['logo', 'hero', 'section', 'og', 'favicon', 'font', 'menu', 'document', 'other', 'video'] as any;
 
@@ -93,6 +95,27 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   const t = (assetType as AssetType);
   if (!VALID_ASSET_TYPES.includes(t)) return json({ error: `Invalid assetType: ${assetType}` }, 400);
 
+  // A direct-uploaded HEIC/HEIF lands raw (this path doesn't convert), and most
+  // browsers can't render it — convert to WebP, re-store, and drop the raw.
+  let curPath = storagePath, curUrl = publicUrl, curMime = contentType, curName = filename;
+  if (kind === 'image' && (isHeic(contentType, filename) || /\.(heic|heif)$/i.test(storagePath))) {
+    try {
+      const res = await fetch(publicUrl);
+      if (!res.ok) throw new Error(`fetch raw failed (${res.status})`);
+      const jpeg = await heicToJpeg(Buffer.from(await res.arrayBuffer()));
+      const webp = await sharp(jpeg).webp({ quality: 82 }).toBuffer();
+      const webpPath = storagePath.replace(/\.(heic|heif)$/i, '.webp');
+      const blob = await blobPut(webpPath, webp, { access: 'public', contentType: 'image/webp', addRandomSuffix: false, allowOverwrite: true });
+      try { await blobDel(publicUrl); } catch { /* ignore */ }
+      curPath = webpPath; curUrl = blob.url; curMime = 'image/webp';
+      curName = filename.replace(/\.(heic|heif)$/i, '.webp');
+    } catch (e: any) {
+      console.error('[finalize] HEIC convert failed:', e?.message || e);
+      try { await blobDel(publicUrl); } catch { /* ignore */ }
+      return json({ error: 'Could not process this HEIC photo. Please try a JPEG or PNG.' }, 415);
+    }
+  }
+
   const metadata: Record<string, any> = {};
   if (sectionId) metadata.sectionId = sectionId;
   if (kind === 'video') metadata.kind = 'video';
@@ -102,32 +125,32 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
     asset = await db.assets.create({
       project_id:   params.projectId!,
       type:         t,
-      filename:     filename,
-      storage_path: storagePath,
-      public_url:   publicUrl,
-      mime_type:    contentType,
+      filename:     curName,
+      storage_path: curPath,
+      public_url:   curUrl,
+      mime_type:    curMime,
       size_bytes:   sizeBytes ?? 0,
       metadata:     Object.keys(metadata).length > 0 ? metadata : undefined,
     });
   } catch (e: any) {
     // Roll back the upload on DB failure
-    try { await blobDel(publicUrl); } catch { /* ignore */ }
+    try { await blobDel(curUrl); } catch { /* ignore */ }
     console.error('[finalize] DB save error:', e?.message || e);
     return json({ error: `DB save failed: ${e?.message || 'unknown'}` }, 500);
   }
 
   // Enrich brief based on asset type
   try {
-    if (t === 'logo')   await db.briefs.merge(params.projectId!, { 'branding.logo': publicUrl });
-    if (t === 'hero')   await db.briefs.merge(params.projectId!, { 'media.heroImage': publicUrl });
-    if (t === 'og')     await db.briefs.merge(params.projectId!, { 'media.ogImage': publicUrl });
-    if (t === 'favicon') await db.briefs.merge(params.projectId!, { 'media.favicon': publicUrl });
-    if (t === 'video')  await db.briefs.merge(params.projectId!, { 'media.videoUrl': publicUrl });
-    if (t === 'menu')   await db.briefs.merge(params.projectId!, { 'media.menuImage': publicUrl });
+    if (t === 'logo')   await db.briefs.merge(params.projectId!, { 'branding.logo': curUrl });
+    if (t === 'hero')   await db.briefs.merge(params.projectId!, { 'media.heroImage': curUrl });
+    if (t === 'og')     await db.briefs.merge(params.projectId!, { 'media.ogImage': curUrl });
+    if (t === 'favicon') await db.briefs.merge(params.projectId!, { 'media.favicon': curUrl });
+    if (t === 'video')  await db.briefs.merge(params.projectId!, { 'media.videoUrl': curUrl });
+    if (t === 'menu')   await db.briefs.merge(params.projectId!, { 'media.menuImage': curUrl });
     if (t === 'section' && sectionId) {
       const brief = await db.briefs.findByProjectId(params.projectId!);
       const sectionImages: Record<string, string> = { ...(brief?.data?.media?.sectionImages ?? {}) };
-      sectionImages[sectionId] = publicUrl;
+      sectionImages[sectionId] = curUrl;
       await db.briefs.merge(params.projectId!, { 'media.sectionImages': sectionImages });
     }
   } catch (e) {

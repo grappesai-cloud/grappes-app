@@ -19,8 +19,8 @@ const MAX_BYTES = {
 
 const MIME_BY_KIND: Record<'image' | 'video' | 'zip', { mimes: string[]; exts: string[] }> = {
   image: {
-    mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml'],
-    exts:  ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'],
+    mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'image/heic', 'image/heif'],
+    exts:  ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'heic', 'heif'],
   },
   video: {
     mimes: ['video/mp4', 'video/webm', 'video/quicktime'],

@@ -6,6 +6,7 @@ import sharp from 'sharp';
 
 import { json } from '../../../../lib/api-utils';
 import { checkRateLimit } from '../../../../lib/rate-limit';
+import { isHeic, heicToJpeg } from '../../../../lib/heic';
 
 const TYPE_LIMITS: Record<AssetType, number> = {
   logo: 2 * 1024 * 1024,
@@ -20,17 +21,21 @@ const TYPE_LIMITS: Record<AssetType, number> = {
   other: 10 * 1024 * 1024,
 };
 
+// Photo formats accepted for raster asset types. Includes HEIC/HEIF (iPhone
+// default) and GIF — both are decoded/normalized to WebP server-side below.
+const PHOTO_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+
 const ALLOWED_MIME: Record<AssetType, string[]> = {
   logo: ['image/png', 'image/svg+xml', 'image/webp', 'image/jpeg'],
   favicon: ['image/png', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'],
-  og: ['image/png', 'image/jpeg', 'image/webp'],
-  hero: ['image/png', 'image/jpeg', 'image/webp'],
-  section: ['image/png', 'image/jpeg', 'image/webp'],
-  menu: ['image/png', 'image/jpeg', 'image/webp'],
+  og: PHOTO_MIME,
+  hero: PHOTO_MIME,
+  section: PHOTO_MIME,
+  menu: PHOTO_MIME,
   font: ['font/woff', 'font/woff2', 'font/ttf'],
   video: ['video/mp4', 'video/webm'],
-  document: ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'],
-  other: ['image/png', 'image/jpeg', 'image/webp'],
+  document: ['application/pdf', 'image/svg+xml', ...PHOTO_MIME],
+  other: PHOTO_MIME,
 };
 
 // These formats are not converted — they're stored as-is (SVG is sanitized first)
@@ -222,11 +227,25 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
     return json({ error: `File content does not match declared type "${file.type}"` }, 415);
   }
 
+  // Decode HEIC/HEIF (iPhone photos) to JPEG first — sharp's prebuilt binary
+  // can't decode HEVC-coded HEIC, so use the dedicated wasm decoder.
+  let sourceBuffer: ArrayBuffer | Buffer = originalBuffer;
+  let sourceMime = file.type;
+  if (isHeic(file.type, file.name, header)) {
+    try {
+      sourceBuffer = await heicToJpeg(Buffer.from(originalBuffer));
+      sourceMime = 'image/jpeg';
+    } catch (e) {
+      console.error('[upload] HEIC decode failed:', e);
+      return json({ error: 'Could not read this HEIC photo. Please try a JPEG or PNG.' }, 415);
+    }
+  }
+
   // Convert to WebP (or keep original for SVG/ICO)
   let convertedBuffer: Buffer;
   let finalMime: string;
   try {
-    const result = await toWebP(originalBuffer, file.type, type);
+    const result = await toWebP(sourceBuffer as ArrayBuffer, sourceMime, type);
     convertedBuffer = result.buffer;
     finalMime = result.mimeType;
   } catch (e) {
