@@ -267,7 +267,10 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
         access: 'public',
         contentType: finalMime,
         addRandomSuffix: false,
-        allowOverwrite: false,
+        // Path is a fresh UUID, so the only thing this can overwrite is a blob
+        // committed by this same request's previous (transiently-failed) attempt
+        // — which is why the retry must be allowed to overwrite, not 409.
+        allowOverwrite: true,
       });
       publicUrl = blob.url;
       uploadError = null;
@@ -299,7 +302,7 @@ async function handleUpload({ params, locals, request }: Parameters<APIRoute>[0]
           access: 'public',
           contentType: 'image/webp',
           addRandomSuffix: false,
-          allowOverwrite: false,
+          allowOverwrite: true,
         });
         variantUrls[`${v.width}w`] = vBlob.url;
         variantPaths.push(variantPath);

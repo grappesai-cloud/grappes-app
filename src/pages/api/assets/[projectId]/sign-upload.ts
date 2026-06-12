@@ -72,6 +72,7 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
           tokenPayload: JSON.stringify({ projectId, kind, assetType, finalPathname }),
           // Override the upload destination so files land at our chosen path.
           addRandomSuffix: false,
+          allowOverwrite: true, // fresh UUID path; tolerate a retry after a flaky write
           pathname: finalPathname,
         } as any;
       },
