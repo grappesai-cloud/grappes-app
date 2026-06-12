@@ -60,6 +60,7 @@ jobs:
         env:
           ASSESSMENT_ID: ${{ github.event.client_payload.assessment_id || github.event.inputs.assessment_id }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SEMGREP_SARIF: ${{ github.workspace }}/semgrep.sarif
           GITLEAKS_JSON: ${{ github.workspace }}/gitleaks.json
           TARGET: ${{ github.event.client_payload.target_repo || github.event.inputs.target_repo }}

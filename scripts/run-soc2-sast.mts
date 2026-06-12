@@ -1,21 +1,17 @@
 // SOC 2 SAST worker (GitHub Actions). Real semantic SAST that needs binaries,
 // so it runs on a runner (not Vercel): Semgrep (taint/data-flow rulesets) +
 // gitleaks (secrets across full git history). The workflow runs the tools and
-// drops their reports; this script normalizes them into Findings and writes them
-// onto the soc2_assessments row in Neon directly (same pattern as the generation
-// worker — no callback endpoint needed).
+// drops their reports; this script normalizes them into Findings, runs them
+// through the SAME adversarial verification as the in-function engines (so CI
+// placeholders and doc-mentions get filtered, not shipped as criticals), and
+// writes the survivors onto the soc2_assessments row in Neon directly.
 //
-// Env: ASSESSMENT_ID, DATABASE_URL, SEMGREP_SARIF (default semgrep.sarif),
-//      GITLEAKS_JSON (default gitleaks.json), TARGET (label).
+// Env: ASSESSMENT_ID, DATABASE_URL, SEMGREP_SARIF, GITLEAKS_JSON, ANTHROPIC_API_KEY.
 
 import fs from 'node:fs';
 import postgres from 'postgres';
-
-type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-interface Finding {
-  id: string; title: string; severity: Severity; criterion: string;
-  detail: string; fix: string; evidence?: string; source: 'sast'; control?: string;
-}
+import type { Finding, Severity } from '../src/lib/soc2/static-checks';
+import { verifyFindings } from '../src/lib/soc2/verify-findings';
 
 function readJson(path: string): any | null {
   try { return JSON.parse(fs.readFileSync(path, 'utf8')); } catch { return null; }
@@ -38,10 +34,7 @@ function semgrepFindings(sarif: any): Finding[] {
       out.push({
         id: `sast-${ruleId.replace(/[^a-z0-9]/gi, '-').slice(0, 50)}-${file}-${line}`.slice(0, 120),
         title: `${ruleId.split('.').pop()} (${file}:${line})`,
-        severity,
-        criterion: 'security',
-        control: 'CC6.1',
-        source: 'sast',
+        severity, criterion: 'security', control: 'CC6.1', source: 'sast',
         detail: `${res.message?.text ?? ruleId}${cwe ? ` [${cwe}]` : ''}`,
         fix: meta.fix ?? 'Review and remediate per the Semgrep rule guidance.',
         evidence: `${file}:${line}`,
@@ -51,19 +44,33 @@ function semgrepFindings(sarif: any): Finding[] {
   return out;
 }
 
+// Deterministic pre-filter for the obvious gitleaks false positives that don't
+// need an LLM: a secret "found" inside documentation, or a PEM header with no
+// actual key body, or a CI/test placeholder value.
+function isLikelyFp(g: any): boolean {
+  const file = String(g.File ?? '').toLowerCase();
+  const match = String(g.Match ?? g.Secret ?? '');
+  if (/\.(md|mdx|txt|rst|adoc)$|(^|\/)docs?\//.test(file)) return true;
+  if (/-----BEGIN [^-]+-----/.test(match) && !/[A-Za-z0-9+/=]{40,}/.test(match)) return true;
+  if (/(^|\/)(\.github\/workflows|ci|tests?|examples?|samples?|fixtures?)\//.test(file)
+      && /\b(ci-|dummy|test|example|sample|placeholder|changeme|xxx|fake|dev-)/i.test(match)) return true;
+  return false;
+}
+
 function gitleaksFindings(report: any): Finding[] {
   const arr = Array.isArray(report) ? report : [];
-  return arr.slice(0, 200).map((g: any, i: number) => ({
-    id: `sast-secret-${(g.RuleID ?? 'leak')}-${i}`,
-    title: `Secret in git history: ${g.RuleID ?? 'credential'} (${g.File}:${g.StartLine})`,
-    severity: 'critical' as Severity,
-    criterion: 'security',
-    control: 'CC6.7',
-    source: 'sast' as const,
-    detail: `${g.Description ?? 'A secret was committed'}. It is in the git history and must be considered compromised even if removed from the current code.`,
-    fix: 'Rotate the exposed credential immediately, then purge it from history (git filter-repo / BFG) and enable push protection.',
-    evidence: `${g.File}:${g.StartLine} (commit ${String(g.Commit ?? '').slice(0, 8)})`,
-  }));
+  return arr
+    .filter((g: any) => !isLikelyFp(g))
+    .slice(0, 200)
+    .map((g: any, i: number) => ({
+      id: `sast-secret-${(g.RuleID ?? 'leak')}-${i}`,
+      title: `Secret in git history: ${g.RuleID ?? 'credential'} (${g.File}:${g.StartLine})`,
+      severity: 'critical' as Severity,
+      criterion: 'security' as const, control: 'CC6.7', source: 'sast' as const,
+      detail: `${g.Description ?? 'A secret was committed'}. It is in the git history and must be considered compromised even if removed from the current code.`,
+      fix: 'Rotate the exposed credential immediately, then purge it from history (git filter-repo / BFG) and enable push protection.',
+      evidence: `${g.File}:${g.StartLine} (commit ${String(g.Commit ?? '').slice(0, 8)})`,
+    }));
 }
 
 async function main() {
@@ -72,13 +79,27 @@ async function main() {
 
   const sarif = readJson(process.env.SEMGREP_SARIF || 'semgrep.sarif');
   const gitleaks = readJson(process.env.GITLEAKS_JSON || 'gitleaks.json');
-  const findings = [...semgrepFindings(sarif ?? {}), ...gitleaksFindings(gitleaks ?? [])];
+
+  const rawSecrets = Array.isArray(gitleaks) ? gitleaks.length : 0;
+  let findings = [...semgrepFindings(sarif ?? {}), ...gitleaksFindings(gitleaks ?? [])];
+  const beforeVerify = findings.length;
+
+  // Same adversarial verification as the in-function engines — drops confident
+  // false positives and attaches confidence/CVSS. Best-effort.
+  try {
+    findings = await verifyFindings(findings);
+  } catch (e) {
+    console.warn('[sast] adversarial verification skipped:', (e as any)?.message ?? e);
+  }
+
   const stats = {
     semgrep: (sarif?.runs?.[0]?.results ?? []).length,
-    secrets: Array.isArray(gitleaks) ? gitleaks.length : 0,
+    secrets: rawSecrets,
+    findings: findings.length,
+    filteredFp: beforeVerify - findings.length,
     ranAt: new Date().toISOString(),
   };
-  console.log(`[sast] ${stats.semgrep} semgrep results, ${stats.secrets} secrets -> ${findings.length} findings`);
+  console.log(`[sast] ${stats.semgrep} semgrep, ${rawSecrets} raw secrets -> ${beforeVerify} findings -> ${findings.length} after verification`);
 
   const sql = postgres(process.env.DATABASE_URL!, { prepare: false });
   try {
