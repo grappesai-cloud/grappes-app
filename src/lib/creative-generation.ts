@@ -857,6 +857,35 @@ export async function findBrokenImages(html: string): Promise<string[]> {
   return broken;
 }
 
+// ─── Hero check ──────────────────────────────────────────────────────────────
+// Catches the "broken hero" failure mode: the main <h1> is missing or pushed far
+// down the page (hero collapsed into a bare nav or an empty atmospheric block).
+// The art-directed / anti-template instinct produces this on calm-minimal briefs.
+// Returned issues feed the repair pass, which only keeps a fix that improves.
+export function checkHero(html: string): string[] {
+  const issues: string[] = [];
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const body = bodyMatch ? bodyMatch[1] : html;
+  const h1Idx = body.search(/<h1[\s>]/i);
+  if (h1Idx === -1) {
+    issues.push('No <h1> on the page. The hero must contain the main value-proposition headline.');
+    return issues;
+  }
+  // Prefer section markers: the h1 should sit within the first ~2 sections
+  // (nav + hero), not only deep in the page.
+  const markers = [...body.matchAll(/<!--\s*SECTION:/gi)].map(m => m.index ?? 0);
+  if (markers.length >= 3) {
+    if (h1Idx > markers[2]) {
+      issues.push('The <h1> headline appears only after the first two sections. The hero/first screen has no headline. Put the main value-proposition headline in the hero, above the fold, and never replace the hero with a bare nav menu or an empty block.');
+    }
+  } else if (h1Idx / body.length > 0.5) {
+    // Fallback when section markers are sparse (trailing scripts inflate the
+    // denominator, so this stays conservative / low false-positive).
+    issues.push('The <h1> headline appears low in the page. The hero/first screen has no value-proposition headline. Move the main headline into the hero, above the fold.');
+  }
+  return issues;
+}
+
 // ─── Inject Canvas-Fit Safety Net ────────────────────────────────────────────
 // Deterministic backstop for generated full-bleed <canvas> backgrounds. The
 // model sometimes emits a bare <canvas> with the default 300×150 drawing buffer

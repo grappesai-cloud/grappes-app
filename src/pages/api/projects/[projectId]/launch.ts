@@ -13,6 +13,7 @@ import {
   injectFormHandler,
   injectStructuredData,
   findBrokenImages,
+  checkHero,
   applyBriefContent,
   grammarCheckHtml,
   repairSite,
@@ -546,16 +547,17 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
       previsReport = await runVisualQAOnContent({ fullHtml: html, projectId });
       const visualIssues = (previsReport?.failedSections ?? []).map((s: string) => `[visual] section fails layout check (hidden/collapsed/overflow): ${s}`);
       const structuralIssues = structuralReport.checks.filter(c => !c.passed).map(c => `${c.name}: ${c.message}`);
-      const fixable = [...structuralIssues, ...visualIssues];
+      const heroIssues = checkHero(html);
+      const fixable = [...structuralIssues, ...visualIssues, ...heroIssues];
 
       if (fixable.length >= 1) {
-        const beforeScore = structuralReport.checks.filter(c => !c.passed).length + (previsReport?.failedSections?.length ?? 0);
+        const beforeScore = structuralReport.checks.filter(c => !c.passed).length + (previsReport?.failedSections?.length ?? 0) + heroIssues.length;
         const repaired = await repairSite({ html, issues: fixable, brief: freshBrief.data });
         const candidate = repaired.html;
         if (candidate.includes('</html>') && candidate.length >= html.length * 0.6) {
           const reStruct = runStructuralQA(candidate);
           const reVisual = await runVisualQAOnContent({ fullHtml: candidate, projectId }).catch(() => null);
-          const afterScore = reStruct.checks.filter(c => !c.passed).length + (reVisual?.failedSections?.length ?? 0);
+          const afterScore = reStruct.checks.filter(c => !c.passed).length + (reVisual?.failedSections?.length ?? 0) + checkHero(candidate).length;
           if (afterScore < beforeScore) {
             console.log(`[launch] Repair accepted: issue score ${beforeScore} -> ${afterScore}`);
             html = candidate;
@@ -577,6 +579,9 @@ async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) 
         generationWarnings.push(
           `Layout check flagged ${previsReport.failedSections.length} section(s) that may render hidden, collapsed, or overflowing: ${previsReport.failedSections.slice(0, 4).join(', ')}. Review and iterate if needed.`
         );
+      }
+      if (checkHero(html).length > 0) {
+        generationWarnings.push('The hero may be missing its main headline above the fold. Open the editor and move the headline into the first screen if needed.');
       }
     } catch (e) {
       console.warn('[launch] Pre-deploy visual QA / repair failed (non-fatal):', e);

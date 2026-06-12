@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { extractHtml, injectAnalytics, injectBacklink, injectFormHandler, applyBriefContent, injectStructuredData, findBrokenImages } from '../src/lib/creative-generation';
+import { extractHtml, injectAnalytics, injectBacklink, injectFormHandler, applyBriefContent, injectStructuredData, findBrokenImages, checkHero } from '../src/lib/creative-generation';
 
 describe('extractHtml', () => {
   it('extracts HTML from markdown fenced code block', () => {
@@ -146,5 +146,23 @@ describe('findBrokenImages', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }) as any);
     const broken = await findBrokenImages('<img src="https://x.example/a.jpg">');
     expect(broken).toEqual([]);
+  });
+});
+
+describe('checkHero', () => {
+  const wrap = (body: string) => `<!DOCTYPE html><html><head><title>x</title></head><body>${body}</body></html>`;
+  it('passes when h1 is in the hero (first section)', () => {
+    const html = wrap(`<!-- SECTION:nav --><nav>menu</nav><!-- SECTION:hero --><h1>Big value prop</h1><!-- SECTION:about --><p>...</p><!-- SECTION:contact --><p>..</p>`);
+    expect(checkHero(html)).toEqual([]);
+  });
+  it('flags a missing h1', () => {
+    const html = wrap(`<!-- SECTION:hero --><div>no headline</div>`);
+    expect(checkHero(html).length).toBe(1);
+    expect(checkHero(html)[0]).toMatch(/No <h1>/);
+  });
+  it('flags an h1 pushed below the first two sections (broken hero)', () => {
+    const html = wrap(`<!-- SECTION:nav --><nav>menu</nav><!-- SECTION:hero --><div>empty atmospheric block</div><!-- SECTION:features --><div>x</div><!-- SECTION:cta --><h1>Headline at the bottom</h1>`);
+    expect(checkHero(html).length).toBe(1);
+    expect(checkHero(html)[0]).toMatch(/after the first two sections/);
   });
 });
