@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { log } from '../../../../lib/logger';
-import { checkRateLimit, checkPersistentRateLimit, recordPersistentRateLimit } from '../../../../lib/rate-limit';
+import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
+import { getPg } from '../../../../lib/supabase';
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {
   generateSite,
@@ -46,14 +47,24 @@ export const GET: APIRoute = async ({ params, locals }) => {
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  // Auto-recover stale generations (Lambda died without updating status)
+  // Auto-recover orphaned generations: status stuck at 'generating' with no
+  // worker still on it. The job queue (generation_jobs) now owns the lifecycle —
+  // a queued/running job is reclaimed + retried by the cron, so only declare the
+  // project dead here when there is NO active job (truly orphaned state).
   if (project.status === 'generating' && project.updated_at) {
     const age = Date.now() - new Date(project.updated_at).getTime();
     if (age > STALE_GENERATION_MS) {
-      console.warn(`[launch] Stale generation detected for ${params.projectId} (${Math.round(age / 60000)}min) — resetting to failed`);
-      await db.projects.updateStatus(params.projectId!, 'failed');
-      await db.projects.updateSubstatus(params.projectId!, null);
-      return json({ status: 'failed', substatus: null, previewUrl: null, githubUrl: null });
+      const active = await getPg()`
+        SELECT 1 FROM generation_jobs
+        WHERE project_id = ${params.projectId!} AND status IN ('queued','running')
+        LIMIT 1
+      `;
+      if (active.length === 0) {
+        console.warn(`[launch] Orphaned generation for ${params.projectId} (${Math.round(age / 60000)}min, no active job) — resetting to failed`);
+        await db.projects.updateStatus(params.projectId!, 'failed');
+        await db.projects.updateSubstatus(params.projectId!, null);
+        return json({ status: 'failed', substatus: null, previewUrl: null, githubUrl: null });
+      }
     }
   }
 
@@ -92,7 +103,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
 
 // ── POST — fire generation pipeline ───────────────────────────────────────────
 
-export const POST: APIRoute = async ({ params, locals }) => {
+export const POST: APIRoute = async ({ params, locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Unauthorized' }, 401);
 
@@ -184,41 +195,50 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }
   }
 
-  // ── Run pipeline synchronously (Vercel Fluid Compute — up to 800s) ──────
-  let pipelineWarnings: string[] = [];
+  // ── Enqueue a durable generation job ────────────────────────────────────
+  // The heavy generate -> QA -> repair pipeline no longer runs inside this
+  // request: a slow/throttled/killed invocation would lose the whole run and the
+  // 800s function ceiling capped long jobs. Instead we enqueue a job that a
+  // worker (kicked below + a 1-min cron) claims and runs off the request path,
+  // retrying if its invocation dies. The dashboard polls GET for completion.
   try {
-    pipelineWarnings = await runPipeline(params.projectId!, { wasLive });
+    const sql = getPg();
+    // Supersede any leftover active job for this project, then enqueue a fresh one.
+    await sql`UPDATE generation_jobs SET status='failed', error='superseded', updated_at=now()
+              WHERE project_id=${params.projectId!} AND status IN ('queued','running')`;
+    await sql`INSERT INTO generation_jobs (project_id, user_id, was_live)
+              VALUES (${params.projectId!}, ${user.id}, ${wasLive})`;
   } catch (e: any) {
-    const errMsg = (e?.message || String(e)).slice(0, 200);
-    const isAnthropicRateLimit = e?.status === 429 || e?.error?.error?.type === 'rate_limit_error';
-    console.error('[launch] Pipeline error:', errMsg, e?.stack?.split('\n').slice(0, 5).join('\n'));
+    console.error('[launch] Failed to enqueue generation job:', e);
     try {
       await db.projects.updateStatus(params.projectId!, 'failed');
-      await db.projects.updateSubstatus(params.projectId!, `err:${errMsg}`);
+      await db.projects.updateSubstatus(params.projectId!, 'err:could not enqueue generation');
     } catch {}
-    // Don't record rate limit on failure — failed attempts shouldn't consume slots
-    return json({
-      error: isAnthropicRateLimit
-        ? 'AI provider is temporarily overloaded. Please try again in a few minutes.'
-        : errMsg,
-    }, isAnthropicRateLimit ? 503 : 500);
+    return json({ error: 'Could not start generation. Please try again.' }, 500);
   }
 
-  // Record rate limit ONLY on success — failed attempts get a free retry
-  if (!isOwnerEquiv) {
-    await recordPersistentRateLimit(launchRateKey);
+  // Kick the worker so generation starts within seconds. Best-effort with a
+  // short timeout — if it never lands, the 1-minute cron drains the queue.
+  try {
+    const origin = new URL(request.url).origin;
+    const cronSecret = import.meta.env.CRON_SECRET;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    await fetch(`${origin}/api/cron/process-generation`, {
+      headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
+      signal: ctrl.signal,
+    }).catch(() => {});
+    clearTimeout(t);
+  } catch {
+    // Non-fatal — the cron picks up the queued job.
   }
 
-  return json({
-    started: true,
-    status: 'generated',
-    warnings: pipelineWarnings.length > 0 ? pipelineWarnings : undefined,
-  });
+  return json({ started: true, status: 'generating' });
 };
 
 // ── Pipeline ───────────────────────────────────────────────────────────────────
 
-async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) {
+export async function runPipeline(projectId: string, opts: { wasLive?: boolean } = {}) {
   const sub = (s: string | null) => db.projects.updateSubstatus(projectId, s);
   const projectRow = await db.projects.findById(projectId);
   const brandingRemoved = !!(projectRow as any)?.branding_removed;
