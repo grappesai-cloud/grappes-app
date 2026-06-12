@@ -3,8 +3,7 @@ import Stripe from 'stripe';
 import { createAdminClient } from '../../../lib/supabase';
 import { db } from '../../../lib/db';
 import { EXTRA_PACK_EDITS } from '../../../lib/edit-quota';
-import { sendPaymentConfirmedEmail, sendReferralEarnedEmail, sendReferralPayoutAlert, sendSubscriptionCancelledEmail, sendDomainPurchaseFailedEmail, sendKitPublishedEmail } from '../../../lib/resend';
-import { processReferralReward } from '../../../lib/referral';
+import { sendPaymentConfirmedEmail, sendSubscriptionCancelledEmail, sendDomainPurchaseFailedEmail, sendKitPublishedEmail } from '../../../lib/resend';
 import { getExpiresAt, getFreeExpiresAt, type SiteBillingType } from '../../../lib/site-billing';
 import { purchaseDomainAndAttach } from '../../../lib/domain-purchase';
 import { log } from '../../../lib/logger';
@@ -258,22 +257,6 @@ export const POST: APIRoute = async ({ request }) => {
             }
           }
 
-          // Process referral reward for first site activation
-          if (session.metadata?.user_id) {
-            try {
-              const { processPerSiteReferralReward } = await import('../../../lib/referral');
-              const { sendReferralEarnedEmail, sendReferralPayoutAlert } = await import('../../../lib/resend');
-              const reward = await processPerSiteReferralReward(session.metadata.user_id, billingType);
-              if (reward) {
-                await sendReferralEarnedEmail({ to: reward.referrerEmail, amount: reward.amount, newBalance: reward.newBalance, plan: billingType });
-                if (reward.shouldNotify) {
-                  await sendReferralPayoutAlert({ referrerEmail: reward.referrerEmail, amount: reward.newBalance });
-                }
-              }
-            } catch (refErr) {
-              console.error('[Stripe webhook] Per-site referral reward failed:', refErr);
-            }
-          }
           break;
         }
 
@@ -406,27 +389,6 @@ export const POST: APIRoute = async ({ request }) => {
               ...(customerId && { stripe_customer_id: customerId }),
             })
             .eq('id', userId);
-
-          // Process referral reward for this plan purchase
-          try {
-            const reward = await processReferralReward(userId, plan);
-            if (reward) {
-              await sendReferralEarnedEmail({
-                to: reward.referrerEmail,
-                amount: reward.amount,
-                newBalance: reward.newBalance,
-                plan,
-              });
-              if (reward.shouldNotify) {
-                await sendReferralPayoutAlert({
-                  referrerEmail: reward.referrerEmail,
-                  amount: reward.newBalance,
-                });
-              }
-            }
-          } catch (refErr) {
-            console.error('[Stripe webhook] Referral reward failed:', refErr);
-          }
         }
         break;
       }

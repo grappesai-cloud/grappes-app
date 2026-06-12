@@ -1,5 +1,5 @@
 // GET  /api/admin/users/[userId] — full admin view of one user
-// Returns: user row, projects, recent support thread, referral summary
+// Returns: user row, projects, recent support thread
 
 import type { APIRoute } from 'astro';
 import { createAdminClient } from '../../../../../lib/supabase';
@@ -15,23 +15,14 @@ export const GET: APIRoute = async ({ cookies, params }) => {
   const [
     { data: user },
     { data: projects },
-    { data: referrals, count: referralCount },
-    { data: payouts },
     { data: openThread },
   ] = await Promise.all([
     client.from('users')
-      .select('id, email, name, plan, projects_limit, extra_edits, edits_used, edits_period_start, referral_balance, multipage_addon, multipage_addon_lifetime, soc2_credits, marketing_opt_out, email_bounced_at, created_at')
+      .select('id, email, name, plan, projects_limit, extra_edits, edits_used, edits_period_start, multipage_addon, multipage_addon_lifetime, soc2_credits, marketing_opt_out, email_bounced_at, created_at')
       .eq('id', userId).maybeSingle(),
     client.from('projects')
       .select('id, name, status, billing_status, billing_type, expires_at, preview_url, created_at, updated_at')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-    client.from('referrals')
-      .select('status, amount_earned', { count: 'exact' })
-      .eq('referrer_id', userId),
-    client.from('referral_payouts')
-      .select('id, amount, status, iban, iban_holder, created_at, paid_at')
-      .eq('referrer_id', userId)
       .order('created_at', { ascending: false }),
     client.from('support_threads')
       .select('id, status, last_message_at')
@@ -45,12 +36,6 @@ export const GET: APIRoute = async ({ cookies, params }) => {
   return json({
     user,
     projects: projects ?? [],
-    referrals: {
-      total: referralCount ?? 0,
-      confirmed: (referrals ?? []).filter((r: any) => r.status === 'confirmed').length,
-      earned: (referrals ?? []).reduce((s: number, r: any) => s + (r.amount_earned ?? 0), 0),
-    },
-    payouts: payouts ?? [],
     openThread: openThread || null,
   });
 };

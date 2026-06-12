@@ -71,18 +71,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.session = session;
   context.locals.supabase = createAuthClient(context.request, context.cookies);
 
-  // Track ?ref=CODE in a 30-day cookie for referral attribution
-  const refCode = context.url.searchParams.get('ref');
-  if (refCode && /^[a-z0-9]{4,16}$/i.test(refCode)) {
-    context.cookies.set('ref_code', refCode.toLowerCase(), {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: import.meta.env.PROD,
-    });
-  }
-
   // Authenticated product routes — anything here does `Astro.locals.user!` and
   // 500s for logged-out visitors unless we redirect first. Public prefixes
   // (e.g. /reels/share/) are exempt so logged-out visitors can view shared links.

@@ -54,8 +54,7 @@ if (Astro.request.method === 'POST') {
 const isAuthed = verifySessionToken(Astro.cookies.get(COOKIE_NAME)?.value ?? '');
 
 // ── Fetch dashboard data (only if authed) ─────────────────────────────────
-let stats = { totalUsers: 0, activeSites: 0, freeDeploymentsLive: 0, expiredSites: 0, failedProjects: 0, pendingPayouts: 0 };
-let pendingPayouts: any[] = [];
+let stats = { totalUsers: 0, activeSites: 0, freeDeploymentsLive: 0, expiredSites: 0, failedProjects: 0 };
 let recentUsers: any[]    = [];
 let allProjects: any[]    = [];
 let failedProjects: any[] = [];
@@ -69,8 +68,6 @@ if (isAuthed) {
     { count: freeDeploymentsLive },
     { count: expiredSites },
     { count: failedCount },
-    { count: pendingPayoutsCount },
-    { data: payoutsData },
     { data: usersData },
     { data: projectsData },
     { data: failedData },
@@ -80,13 +77,8 @@ if (isAuthed) {
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'live').eq('billing_status', 'free'),
     client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'expired'),
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
-    client.from('referral_payouts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    client.from('referral_payouts')
-      .select('id, amount, created_at, referrer_id, iban, iban_holder, users(email)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false }),
     client.from('users')
-      .select('id, email, created_at, plan, referral_balance')
+      .select('id, email, created_at, plan')
       .order('created_at', { ascending: false })
       .limit(30),
     client.from('projects')
@@ -105,10 +97,8 @@ if (isAuthed) {
     freeDeploymentsLive: freeDeploymentsLive ?? 0,
     expiredSites:        expiredSites        ?? 0,
     failedProjects:      failedCount         ?? 0,
-    pendingPayouts:      pendingPayoutsCount ?? 0,
   };
 
-  pendingPayouts = (payoutsData ?? []) as any[];
   recentUsers    = (usersData   ?? []) as any[];
   allProjects    = (projectsData ?? []) as any[];
   failedProjects = (failedData  ?? []) as any[];
@@ -485,51 +475,6 @@ function fmt(dateStr: string | null | undefined): string {
         <div class="stat-label">Failed Projects</div>
         <div class="stat-value orange">{stats.failedProjects}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Pending Payouts</div>
-        <div class="stat-value yellow">{stats.pendingPayouts}</div>
-      </div>
-    </div>
-
-    <!-- Pending Referral Payouts -->
-    <div class="section">
-      <div class="section-title">Pending Referral Payouts ({pendingPayouts.length})</div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Referrer Email</th>
-              <th>Amount</th>
-              <th>IBAN</th>
-              <th>Holder</th>
-              <th>Requested At</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pendingPayouts.length === 0 ? (
-              <tr class="empty-row"><td colspan="6">No pending payouts.</td></tr>
-            ) : pendingPayouts.map((p: any) => (
-              <tr>
-                <td>{(p.users as any)?.email ?? p.referrer_id}</td>
-                <td><strong style="color:#06bfdd;">{Number(p.amount).toFixed(2)}€</strong></td>
-                <td style="font-family:monospace;font-size:12px;">{p.iban ?? '—'}</td>
-                <td>{p.iban_holder ?? '—'}</td>
-                <td>{fmt(p.created_at)}</td>
-                <td>
-                  <button
-                    class="btn-mark-paid"
-                    data-payout-id={p.id}
-                    onclick={`markPaid(this, '${p.id}')`}
-                  >
-                    Mark Paid
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
 
     <!-- Recent Users -->
@@ -541,13 +486,12 @@ function fmt(dateStr: string | null | undefined): string {
             <tr>
               <th>Email</th>
               <th>Plan</th>
-              <th>Referral Balance</th>
               <th>Joined</th>
             </tr>
           </thead>
           <tbody>
             {recentUsers.length === 0 ? (
-              <tr class="empty-row"><td colspan="4">No users found.</td></tr>
+              <tr class="empty-row"><td colspan="3">No users found.</td></tr>
             ) : recentUsers.map((u: any) => (
               <tr>
                 <td>{u.email}</td>
@@ -556,7 +500,6 @@ function fmt(dateStr: string | null | undefined): string {
                     {u.plan ?? 'free'}
                   </span>
                 </td>
-                <td>{u.referral_balance != null ? `${Number(u.referral_balance).toFixed(2)}€` : '—'}</td>
                 <td>{fmt(u.created_at)}</td>
               </tr>
             ))}
@@ -714,7 +657,6 @@ function fmt(dateStr: string | null | undefined): string {
       var data = await res.json();
       var u = data.user;
       var ps = data.projects || [];
-      var r = data.referrals || {};
       var projectsHtml = ps.length === 0
         ? '<p style="color:rgba(255,255,255,0.4);font-size:12px;">No projects</p>'
         : ps.map(function (p) {
@@ -734,7 +676,6 @@ function fmt(dateStr: string | null | undefined): string {
           + '<div class="kv-row"><span class="k">Edits used</span><span>' + (u.edits_used ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">Extra edits</span><span>' + (u.extra_edits ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">SOC 2 credits</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Referral balance</span><span>€' + Number(u.referral_balance ?? 0).toFixed(2) + '</span></div>'
           + '<div class="kv-row"><span class="k">Multipage lifetime</span><span>' + (u.multipage_addon_lifetime ? 'Yes' : 'No') + '</span></div>'
         + '</div>'
         + '<div class="drawer-section"><h3>Quick actions</h3>'
@@ -750,12 +691,7 @@ function fmt(dateStr: string | null | undefined): string {
           + '</div>'
           + '<div id="drawer-msg" hidden></div>'
         + '</div>'
-        + '<div class="drawer-section"><h3>Projects (' + ps.length + ')</h3>' + projectsHtml + '</div>'
-        + '<div class="drawer-section"><h3>Referrals</h3>'
-          + '<div class="kv-row"><span class="k">Total invited</span><span>' + (r.total || 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Confirmed</span><span>' + (r.confirmed || 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Lifetime earned</span><span>€' + Number(r.earned ?? 0).toFixed(2) + '</span></div>'
-        + '</div>';
+        + '<div class="drawer-section"><h3>Projects (' + ps.length + ')</h3>' + projectsHtml + '</div>';
     } catch (e) {
       content.innerHTML = '<p style="color:#ff7b7b">Error: ' + e.message + '</p>';
     }
@@ -829,34 +765,6 @@ function fmt(dateStr: string | null | undefined): string {
       if (btn) { btn.disabled = false; btn.textContent = 'Retry generation'; }
     }
   };
-</script>
-
-<script>
-  async function markPaid(btn, payoutId) {
-    if (!confirm('Mark this payout as paid?')) return;
-    btn.disabled = true;
-    btn.textContent = 'Processing…';
-    try {
-      const res = await fetch('/api/admin/referral/mark-paid', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payoutId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        btn.closest('tr').style.opacity = '0.4';
-        btn.textContent = 'Paid ✓';
-      } else {
-        btn.disabled = false;
-        btn.textContent = 'Mark Paid';
-        alert('Error: ' + (data.error ?? 'Unknown'));
-      }
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Mark Paid';
-      alert('Network error');
-    }
-  }
 </script>
 
 </body>

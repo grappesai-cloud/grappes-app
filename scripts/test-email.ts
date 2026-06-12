@@ -20,8 +20,6 @@ import {
   sendFormEmail,
   sendWelcomeEmail,
   sendSiteLiveEmail,
-  sendReferralPayoutAlert,
-  sendReferralEarnedEmail,
   sendSubscriptionCancelledEmail,
   sendDeploymentFailedEmail,
   sendDomainPurchaseFailedEmail,
@@ -73,14 +71,6 @@ async function main() {
       siteUrl: 'https://acme.grappes.dev',
       submission: { name: 'Jane Doe', email: 'jane@example.com', message: 'Hi, I am interested in your services.' },
     })
-  );
-
-  await test('sendReferralPayoutAlert', () =>
-    sendReferralPayoutAlert({ referrerEmail: 'referrer@example.com', amount: 75 })
-  );
-
-  await test('sendReferralEarnedEmail', () =>
-    sendReferralEarnedEmail({ to: TEST_TO!, amount: 15, newBalance: 45, plan: 'pro' })
   );
 
   await test('sendSubscriptionCancelledEmail', () =>

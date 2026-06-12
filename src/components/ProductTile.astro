@@ -8,7 +8,6 @@ interface Props {
   cta?: string;
   accent?: string;
   comingSoon?: boolean;
-  isNew?: boolean;
 }
 
 const {
@@ -20,7 +19,6 @@ const {
   cta = 'Open',
   accent = '#06bfdd',
   comingSoon = false,
-  isNew = false,
 } = Astro.props;
 
 // Stable per-card id so animations don't collide across tiles.
@@ -78,7 +76,6 @@ const cardId = `pt-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
         <div class="pt-icon-bg" aria-hidden="true"></div>
         <div class="pt-icon-svg" set:html={icon}></div>
       </div>
-      {isNew && <span class="pt-badge">New</span>}
       {comingSoon && <span class="pt-badge pt-badge--soon">Soon</span>}
     </div>
 

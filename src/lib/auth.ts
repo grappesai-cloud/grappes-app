@@ -67,7 +67,6 @@ export const auth = betterAuth({
         after: async (createdUser, ctx) => {
           // 1) Mirror into the `public.users` profile table so existing
           //    `.from('users')` API code keeps working transparently.
-          // 2) Attribute referral code if present in the ref_code cookie.
           try {
             const { sql } = await import('../db');
             await sql`
@@ -79,26 +78,7 @@ export const auth = betterAuth({
             console.warn('[auth] public.users mirror insert failed:', err);
           }
 
-          try {
-            const cookieHeader = ctx?.context?.request?.headers?.get?.('cookie') ?? '';
-            const refCookie = cookieHeader
-              .split(';')
-              .map((c: string) => c.trim())
-              .find((c: string) => c.startsWith('ref_code='));
-            const refCode = refCookie ? decodeURIComponent(refCookie.split('=')[1] ?? '') : '';
-            if (refCode && /^[a-z0-9]{4,16}$/i.test(refCode)) {
-              const { recordReferral } = await import('./referral');
-              const ip =
-                ctx?.context?.request?.headers?.get?.('x-real-ip') ??
-                ctx?.context?.request?.headers?.get?.('x-forwarded-for')?.split(',')[0]?.trim() ??
-                'unknown';
-              await recordReferral(createdUser.id, refCode, ip);
-            }
-          } catch (err) {
-            console.warn('[auth] post-create referral hook failed:', err);
-          }
-
-          // 3) Welcome email — fire-and-forget so a Resend hiccup never blocks signup.
+          // 2) Welcome email — fire-and-forget so a Resend hiccup never blocks signup.
           try {
             const { sendWelcomeEmail } = await import('./resend');
             await sendWelcomeEmail({

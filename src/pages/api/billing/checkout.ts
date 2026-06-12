@@ -1,6 +1,5 @@
 // ── Plan upgrade checkout ─────────────────────────────────────────────────────
 // Creates a Stripe Checkout session for starter/pro/agency plans.
-// Applies referral discount coupon automatically if user is eligible.
 
 import type { APIRoute } from 'astro';
 import Stripe from 'stripe';
@@ -13,12 +12,6 @@ const PLAN_MODES: Record<string, 'subscription' | 'payment'> = {
   starter: 'subscription',
   pro:     'subscription',
   agency:  'payment',
-};
-
-// Referral discount % per plan (only pro and agency)
-const REFERRAL_DISCOUNT_PCT: Record<string, number> = {
-  pro:    10,
-  agency: 15,
 };
 
 export const POST: APIRoute = async ({ locals, request }) => {
@@ -53,38 +46,12 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const siteUrl  = import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
   const mode     = PLAN_MODES[plan];
 
-  // Check if user is eligible for referral discount
   const client = createAdminClient();
   const { data: dbUser } = await client
     .from('users')
-    .select('referred_by, plan, stripe_customer_id, email')
+    .select('plan, stripe_customer_id, email')
     .eq('id', user.id)
     .single();
-
-  const discountPct = (dbUser?.referred_by && dbUser.plan === 'free')
-    ? (REFERRAL_DISCOUNT_PCT[plan] ?? 0)
-    : 0;
-
-  // Create or reuse a referral coupon for this checkout
-  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] = [];
-  if (discountPct > 0) {
-    // Use a deterministic coupon ID per user+plan to avoid creating orphan coupons
-    const couponId = `ref-${user.id.slice(0, 8)}-${plan}-${discountPct}`;
-    try {
-      // Try to retrieve existing coupon first
-      await stripe.coupons.retrieve(couponId);
-    } catch {
-      // Doesn't exist yet — create it
-      await stripe.coupons.create({
-        id:              couponId,
-        percent_off:     discountPct,
-        duration:        'once',
-        name:            `Referral -${discountPct}%`,
-        max_redemptions: 3, // allows a few retries if checkout is abandoned
-      });
-    }
-    discounts = [{ coupon: couponId }];
-  }
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode,
@@ -96,7 +63,6 @@ export const POST: APIRoute = async ({ locals, request }) => {
     customer_email: user.email ?? undefined,
     // Always create a Stripe customer so stripe_customer_id is always saved
     ...(mode === 'payment' && { customer_creation: 'always' }),
-    ...(discounts.length > 0 && { discounts }),
   };
 
   // For subscriptions: pass metadata on the subscription object too

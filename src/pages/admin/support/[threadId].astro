@@ -24,7 +24,7 @@ if (!threadId) return Astro.redirect('/admin/support');
 const client = createAdminClient();
 const { data: thread } = await client
   .from('support_threads')
-  .select('id, user_id, project_id, status, last_message_at, created_at, users(email, name, plan, referral_balance)')
+  .select('id, user_id, project_id, status, last_message_at, created_at, users(email, name, plan)')
   .eq('id', threadId)
   .maybeSingle();
 if (!thread) return Astro.redirect('/admin/support');
@@ -169,7 +169,6 @@ function fmt(d: string): string {
     <aside>
       <h3>User context</h3>
       <div class="ctx-row"><span class="k">Plan</span>{user?.plan ?? 'free'}</div>
-      <div class="ctx-row"><span class="k">Referral balance</span>€{Number(user?.referral_balance ?? 0).toFixed(2)}</div>
       {project && (
         <>
           <div class="ctx-row"><span class="k">Project</span>{project.name}</div>

@@ -69,12 +69,7 @@ export const POST: APIRoute = async ({ locals }) => {
       await client.from('projects').delete().eq('user_id', user.id);
     }
 
-    // 3. Delete referral data
-    await client.from('referrals').delete().eq('referrer_id', user.id);
-    await client.from('referrals').delete().eq('referred_id', user.id);
-    await client.from('referral_payouts').delete().eq('referrer_id', user.id);
-
-    // 4. Delete the auth-managed user row (cascades via FK to public.users)
+    // 3. Delete the auth-managed user row (cascades via FK to public.users)
     await client.from('user').delete().eq('id', user.id);
     // Belt-and-braces: explicitly drop the public.users mirror row too
     await client.from('users').delete().eq('id', user.id);

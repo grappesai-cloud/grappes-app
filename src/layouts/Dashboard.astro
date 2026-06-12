@@ -84,7 +84,6 @@ const tourSteps = isStudioHome ? studioTourSteps : isSitesPage ? sitesTourSteps 
         .dash-nav.open { display: flex !important; }
         .dash-nav a { width: 100%; text-align: center; }
         .dash-right { gap: 8px !important; }
-        .dash-right .referral-link { display: none; }
       }
 
       @media (max-width: 480px) {
@@ -127,12 +126,6 @@ const tourSteps = isStudioHome ? studioTourSteps : isSitesPage ? sitesTourSteps 
           )}
         </nav>
         <div class="dash-right" style="display:flex;align-items:center;gap:14px;">
-          {!inProject && (
-            <a href="/dashboard/referrals" class="referral-link"
-              style={`font-size:14px;font-weight:600;padding:7px 16px;border-radius:30px;transition:all 0.3s;${currentPath === '/dashboard/referrals' ? 'color:#0a0a0a;background:#06bfdd;' : 'color:rgba(255,255,255,0.55);border:1px solid rgba(255,255,255,0.15);'}`}>
-              <span>Referrals</span>
-            </a>
-          )}
           <button type="button" data-signout style="background:none;border:1px solid rgba(255,255,255,0.25);border-radius:30px;color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;padding:7px 18px;cursor:pointer;"><span>Sign out</span></button>
           <a href="/dashboard/account" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#06bfdd,#6c6bf3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0a0a0a;text-transform:uppercase;text-decoration:none;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
             {user.email?.[0] ?? '?'}

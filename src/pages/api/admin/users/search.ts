@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ cookies, url }) => {
   const client = createAdminClient();
   const { data, error } = await client
     .from('users')
-    .select('id, email, name, plan, referral_balance, created_at')
+    .select('id, email, name, plan, created_at')
     .or(`email.ilike.%${q}%,name.ilike.%${q}%`)
     .order('created_at', { ascending: false })
     .limit(15);
