@@ -1044,7 +1044,7 @@ export function injectEffectRuntimes(html: string): string {
 
 // ─── Opus Creative Plan (the brain — thinks, doesn't code) ──────────────────
 
-export async function generateCreativePlan(brief: BriefData, locale: string, rawConversation?: string): Promise<{ plan: string; inputTokens: number; outputTokens: number }> {
+async function generateCreativePlan(brief: BriefData, locale: string, rawConversation?: string): Promise<{ plan: string; inputTokens: number; outputTokens: number }> {
   const briefJson = JSON.stringify(brief, null, 2);
   const businessName = brief?.business?.name || 'Brand';
   const industry = brief?.business?.industry || '';
