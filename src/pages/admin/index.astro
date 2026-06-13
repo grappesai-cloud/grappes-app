@@ -678,6 +678,23 @@ function fmt(dateStr: string | null | undefined): string {
           + '<div class="kv-row"><span class="k">SOC 2 credits</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">Multipage lifetime</span><span>' + (u.multipage_addon_lifetime ? 'Yes' : 'No') + '</span></div>'
         + '</div>'
+        + '<div class="drawer-section"><h3>Credits (per service)</h3>'
+          + '<div class="kv-row"><span class="k">Reels</span><span>' + (u.reel_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Audit</span><span>' + (u.audit_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">SOC 2</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Logo</span><span>' + (u.logo_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Offer</span><span>' + (u.offer_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Brand Book</span><span>' + (u.brandbook_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Social</span><span>' + (u.social_credits ?? 0) + '</span></div>'
+          + '<div class="kv-row"><span class="k">Site</span><span>' + (u.site_credits ?? 0) + '</span></div>'
+          + '<div style="display:flex;gap:8px;margin-top:12px;align-items:center;">'
+            + '<select id="credit-kind" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:8px 10px;font-family:inherit;font-size:13px;">'
+              + '<option value="reel">Reels</option><option value="audit">Audit</option><option value="soc2">SOC 2</option><option value="logo">Logo</option><option value="offer">Offer</option><option value="brandbook">Brand Book</option><option value="social">Social</option><option value="site">Site</option>'
+            + '</select>'
+            + '<input id="credit-amount" type="number" value="10" style="width:78px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:8px 10px;font-family:inherit;font-size:13px;" />'
+            + '<button onclick="grantCredit(\\''+userId+'\\')" style="background:rgba(6,191,221,0.1);color:#06bfdd;border:1px solid rgba(6,191,221,0.3);border-radius:999px;padding:8px 16px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Grant</button>'
+          + '</div>'
+        + '</div>'
         + '<div class="drawer-section"><h3>Quick actions</h3>'
           + '<div class="drawer-actions">'
             + '<button onclick="grantEdits(\\''+userId+'\\', 10)">+10 edits</button>'
@@ -727,6 +744,22 @@ function fmt(dateStr: string | null | undefined): string {
     });
     var d = await res.json();
     if (res.ok) drawerMsg('✓ SOC 2 credits → ' + d.soc2_credits, 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
+
+  // Per-service credit grant (universal endpoint: { kind, amount }).
+  window.grantCredit = async function (userId) {
+    var kindEl = document.getElementById('credit-kind');
+    var amtEl  = document.getElementById('credit-amount');
+    var kind = kindEl ? kindEl.value : '';
+    var amount = amtEl ? parseInt(amtEl.value, 10) : 0;
+    if (!kind || !amount) { drawerMsg('Pick a service and a non-zero amount', 'error'); return; }
+    var res = await fetch('/api/admin/users/' + userId + '/grant-credits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: kind, amount: amount }),
+    });
+    var d = await res.json();
+    if (res.ok) { drawerMsg('✓ ' + d.kind + ' credits → ' + d.balance, 'success'); openUser(userId); }
     else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
   };
 

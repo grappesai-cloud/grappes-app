@@ -200,9 +200,21 @@ export function injectEditModeIntoFullPage(fullHtml: string): string {
     // invisible so the editor is usable. Skips overlay helpers (#__wn_*).
     function forceReveal(){
       var changed = 0;
+      var vw = window.innerWidth, vh = window.innerHeight;
       document.querySelectorAll('body *:not([id^="__wn_"])').forEach(function(el){
         var cs = getComputedStyle(el);
         if (cs.opacity === '0' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+          // DON'T reveal deliberately-hidden overlays: mobile nav menus, modals,
+          // drawers, cookie banners, search overlays. These are position:fixed/
+          // sticky (or large absolute) full-screen layers hidden via opacity/
+          // visibility — "revealing" them covers the whole page (the stuck
+          // full-screen menu bug). Entrance-animation content is always in normal
+          // flow, never a fixed full-screen layer, so this never hides real content.
+          var pos = cs.position;
+          var isOverlay = pos === 'fixed' || pos === 'sticky'
+            || (pos === 'absolute' && el.offsetWidth >= vw * 0.85 && el.offsetHeight >= vh * 0.6);
+          if (isOverlay) return;
+
           el.style.setProperty('opacity', '1', 'important');
           // Common entrance transforms (translateY/translateX/scale) — neutralize too
           if (cs.transform && cs.transform !== 'none' && cs.transform !== 'matrix(1, 0, 0, 1, 0, 0)') {

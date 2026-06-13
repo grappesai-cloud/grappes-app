@@ -260,44 +260,44 @@ type Defaults = Record<string, any>;
 const INDUSTRY_DEFAULTS: Record<string, Defaults> = {
   restaurant: {
     'content.pages': ['Home', 'Menu', 'About', 'Reservations', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   tech: {
     'content.pages': ['Home', 'Features', 'Pricing', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   saas: {
     'content.pages': ['Home', 'Features', 'Pricing', 'Blog', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.blog': true,
   },
   software: {
     'content.pages': ['Home', 'Features', 'Pricing', 'Docs', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   fitness: {
     'content.pages': ['Home', 'Classes', 'Trainers', 'Pricing', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   gym: {
     'content.pages': ['Home', 'Classes', 'Memberships', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   healthcare: {
     'content.pages': ['Home', 'Services', 'About', 'Team', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   medical: {
     'content.pages': ['Home', 'Services', 'Doctors', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   retail: {
     'content.pages': ['Home', 'Products', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.ecommerce': true,
   },
   shop: {
@@ -306,90 +306,90 @@ const INDUSTRY_DEFAULTS: Record<string, Defaults> = {
   },
   agency: {
     'content.pages': ['Home', 'Work', 'Services', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   marketing: {
     'content.pages': ['Home', 'Services', 'Case Studies', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   law: {
     'content.pages': ['Home', 'Practice Areas', 'Attorneys', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   finance: {
     'content.pages': ['Home', 'Services', 'About', 'Team', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   consulting: {
     'content.pages': ['Home', 'Services', 'Case Studies', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   education: {
     'content.pages': ['Home', 'Courses', 'About', 'Blog', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.blog': true,
   },
   portfolio: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   photography: {
     'content.pages': ['Home', 'Portfolio', 'Services', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   artist: {
     'content.pages': ['Home', 'Work', 'About', 'Press', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   musician: {
     'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   music: {
     'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   band: {
     'content.pages': ['Home', 'Music', 'Tour', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   dj: {
     'content.pages': ['Home', 'Music', 'Events', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   producer: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   creator: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   author: {
     'content.pages': ['Home', 'Books', 'About', 'Events', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   writer: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   coach: {
     'content.pages': ['Home', 'Services', 'About', 'Testimonials', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   therapist: {
     'content.pages': ['Home', 'Services', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
     'features.booking': true,
   },
   filmmaker: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
   designer: {
     'content.pages': ['Home', 'Work', 'About', 'Contact'],
-    'features.contact_form': true,
+    'features.contact_form': false,
   },
 };
 
@@ -439,7 +439,9 @@ export function applySmartDefaults(data: Record<string, any>): Record<string, an
     setNestedValue(result, 'content.pages', isMulti ? ['Home', 'About', 'Services', 'Contact'] : ['Home']);
   }
   if (!hasValue(result?.features?.contact_form)) {
-    setNestedValue(result, 'features.contact_form', true);
+    // No form backend exists — never default a contact/lead form on. Contact is
+    // handled via mailto/tel/WhatsApp links instead.
+    setNestedValue(result, 'features.contact_form', false);
   }
 
   // Auto-fill P1/P2 fields from brief context so completeness can reach 100%

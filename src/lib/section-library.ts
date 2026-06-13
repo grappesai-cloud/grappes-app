@@ -38,9 +38,9 @@ export const SECTION_LIBRARY: SectionDef[] = [
   { key: 'clients',      title: 'Clients / Brands',         blurb: 'Logos of clients or brands they have worked with.',                               fitFor: 'B2B, agency, freelance' },
   { key: 'stats',        title: 'Stats / Numbers',          blurb: 'Big-number metrics — years in business, projects done, satisfied clients.',       fitFor: 'agency, corporate, established business' },
   { key: 'video',        title: 'Video showcase',           blurb: 'Embedded explainer or hero video (YouTube/Vimeo).',                               fitFor: 'creative, demo, product launches' },
-  { key: 'contact',      title: 'Contact',                  blurb: 'Functional contact form wired to the owner inbox + email/phone.',                 fitFor: 'every site' },
+  { key: 'contact',      title: 'Contact',                  blurb: 'Contact details: email, phone and social as clickable mailto/tel/WhatsApp links. NO input form (no name/email/message fields) — there is no form backend.',  fitFor: 'every site' },
   { key: 'map',          title: 'Location / Map',           blurb: 'Embedded map of the physical location.',                                          fitFor: 'local business, retail, venue' },
-  { key: 'newsletter',   title: 'Newsletter signup',        blurb: 'Functional newsletter signup — submissions go to the owner inbox.',               fitFor: 'content, lead-gen' },
+  { key: 'newsletter',   title: 'Follow / Subscribe',       blurb: 'Invite to follow on social or subscribe via an external link. NO email input form — there is no form backend.',                          fitFor: 'content, lead-gen' },
   { key: 'partners',     title: 'Partners / Integrations',  blurb: 'Logos of partner brands, technologies, or integrations.',                         fitFor: 'SaaS, B2B' },
 ];
 

@@ -92,7 +92,7 @@ INTERVIEW PHASES (complete in this order):
 2. content     — Copy ownership (who writes), headline, opening line, about, services/products, section descriptions, testimonials, stats, team (if applicable), press/collaborators/awards (creatives only), pricing display (if they sell), contact info, pages (multi-page only)
 3. branding    — Visual style, colors, fonts, brand voice (3 adjectives + what to avoid), inspiration links
 4. media       — Logo, hero image/video, section photos, audio embeds (musicians only)
-5. preferences — Special features (contact form, blog, booking), integrations (analytics, booking)
+5. preferences — Special features (blog, booking), integrations (analytics, booking). NEVER propose a contact form, lead form, or newsletter signup with name/email/message fields — there is no form backend. Contact is handled via email/phone/WhatsApp links instead.
 6. review      — Ask about additional materials, then summarize the brief, confirm everything is correct
 
 RULES:
@@ -373,7 +373,7 @@ PHASE TRANSITION GUIDE:
 → "branding"    after collecting: content.copy_ownership, content.headline OR content.opening_line, content.about OR content.services, descriptions for all non-trivial sections, AND at least one of content.testimonials OR content.stats (or user explicitly declined both), AND contact.email. If multi-page: also content.pages. If creative/sells services: also content.pricing_mode.
 → "media"       after collecting: branding.colors.primary, branding.voice.traits (branding.style is optional — let user mention it naturally or skip)
 → "preferences" after collecting: media.has_logo
-→ "review"      after collecting: features (at least contact_form), integrations (or explicit "none" for each)
+→ "review"      after collecting: integrations (or explicit "none" for each)
 → add "_complete": true after the user confirms the brief summary in review phase
 
 IMPORTANT: Always output valid JSON in the ---DATA--- block. Use {} if nothing new was extracted. Do NOT include markdown formatting (no **bold**, no bullet points) inside the ---REPLY--- section.`;
