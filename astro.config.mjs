@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import vercel from '@astrojs/vercel';
+import node from '@astrojs/node';
 import react from '@astrojs/react';
 import sentry from '@sentry/astro';
 import tailwindcss from '@tailwindcss/vite';
@@ -23,12 +24,17 @@ const ffBinaries = [
 // the headless binary from a remote pack at runtime, keeping the serverless
 // function under Vercel's 250 MB limit (see src/lib/browser.ts).
 
+// DEPLOY_TARGET=node → standalone Node server (Coolify/Hetzner). Default = Vercel.
+const adapter = process.env.DEPLOY_TARGET === 'node'
+  ? node({ mode: 'standalone' })
+  : vercel({
+      maxDuration: 800,
+      includeFiles: ffBinaries,
+    });
+
 export default defineConfig({
   output: 'server',
-  adapter: vercel({
-    maxDuration: 800,
-    includeFiles: ffBinaries,
-  }),
+  adapter,
   security: { checkOrigin: false }, // CSRF handled via auth middleware — Astro's checkOrigin breaks Vercel preview URLs
 
   server: {
