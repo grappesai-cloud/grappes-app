@@ -270,6 +270,7 @@
 
     function renderLogoColor(card) {
       const presets = ['#0f5132','#6b1d1d','#1d2bd1','#e25822','#1e3a8a','#b65238','#5a6b2f','#0b1f3a','#c97064','#7a8b6f','#0a0a0a','#fafafa'];
+      const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
       card.innerHTML = `
         ${eyebrowHTML()}
         <h2 style="${STYLE_TITLE}">A specific color in mind?</h2>
@@ -279,25 +280,51 @@
             <button type="button" data-color="${h}" title="${h}" style="aspect-ratio:1;border-radius:12px;background:${h};border:${LG.primaryColor === h ? '3px solid #fff' : '1px solid rgba(255,255,255,0.12)'};cursor:pointer;position:relative;${LG.primaryColor === h ? 'box-shadow:0 0 0 3px rgba(167,139,250,0.45);' : ''}"></button>
           `).join('')}
         </div>
-        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;">
-          <input id="lg-custom-color" type="color" value="${LG.primaryColor || '#a78bfa'}" style="width:48px;height:36px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
-          <span style="font-size:13px;color:rgba(255,255,255,0.78);font-weight:500;">Or pick any custom color</span>
-          ${LG.primaryColor ? `<button type="button" id="lg-clear-color" style="margin-left:auto;height:32px;padding:0 14px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;">Clear</button>` : ''}
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;flex-wrap:wrap;">
+          <input id="lg-custom-color" type="color" value="${isHex(LG.primaryColor) ? LG.primaryColor : '#a78bfa'}" style="width:48px;height:36px;padding:0;border-radius:8px;border:1px solid rgba(255,255,255,0.14);background:none;cursor:pointer;" />
+          <input id="lg-hex-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="7" placeholder="#a78bfa" value="${LG.primaryColor || ''}" style="width:120px;height:36px;padding:0 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;font-family:inherit;font-size:14px;letter-spacing:0.04em;outline:none;" />
+          <span style="font-size:13px;color:rgba(255,255,255,0.78);font-weight:500;">Pick or type a hex code</span>
+          <button type="button" id="lg-clear-color" style="margin-left:auto;height:32px;padding:0 14px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.14);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;display:${LG.primaryColor ? 'inline-flex' : 'none'};">Clear</button>
         </div>
         ${footerHTML({ skipText: 'Skip color', nextText: 'Continue →' })}
       `;
+      const colorInput = card.querySelector('#lg-custom-color');
+      const hexInput = card.querySelector('#lg-hex-input');
+      const clearBtn = card.querySelector('#lg-clear-color');
+      // Targeted UI sync — never rebuilds the inputs, so the native color popup
+      // stays open while the user drags through it (the old full re-render
+      // destroyed the input mid-interaction and slammed the popup shut).
+      function syncColorUI() {
+        card.querySelectorAll('#lg-color-grid [data-color]').forEach((b) => {
+          const on = LG.primaryColor && b.dataset.color.toLowerCase() === LG.primaryColor.toLowerCase();
+          b.style.border = on ? '3px solid #fff' : '1px solid rgba(255,255,255,0.12)';
+          b.style.boxShadow = on ? '0 0 0 3px rgba(167,139,250,0.45)' : '';
+        });
+        if (isHex(LG.primaryColor)) colorInput.value = LG.primaryColor;
+        clearBtn.style.display = LG.primaryColor ? 'inline-flex' : 'none';
+      }
       card.querySelector('#lg-color-grid').addEventListener('click', (e) => {
         const b = e.target.closest('[data-color]'); if (!b) return;
-        LG.primaryColor = LG.primaryColor === b.dataset.color ? null : b.dataset.color;
-        renderLogoColor(card);
+        LG.primaryColor = (LG.primaryColor && LG.primaryColor.toLowerCase() === b.dataset.color.toLowerCase()) ? null : b.dataset.color;
+        hexInput.value = LG.primaryColor || '';
+        syncColorUI();
       });
-      card.querySelector('#lg-custom-color').addEventListener('input', (e) => {
+      colorInput.addEventListener('input', (e) => {
         LG.primaryColor = e.target.value;
-        renderLogoColor(card);
+        hexInput.value = LG.primaryColor;
+        syncColorUI();
       });
-      card.querySelector('#lg-clear-color')?.addEventListener('click', () => {
+      hexInput.addEventListener('input', (e) => {
+        let v = e.target.value.trim().toLowerCase();
+        if (v && v[0] !== '#') { v = '#' + v; e.target.value = v; }
+        if (isHex(v)) { LG.primaryColor = v; syncColorUI(); }
+        else if (v === '' || v === '#') { LG.primaryColor = null; clearBtn.style.display = 'none'; }
+      });
+      clearBtn.addEventListener('click', () => {
         LG.primaryColor = null;
-        renderLogoColor(card);
+        hexInput.value = '';
+        colorInput.value = '#a78bfa';
+        syncColorUI();
       });
       wireFooter(card);
     }

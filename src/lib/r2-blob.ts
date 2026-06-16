@@ -29,6 +29,12 @@ function client(): S3Client {
     region: "auto",
     endpoint: env("R2_ENDPOINT"),
     credentials: { accessKeyId: env("R2_ACCESS_KEY_ID"), secretAccessKey: env("R2_SECRET_ACCESS_KEY") },
+    // AWS SDK v3 defaults to injecting CRC32 checksum params (x-amz-checksum-crc32 /
+    // x-amz-sdk-checksum-algorithm) into the signature. For a presigned PUT the browser
+    // never sends those headers, so the signature would mismatch. Only add checksums
+    // when the operation strictly requires them (none of ours do).
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
   return _client;
 }
