@@ -11,7 +11,6 @@
 
 import type { APIRoute } from 'astro';
 import { timingSafeEqual } from 'node:crypto';
-import { waitUntil } from '@vercel/functions';
 import { claimJob, runJob } from '../../../lib/generation-queue';
 import { json } from '../../../lib/api-utils';
 
@@ -36,16 +35,13 @@ export const GET: APIRoute = async ({ request }) => {
   const job = await claimJob({ minQueuedAgeSeconds: GITHUB_HEADSTART_SECONDS });
   if (!job) return json({ processed: 0 });
 
-  // Run in the background and return immediately. runJob handles its own errors.
-  const work = runJob(job).catch((err) => console.error('[gen-queue] runJob crashed:', err));
-  let scheduled = false;
-  try {
-    waitUntil(work);
-    scheduled = true;
-  } catch {
-    // No Vercel request context (e.g. local dev) — fall back to inline await.
-  }
-  if (!scheduled) await work;
+  // Self-hosted Node server: there's no Vercel `waitUntil` that keeps
+  // background work alive after the response, so fire-and-forget gets dropped.
+  // Run the job INLINE to completion instead. `claimJob` atomically flips the
+  // job to "running", so the next 1-min cron tick won't re-claim it — a long
+  // inline run is safe even if the HTTP client/proxy times out the connection
+  // (Node keeps executing the handler until the work finishes).
+  await runJob(job).catch((err) => console.error('[gen-queue] runJob crashed:', err));
 
   return json({ processed: 1, jobId: job.id, projectId: job.project_id });
 };
