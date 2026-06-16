@@ -6,6 +6,7 @@
 export const maxDuration = 800;
 
 import type { APIRoute } from 'astro';
+import { createHmac } from 'node:crypto';
 import { db } from '../../../../lib/db';
 import { FULL_PAGE_KEY } from '../../../../lib/creative-generation';
 import { buildStaticPublishFiles, HTML_KEY_PREFIX } from '../../../../lib/html-compat';
@@ -77,6 +78,29 @@ async function runPublishPipeline(projectId: string, slug: string) {
   }
 
   if (!fullHtml && Object.keys(sectionHtmls).length === 0) throw new Error('No HTML found');
+
+  // ── Self-hosted publish (no Vercel) ────────────────────────────────────────
+  // The platform hosts generated sites itself: the public /preview route streams
+  // the stored HTML, gated by a share token. "Publish" just marks the site live
+  // and records that self-hosted URL — removing the hard dependency on Vercel
+  // deployments + GitHub (which broke once we left the paused Vercel account).
+  {
+    await sub('publishing');
+    const freshProject = await db.projects.findById(projectId);
+    if (!freshProject) throw new Error('Project not found');
+    const secret =
+      import.meta.env.SHARE_TOKEN_SECRET ??
+      import.meta.env.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SHARE_TOKEN_SECRET;
+    if (!secret) throw new Error('SHARE_TOKEN_SECRET not configured');
+    const token = createHmac('sha256', secret).update(`share:${projectId}`).digest('hex').slice(0, 24);
+    const base = (import.meta.env.PUBLIC_SITE_URL ?? process.env.PUBLIC_SITE_URL ?? 'https://grappes.dev').replace(/\/$/, '');
+    await db.projects.update(projectId, { preview_url: `${base}/preview/${projectId}?token=${token}` });
+    await db.projects.updateStatus(projectId, 'live');
+    if (freshProject.billing_status === 'free') await db.projects.setFreeExpiry(projectId);
+    await sub(null);
+    return;
+  }
 
   const brief = await db.briefs.findByProjectId(projectId);
   if (!brief) throw new Error('Brief not found');
