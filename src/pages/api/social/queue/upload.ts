@@ -1,10 +1,10 @@
-// ─── Presigned R2 PUT URL for social queue media ───────────────────────────
-// Browser PUTs the file straight to R2, then registers it with
-// POST /api/social/queue/items. Namespaced per user.
+// POST /api/social/queue/upload — accepts social media (multipart, field
+// `file`), stores it in R2 server-side, returns { url, pathname }. Namespaced
+// per user under `social/<user-id>/queue/...`. Same-origin POST: no CORS.
 
 import type { APIRoute } from 'astro';
 import { nanoid } from 'nanoid';
-import { presignPut } from '@lib/r2-blob';
+import { put } from '@lib/r2-blob';
 import { json } from '../../../../lib/api-utils';
 
 export const prerender = false;
@@ -18,19 +18,23 @@ export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to upload.' }, 401);
 
-  const { pathname, contentType } = (await request.json().catch(() => ({}))) as {
-    pathname?: string; contentType?: string;
-  };
+  let form: FormData;
+  try { form = await request.formData(); } catch { return json({ error: 'Invalid upload.' }, 400); }
+  const file = form.get('file');
+  if (!(file instanceof File)) return json({ error: 'No file provided.' }, 400);
+
+  const contentType = file.type || String(form.get('contentType') || '');
   if (contentType && !ALLOWED.has(contentType)) {
     return json({ error: `Content type ${contentType} not allowed.` }, 400);
   }
   try {
-    const base = (pathname?.split('/').pop() || 'media').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80);
+    const base = (file.name || 'media').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80);
     const key = `social/${user.id}/queue/${nanoid(10)}-${base}`;
-    const res = await presignPut(key, contentType);
-    return json(res);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const res = await put(key, bytes, { contentType });
+    return json({ url: res.url, pathname: res.pathname });
   } catch (e: any) {
     console.error('[social/queue/upload] error:', e?.message);
-    return json({ error: e?.message ?? 'Upload setup failed.' }, 500);
+    return json({ error: e?.message ?? 'Upload failed.' }, 500);
   }
 };

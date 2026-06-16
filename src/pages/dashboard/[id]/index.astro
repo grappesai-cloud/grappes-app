@@ -2620,28 +2620,21 @@ if (hasPreview) {
         imgUploadingEl.style.display = '';
         imgSaveBtn.disabled = true;
         try {
-          // Step 1: Get a presigned R2 PUT URL. The path must be scoped to this
-          // project (the sign endpoint enforces the assets/<projectId>/ prefix).
+          // POST the file to the project-scoped endpoint (same-origin → no CORS).
+          // The path must stay under assets/<projectId>/ — the server enforces it.
           var ext = (file.name.split('.').pop() || 'png').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'png';
           var base = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 60) || 'image';
           var pathname = 'assets/' + projectId + '/uploads/' + Date.now() + '-' + base + '.' + ext;
-          var signRes = await fetch('/api/assets/' + projectId + '/sign-upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pathname: pathname, contentType: file.type, kind: 'image' }),
-          });
-          var signData = await signRes.json();
-          if (!signData.uploadUrl) { alert(signData.error || 'Upload failed'); imgUploadingEl.style.display = 'none'; return; }
+          var fd = new FormData();
+          fd.append('pathname', pathname);
+          fd.append('contentType', file.type);
+          fd.append('kind', 'image');
+          fd.append('file', file, file.name);
+          var upRes = await fetch('/api/assets/' + projectId + '/sign-upload', { method: 'POST', body: fd });
+          var upData = await upRes.json();
+          if (!upRes.ok || !upData.url) { alert(upData.error || 'Upload failed'); imgUploadingEl.style.display = 'none'; return; }
 
-          // Step 2: PUT the file straight to R2.
-          var upRes = await fetch(signData.uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type },
-            body: file,
-          });
-          if (!upRes.ok) { alert('Upload failed: ' + upRes.statusText); imgUploadingEl.style.display = 'none'; return; }
-
-          setImagePreview(signData.publicUrl);
+          setImagePreview(upData.url);
         } catch (e) {
           alert('Upload failed');
         }

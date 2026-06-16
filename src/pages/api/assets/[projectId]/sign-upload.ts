@@ -1,10 +1,10 @@
-// ─── Signed Upload URL (Cloudflare R2 presigned PUT) ────────────────────────
-// Returns a presigned R2 PUT URL so the browser uploads directly to storage,
-// bypassing the function body limit. Project-scoped + kind-validated.
-// Client PUTs the file, then registers it via /finalize.
+// POST /api/assets/[projectId]/sign-upload — accepts a project asset (multipart,
+// field `file`), stores it in R2 server-side, returns { url, pathname }.
+// Project-scoped: the path must stay under assets/<projectId>/ and the project
+// must belong to the user. Same-origin POST: no bucket CORS needed.
 
 import type { APIRoute } from 'astro';
-import { presignPut } from '@lib/r2-blob';
+import { put } from '@lib/r2-blob';
 import { db } from '../../../../lib/db';
 import { json } from '../../../../lib/api-utils';
 
@@ -22,27 +22,35 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   const project = await db.projects.findById(projectId);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  let payload: { pathname?: string; contentType?: string; kind?: 'image' | 'video' | 'zip'; clientPayload?: string };
-  try { payload = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  let form: FormData;
+  try { form = await request.formData(); } catch { return json({ error: 'Invalid upload.' }, 400); }
+  const file = form.get('file');
+  if (!(file instanceof File)) return json({ error: 'No file provided.' }, 400);
 
-  // kind can come directly or inside clientPayload (back-compat with the old upload() call)
-  let kind: 'image' | 'video' | 'zip' = payload.kind ?? 'image';
-  try { if (payload.clientPayload) { const cp = JSON.parse(payload.clientPayload); if (cp.kind) kind = cp.kind; } } catch { /* ignore */ }
+  // kind from form field or clientPayload (back-compat).
+  let kind: 'image' | 'video' | 'zip' = 'image';
+  const kindRaw = String(form.get('kind') || '');
+  if (['image', 'video', 'zip'].includes(kindRaw)) kind = kindRaw as any;
+  else {
+    try { const cp = JSON.parse(String(form.get('clientPayload') || '{}')); if (cp.kind) kind = cp.kind; } catch { /* ignore */ }
+  }
   if (!['image', 'video', 'zip'].includes(kind)) kind = 'image';
 
-  const pathname = payload.pathname ?? '';
+  const pathname = String(form.get('pathname') || '');
   if (!pathname.startsWith(`assets/${projectId}/`)) {
     return json({ error: 'Upload path must be within this project' }, 400);
   }
-  if (payload.contentType && !MIME_BY_KIND[kind].includes(payload.contentType)) {
-    return json({ error: `Content type ${payload.contentType} not allowed for ${kind}.` }, 400);
+  const contentType = file.type || String(form.get('contentType') || '');
+  if (contentType && !MIME_BY_KIND[kind].includes(contentType)) {
+    return json({ error: `Content type ${contentType} not allowed for ${kind}.` }, 400);
   }
 
   try {
-    const res = await presignPut(pathname, payload.contentType);
-    return json(res);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const res = await put(pathname, bytes, { contentType });
+    return json({ url: res.url, pathname: res.pathname });
   } catch (err) {
-    console.error('[sign-upload] presign error:', err);
-    return json({ error: err instanceof Error ? err.message : 'Failed to create upload URL' }, 500);
+    console.error('[assets/sign-upload] error:', err);
+    return json({ error: err instanceof Error ? err.message : 'Upload failed' }, 500);
   }
 };
