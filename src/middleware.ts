@@ -88,6 +88,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const origin = context.request.headers.get('origin');
     const isPublicEndpoint =
       path.startsWith('/api/webhooks/') ||
+      path === '/api/soc2/scan-callback' || // HMAC-authenticated worker callback, no cookie/origin
       path.startsWith('/api/analytics/') ||
       path.startsWith('/api/forms/') ||
       path.startsWith('/api/auth/') ||
@@ -143,6 +144,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     !path.startsWith('/api/cron/') &&
     !path.startsWith('/api/domains/check') &&
     !path.startsWith('/api/admin/') &&
+    path !== '/api/soc2/scan-callback' &&
     !isPublicMockup &&
     path !== '/api/health' &&
     path !== '/api/contact'
