@@ -850,9 +850,9 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     //    bypasses the function body limit entirely.
     var blob;
     try {
-      // CDN ESM import — bare specifier '@vercel/blob/client' isn't resolved
-      // inside Astro define:vars scripts (they bypass Vite bundling).
-      var mod = await import('/vendor/vercel-blob-client.js');
+      // R2 presigned-PUT client (drop-in for @vercel/blob/client's upload()).
+      // Bare specifiers aren't resolved inside Astro define:vars scripts.
+      var mod = await import('/vendor/r2-blob-client.js');
       blob = await mod.upload(blobPath, file, {
         access: 'public',
         handleUploadUrl: '/api/assets/' + projectId + '/sign-upload',

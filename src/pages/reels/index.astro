@@ -145,7 +145,7 @@ function timeAgo(d: Date | string): string {
       progressBar.hidden = false;
 
       try {
-        const mod = await import('/vendor/vercel-blob-client.js');
+        const mod = await import('/vendor/r2-blob-client.js');
         // Sanitize filename for Blob pathname (server adds a random suffix
         // for uniqueness; this just keeps the human-readable base clean).
         const ext = file.name.split('.').pop() || 'mp4';

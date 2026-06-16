@@ -1,37 +1,28 @@
-// Vercel Blob client-direct upload token issuer for reel files.
-// Browser calls this via @vercel/blob/client's `upload()` helper.
+// Issues a presigned Cloudflare R2 PUT URL for direct browser upload of reel
+// files (replaces the Vercel Blob handleUpload flow). The browser PUTs the file
+// straight to R2, then confirms via POST /api/reels/analyze.
 
 import type { APIRoute } from 'astro';
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { nanoid } from 'nanoid';
+import { presignPut } from '@lib/r2-blob';
 import { json } from '../../../lib/api-utils';
+
+const ALLOWED = new Set(['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska']);
 
 export const POST: APIRoute = async ({ locals, request }) => {
   const user = locals.user;
   if (!user) return json({ error: 'Sign in to upload a reel.' }, 401);
 
-  const body = (await request.json()) as HandleUploadBody;
+  const { pathname, contentType } = (await request.json().catch(() => ({}))) as {
+    pathname?: string; contentType?: string;
+  };
+  if (contentType && !ALLOWED.has(contentType)) {
+    return json({ error: `Content type ${contentType} not allowed.` }, 400);
+  }
   try {
-    const res = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname: string) => {
-        // `pathname` here is the one the client passed to upload(); we keep it
-        // as a label but let Blob append a random suffix so repeat-uploads of
-        // the same filename don't collide.
-        return {
-          allowedContentTypes: [
-            'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
-          ],
-          maximumSizeInBytes: 200 * 1024 * 1024,
-          tokenPayload: JSON.stringify({ userId: user.id, pathname }),
-          addRandomSuffix: true,
-        } as any;
-      },
-      onUploadCompleted: async () => {
-        // Pipeline kicks off on /api/reels/analyze after client confirms.
-      },
-    });
+    const base = (pathname?.split('/').pop() || 'reel.mp4').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-80);
+    const key = `reels/${user.id}/${nanoid(10)}-${base}`;
+    const res = await presignPut(key, contentType);
     return json(res);
   } catch (e: any) {
     console.error('[reels/upload] error:', e?.message);

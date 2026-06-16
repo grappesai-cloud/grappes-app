@@ -1,41 +1,18 @@
-// ─── Signed Upload URL ──────────────────────────────────────────────────────
-// Returns a Vercel Blob client-upload token so the browser can upload directly
-// to Blob storage, bypassing the Vercel function body limit.
-// Called by the client via `upload()` from `@vercel/blob/client` — that helper
-// posts the request body that `handleUpload` expects below.
-// Supports: images, videos, zip archives.
+// ─── Signed Upload URL (Cloudflare R2 presigned PUT) ────────────────────────
+// Returns a presigned R2 PUT URL so the browser uploads directly to storage,
+// bypassing the function body limit. Project-scoped + kind-validated.
+// Client PUTs the file, then registers it via /finalize.
 
 import type { APIRoute } from 'astro';
-import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { presignPut } from '@lib/r2-blob';
 import { db } from '../../../../lib/db';
 import { json } from '../../../../lib/api-utils';
 
-// Max sizes per kind
-const MAX_BYTES = {
-  image:  20 * 1024 * 1024,
-  video:  50 * 1024 * 1024,
-  zip:   200 * 1024 * 1024,
-} as const;
-
-const MIME_BY_KIND: Record<'image' | 'video' | 'zip', { mimes: string[]; exts: string[] }> = {
-  image: {
-    mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'image/heic', 'image/heif'],
-    exts:  ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'heic', 'heif'],
-  },
-  video: {
-    mimes: ['video/mp4', 'video/webm', 'video/quicktime'],
-    exts:  ['mp4', 'webm', 'mov'],
-  },
-  zip: {
-    mimes: ['application/zip', 'application/x-zip-compressed', 'application/x-zip', 'application/octet-stream'],
-    exts:  ['zip'],
-  },
+const MIME_BY_KIND: Record<'image' | 'video' | 'zip', string[]> = {
+  image: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'image/heic', 'image/heif'],
+  video: ['video/mp4', 'video/webm', 'video/quicktime'],
+  zip: ['application/zip', 'application/x-zip-compressed', 'application/x-zip', 'application/octet-stream'],
 };
-
-interface ClientPayload {
-  kind?: 'image' | 'video' | 'zip';
-  assetType?: string;
-}
 
 export const POST: APIRoute = async ({ params, locals, request }) => {
   const user = locals.user;
@@ -45,49 +22,27 @@ export const POST: APIRoute = async ({ params, locals, request }) => {
   const project = await db.projects.findById(projectId);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
-  let body: HandleUploadBody;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  let payload: { pathname?: string; contentType?: string; kind?: 'image' | 'video' | 'zip'; clientPayload?: string };
+  try { payload = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+
+  // kind can come directly or inside clientPayload (back-compat with the old upload() call)
+  let kind: 'image' | 'video' | 'zip' = payload.kind ?? 'image';
+  try { if (payload.clientPayload) { const cp = JSON.parse(payload.clientPayload); if (cp.kind) kind = cp.kind; } } catch { /* ignore */ }
+  if (!['image', 'video', 'zip'].includes(kind)) kind = 'image';
+
+  const pathname = payload.pathname ?? '';
+  if (!pathname.startsWith(`assets/${projectId}/`)) {
+    return json({ error: 'Upload path must be within this project' }, 400);
+  }
+  if (payload.contentType && !MIME_BY_KIND[kind].includes(payload.contentType)) {
+    return json({ error: `Content type ${payload.contentType} not allowed for ${kind}.` }, 400);
+  }
 
   try {
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname: string, clientPayloadStr) => {
-        let payload: ClientPayload = {};
-        try { if (clientPayloadStr) payload = JSON.parse(clientPayloadStr); } catch { /* ignore */ }
-        const kind = (payload.kind && ['image', 'video', 'zip'].includes(payload.kind)) ? payload.kind : 'image';
-        const allow = MIME_BY_KIND[kind];
-        const assetType = payload.assetType ?? 'section';
-
-        // The @vercel/blob client decides the final pathname from the first arg of
-        // upload() — a server-returned `pathname` override is NOT honored, so the
-        // client now builds a project-scoped path (assets/<projectId>/...). Enforce
-        // that prefix here so a token can't be used to write outside this project.
-        if (!pathname.startsWith(`assets/${projectId}/`)) {
-          throw new Error('Upload path must be within this project');
-        }
-
-        return {
-          allowedContentTypes: allow.mimes,
-          maximumSizeInBytes: MAX_BYTES[kind],
-          tokenPayload: JSON.stringify({ projectId, kind, assetType, pathname }),
-          addRandomSuffix: false,
-          allowOverwrite: true, // client UUID path; tolerate a retry after a flaky write
-        } as any;
-      },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // Hook for post-upload work; currently a no-op (the /finalize endpoint
-        // registers the asset row after the client confirms upload). Kept for
-        // future webhook-style flows.
-        try {
-          const meta = tokenPayload ? JSON.parse(tokenPayload) : null;
-          console.log('[sign-upload] completed:', { url: blob.url, pathname: blob.pathname, meta });
-        } catch { /* ignore */ }
-      },
-    });
-    return json(jsonResponse);
+    const res = await presignPut(pathname, payload.contentType);
+    return json(res);
   } catch (err) {
-    console.error('[sign-upload] handleUpload error:', err);
+    console.error('[sign-upload] presign error:', err);
     return json({ error: err instanceof Error ? err.message : 'Failed to create upload URL' }, 500);
   }
 };

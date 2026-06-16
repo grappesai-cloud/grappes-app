@@ -402,7 +402,12 @@ const PRIORITY_COLOR: Record<string, string> = {
   </style>
 
   <script>
-    import { upload } from '@vercel/blob/client';
+    // R2 presigned-PUT client (drop-in for @vercel/blob/client's upload()).
+    // Path via a variable so Rollup leaves it as a runtime import (the helper
+    // lives in /public and isn't bundled by Vite).
+    const R2_CLIENT = '/vendor/r2-blob-client.js';
+    // @ts-ignore - runtime import from /public, no bundled types
+    const { upload } = await import(/* @vite-ignore */ R2_CLIENT);
 
     async function api(path: string, init?: RequestInit) {
       const res = await fetch(path, {
