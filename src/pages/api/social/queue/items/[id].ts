@@ -5,7 +5,7 @@
 
 import type { APIRoute } from 'astro';
 import { and, eq, inArray } from 'drizzle-orm';
-import { del } from '@vercel/blob';
+import { del } from '@lib/r2-blob';
 import { json } from '../../../../../lib/api-utils';
 import { db } from '../../../../../db';
 import { socialQueueItems } from '../../../../../db/schema/social';

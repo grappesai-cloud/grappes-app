@@ -3,7 +3,7 @@
 // that fails we still drop the row.
 
 import type { APIRoute } from "astro";
-import { del } from "@vercel/blob";
+import { del } from '@lib/r2-blob';
 import { createAdminClient } from "../../../lib/supabase";
 import { json } from "../../../lib/api-utils";
 

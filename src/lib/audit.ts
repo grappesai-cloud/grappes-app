@@ -7,7 +7,7 @@
 // Each step is wrapped in try/catch so a failure in one doesn't kill the whole
 // audit; the report shows what we could analyse and reports the rest as errors.
 
-import { put } from "@vercel/blob";
+import { put } from '@lib/r2-blob';
 import { createMessage, HAIKU_MODEL } from "./anthropic";
 import {
   runHtmlChecks,

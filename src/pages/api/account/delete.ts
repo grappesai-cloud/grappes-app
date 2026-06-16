@@ -3,7 +3,7 @@
 // Art. 17 GDPR — Right to erasure.
 
 import type { APIRoute } from 'astro';
-import { del as blobDel } from '@vercel/blob';
+import { del as blobDel } from '@lib/r2-blob';
 import { createAdminClient } from '../../../lib/supabase';
 import { json } from '../../../lib/api-utils';
 import { checkRateLimit } from '../../../lib/rate-limit';

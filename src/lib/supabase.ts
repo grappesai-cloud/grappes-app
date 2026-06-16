@@ -24,7 +24,7 @@
 
 import postgres from 'postgres';
 import { e } from './env';
-import { put, del, head as blobHead, list as blobList } from '@vercel/blob';
+import { put, del, head as blobHead, list as blobList } from '@lib/r2-blob';
 
 // ─── Connection ─────────────────────────────────────────────────────────────
 

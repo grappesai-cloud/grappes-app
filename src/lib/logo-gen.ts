@@ -20,7 +20,7 @@
 // Caller persists pngUrl + svgUrl to kit.assets.logo / kit.assets.logo_svg.
 
 import sharp from "sharp";
-import { put } from "@vercel/blob";
+import { put } from '@lib/r2-blob';
 
 // Premium accent palette — used when caller doesn't pass primaryColor.
 // One is picked at random per generation so successive logos for the same

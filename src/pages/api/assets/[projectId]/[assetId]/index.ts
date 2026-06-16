@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { del as blobDel } from '@vercel/blob';
+import { del as blobDel } from '@lib/r2-blob';
 import { db } from '../../../../../lib/db';
 
 import { json } from '../../../../../lib/api-utils';

@@ -15,7 +15,7 @@
 import yauzl from 'yauzl';
 import sharp from 'sharp';
 import type { Readable } from 'node:stream';
-import { put as blobPut, del as blobDel } from '@vercel/blob';
+import { put as blobPut, del as blobDel } from '@lib/r2-blob';
 import { db } from './db';
 import type { AssetType } from './db';
 

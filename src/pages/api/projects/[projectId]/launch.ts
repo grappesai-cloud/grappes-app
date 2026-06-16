@@ -4,7 +4,7 @@ import { log } from '../../../../lib/logger';
 import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
 import { getPg } from '../../../../lib/supabase';
 import { e } from '../../../../lib/env';
-import { put } from '@vercel/blob';
+import { put } from '@lib/r2-blob';
 import { normalizeLogoSvg, injectLogoContrastCss, type LogoTone } from '../../../../lib/logo-normalize';
 import { applySmartDefaults } from '../../../../lib/onboarding';
 import {

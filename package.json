@@ -24,6 +24,8 @@
     "@astrojs/node": "^10.0.4",
     "@astrojs/react": "^5.0.3",
     "@astrojs/vercel": "^10.0.4",
+    "@aws-sdk/client-s3": "^3.1069.0",
+    "@aws-sdk/s3-request-presigner": "^3.1069.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@ffprobe-installer/ffprobe": "^2.1.2",
     "@neplex/vectorizer": "^0.0.5",

@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { put as blobPut, del as blobDel } from '@vercel/blob';
+import { put as blobPut, del as blobDel } from '@lib/r2-blob';
 import { db } from '../../../../lib/db';
 import type { AssetType } from '../../../../lib/db';
 import sharp from 'sharp';
