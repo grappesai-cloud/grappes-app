@@ -4,7 +4,7 @@
 // Falls back to single-page if multi-page generation fails.
 
 import { createMessage } from './anthropic';
-import { SONNET_MODEL, SONNET_INPUT_COST, SONNET_OUTPUT_COST } from './generation';
+import { GEN_MODEL, GEN_INPUT_COST, GEN_OUTPUT_COST } from './generation';
 import { CREATIVE_SYSTEM_PROMPT, extractHtml, buildUserPrompt } from './creative-generation';
 import type { BriefData, AssetData } from './creative-generation';
 
@@ -63,7 +63,7 @@ export async function generateOnePage(params: {
   console.log(`[multipage] Generating page ${pageIndex + 1}/${allPages.length}: ${pageName} (${filename})`);
 
   const response = await createMessage({
-    model: SONNET_MODEL,
+    model: GEN_MODEL,
     max_tokens: 64000,
     system: MULTIPAGE_SYSTEM,
     messages: [{ role: 'user', content: pagePrompt }],
@@ -80,7 +80,7 @@ export async function generateOnePage(params: {
   for (let cont = 0; cont < 3 && !html.includes('</html>'); cont++) {
     console.log(`[multipage] Page "${pageName}" truncated (${html.length} chars) — continuation ${cont + 1}/3`);
     const contResponse = await createMessage({
-      model: SONNET_MODEL,
+      model: GEN_MODEL,
       max_tokens: 64000,
       system: MULTIPAGE_SYSTEM,
       messages: [
@@ -110,7 +110,7 @@ export async function generateOnePage(params: {
       title: pageName,
       html,
     },
-    cost: inputTokens * SONNET_INPUT_COST + outputTokens * SONNET_OUTPUT_COST,
+    cost: inputTokens * GEN_INPUT_COST + outputTokens * GEN_OUTPUT_COST,
     tokens: { input: inputTokens, output: outputTokens },
   };
 }
