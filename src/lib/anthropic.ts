@@ -7,27 +7,60 @@ export const anthropic = new Anthropic({
   maxRetries: 0,
 });
 
+// A dropped HTTP/SSE connection to the Anthropic API. On the self-hosted Node
+// server the SDK streams over node-fetch, which intermittently tears the
+// connection down mid-response with ERR_STREAM_PREMATURE_CLOSE (and friends).
+// These are transient and safe to retry — unlike a 4xx, the request never
+// reached a terminal state.
+function isConnectionError(err: any): boolean {
+  const code = err?.code || err?.cause?.code || err?.error?.code;
+  if (
+    code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EPIPE' ||
+    code === 'UND_ERR_SOCKET'
+  ) return true;
+  const msg = `${err?.message ?? ''} ${err?.cause?.message ?? ''}`.toLowerCase();
+  return /premature close|socket hang up|econnreset|fetch failed|terminated|network error|the operation was aborted/.test(msg);
+}
+
+// Small responses don't need streaming, and a plain request is far more robust
+// against the premature-close drops above (one buffered body vs a long-lived
+// token-by-token SSE stream). Large generations (site build, full-page iterate)
+// still stream — non-streaming them would trip the SDK's long-request guard.
+const STREAM_THRESHOLD_TOKENS = 8000;
+
 export async function createMessage(
   params: Parameters<typeof anthropic.messages.create>[0]
 ): Promise<Anthropic.Message> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const maxTokens = Number((params as any)?.max_tokens) || 0;
+  const useStream = maxTokens > STREAM_THRESHOLD_TOKENS;
+  let lastErr: any;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      return await anthropic.messages.stream(params as any).finalMessage();
+      return useStream
+        ? await anthropic.messages.stream(params as any).finalMessage()
+        : ((await anthropic.messages.create(params)) as Anthropic.Message);
     } catch (e: any) {
+      lastErr = e;
       const status = e?.status ?? e?.error?.status;
       const isOverloaded = status === 529 || e?.error?.error?.type === 'overloaded_error';
       const isRateLimit  = status === 429 || e?.error?.error?.type === 'rate_limit_error';
+      const isConn       = isConnectionError(e);
 
-      if ((isOverloaded || isRateLimit) && attempt < 2) {
-        const wait = isRateLimit ? 15000 : (attempt + 1) * 8000;
-        console.warn(`[anthropic] ${isRateLimit ? '429 rate limit' : '529 overloaded'}, retrying in ${wait / 1000}s (attempt ${attempt + 1}/3)`);
+      if ((isOverloaded || isRateLimit || isConn) && attempt < 3) {
+        const wait = isRateLimit ? 15000 : isConn ? (attempt + 1) * 2500 : (attempt + 1) * 8000;
+        const kind = isRateLimit ? '429 rate limit' : isOverloaded ? '529 overloaded' : `connection drop (${e?.cause?.code || e?.code || e?.message})`;
+        console.warn(`[anthropic] ${kind}, retrying in ${wait / 1000}s (attempt ${attempt + 1}/4)`);
         await new Promise(r => setTimeout(r, wait));
         continue;
       }
       throw e;
     }
   }
-  throw new Error('Anthropic API unreachable after retries');
+  throw lastErr || new Error('Anthropic API unreachable after retries');
 }
 
 export const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
