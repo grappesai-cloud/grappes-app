@@ -32,11 +32,8 @@ export interface BrandBookRow {
   custom_fonts?: CustomFonts | null;
 }
 
-// Only columns guaranteed to exist today. The Phase-2 columns are read
-// defensively from the row when present (see toDoc), so no migration is needed
-// to ship the new template.
 const SELECT =
-  'id, user_id, name, tagline, industry, logo_url, typeface, logo_is_light, palette_named, donts, book_content, created_at';
+  'id, user_id, name, tagline, industry, logo_url, symbol_url, badge_url, typeface, custom_fonts, logo_is_light, palette_named, donts, book_content, created_at';
 
 export async function loadBrandBook(id: string, userId: string): Promise<BrandBookRow | null> {
   const client = createAdminClient();

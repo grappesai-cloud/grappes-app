@@ -20,9 +20,31 @@ interface GenerateBody {
   colors?: Array<{ hex: string; label?: string }>;
   typeface?: string;
   logoUrl?: string;
+  symbolUrl?: string;
+  badgeUrl?: string;
+  customFonts?: Partial<Record<'display' | 'text' | 'mono', { family?: string; url?: string; format?: string }>>;
   logoIsLight?: boolean;
   template?: string;
   website?: string;
+}
+
+type FontRole = 'display' | 'text' | 'mono';
+function sanitizeFonts(
+  input: GenerateBody['customFonts'],
+): Record<string, { family: string; url: string; format?: string }> | null {
+  if (!input || typeof input !== 'object') return null;
+  const out: Record<string, { family: string; url: string; format?: string }> = {};
+  for (const role of ['display', 'text', 'mono'] as FontRole[]) {
+    const f = input[role];
+    const url = (f?.url || '').trim();
+    if (!url || !isOwnPublicUrl(url)) continue; // only our R2 uploads
+    out[role] = {
+      family: (f?.family || 'Custom').toString().trim().slice(0, 60) || 'Custom',
+      url,
+      ...(f?.format ? { format: String(f.format).slice(0, 8) } : {}),
+    };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -54,6 +76,11 @@ export const POST: APIRoute = async ({ locals, request }) => {
   if (!isOwnPublicUrl(logoUrl)) {
     return json({ error: 'Invalid logo URL.' }, 400);
   }
+  const symbolUrl = (body.symbolUrl || '').trim();
+  const badgeUrl = (body.badgeUrl || '').trim();
+  if (symbolUrl && !isOwnPublicUrl(symbolUrl)) return json({ error: 'Invalid symbol URL.' }, 400);
+  if (badgeUrl && !isOwnPublicUrl(badgeUrl)) return json({ error: 'Invalid badge URL.' }, 400);
+  const customFonts = sanitizeFonts(body.customFonts);
 
   const typeface = TYPEFACES.includes(body.typeface || '') ? (body.typeface as string) : 'Inter';
   const template = TEMPLATES.includes(body.template || '') ? (body.template as string) : 'editorial';
@@ -115,6 +142,9 @@ export const POST: APIRoute = async ({ locals, request }) => {
       links: website ? { website: website.url } : {},
       donts: DEFAULT_DONTS,
       logo_url: logoUrl,
+      symbol_url: symbolUrl || null,
+      badge_url: badgeUrl || null,
+      custom_fonts: customFonts,
       logo_is_light: body.logoIsLight !== false,
       typeface,
       template,

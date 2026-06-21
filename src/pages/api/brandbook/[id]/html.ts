@@ -9,7 +9,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
   if (!user) return json({ error: 'Sign in first.' }, 401);
 
   const row = await loadBrandBook(params.id as string, user.id);
-  const doc = row && toDoc(row);
+  const doc = row && toDoc(row, { downloads: true });
   if (!doc) return json({ error: 'Brand book not found.' }, 404);
 
   return new Response(renderBookHTML(row, doc), {
