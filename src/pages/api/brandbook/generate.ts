@@ -31,18 +31,20 @@ interface GenerateBody {
 type FontRole = 'display' | 'text' | 'mono';
 function sanitizeFonts(
   input: GenerateBody['customFonts'],
-): Record<string, { family: string; url: string; format?: string }> | null {
+): Record<string, { family: string; url?: string; format?: string }> | null {
   if (!input || typeof input !== 'object') return null;
-  const out: Record<string, { family: string; url: string; format?: string }> = {};
+  const out: Record<string, { family: string; url?: string; format?: string }> = {};
   for (const role of ['display', 'text', 'mono'] as FontRole[]) {
     const f = input[role];
-    const url = (f?.url || '').trim();
-    if (!url || !isOwnPublicUrl(url)) continue; // only our R2 uploads
-    out[role] = {
-      family: (f?.family || 'Custom').toString().trim().slice(0, 60) || 'Custom',
-      url,
-      ...(f?.format ? { format: String(f.format).slice(0, 8) } : {}),
-    };
+    if (!f) continue;
+    const family = (f.family || '').toString().trim().slice(0, 60);
+    const url = (f.url || '').trim();
+    if (url) {
+      if (!isOwnPublicUrl(url)) continue; // custom upload must be our own R2 file
+      out[role] = { family: family || 'Custom', url, ...(f.format ? { format: String(f.format).slice(0, 8) } : {}) };
+    } else if (family) {
+      out[role] = { family }; // a Google family choice (no file)
+    }
   }
   return Object.keys(out).length ? out : null;
 }

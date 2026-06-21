@@ -4,7 +4,36 @@
     const ACCENT = '#f97316';
     const ACCENT_SOFT = 'rgba(249,115,22,0.12)';
     const ACCENT_BORDER = 'rgba(249,115,22,0.32)';
-    const BB = { name: '', about: '', industry: '', website: '', values: [], voice: [], colors: [], typeface: 'Inter', logoUrl: '', logoDataUrl: '', logoIsLight: true, template: 'editorial' };
+    const BB = {
+      name: '', about: '', industry: '', website: '', values: [], voice: [], colors: [],
+      typeface: 'Space Grotesk',
+      fonts: { display: { family: 'Space Grotesk' }, text: { family: 'Inter' }, mono: { family: 'Space Mono' } },
+      logoUrl: '', logoDataUrl: '', logoIsLight: true,
+      symbolUrl: '', badgeUrl: '',
+      template: 'editorial',
+    };
+    const FONT_ROLES = [
+      { key: 'display', label: 'Display', hint: 'Headlines & titles', fonts: ['Space Grotesk', 'Archivo', 'Sora', 'Manrope', 'Syne', 'Anton'] },
+      { key: 'text',    label: 'Text',    hint: 'Body & descriptions', fonts: ['Inter', 'Work Sans', 'IBM Plex Sans', 'DM Sans', 'Manrope'] },
+      { key: 'mono',    label: 'Functional', hint: 'Labels, data, captions', fonts: ['Space Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Roboto Mono'] },
+    ];
+    // Inject a Google Fonts link + @font-face for any families used in previews.
+    function ensureFontLoaded(family, url, format) {
+      if (url) {
+        const id = 'bbff-' + family.replace(/\W+/g, '');
+        if (!document.getElementById(id)) {
+          const st = document.createElement('style'); st.id = id;
+          st.textContent = `@font-face{font-family:'${family}';src:url('${url}') format('${format || 'woff2'}');font-display:swap;}`;
+          document.head.appendChild(st);
+        }
+        return;
+      }
+      const id = 'bbg-' + family.replace(/\W+/g, '');
+      if (document.getElementById(id)) return;
+      const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet';
+      l.href = `https://fonts.googleapis.com/css2?family=${family.replace(/\s+/g, '+')}:wght@300;400;500;700&display=swap`;
+      document.head.appendChild(l);
+    }
 
     const STEPS = [
       { key: 'bb-name',     chapter: 'Brand',    title: 'Brand name' },
@@ -281,6 +310,19 @@
         <button type="button" id="bb-add-logo" style="${STYLE_ADD}">${BB.logoUrl ? 'Replace logo' : '+ Upload logo file'}</button>
         <input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg" id="bb-logo-input" style="display:none;" />
         <p id="bb-logo-err" style="display:none;font-size:12.5px;color:#ff8a8a;margin-top:8px;"></p>
+
+        <div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,0.07);">
+          <div style="${STYLE_LABEL}">Optional · extra marks</div>
+          <p style="font-size:12px;color:rgba(255,255,255,0.45);margin:0 0 12px;line-height:1.5;">By default we derive a badge and symbol from your logo. Upload your own only if you have dedicated artwork.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${['symbol', 'badge'].map((k) => `
+              <div>
+                <button type="button" data-markup="${k}" style="width:100%;font-size:12.5px;color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.18);border-radius:10px;padding:11px;cursor:pointer;text-transform:capitalize;">${BB[k + 'Url'] ? k + ' ✓' : '+ ' + k}</button>
+                <input type="file" accept="image/png,image/svg+xml,image/webp" data-markinput="${k}" style="display:none;" />
+              </div>`).join('')}
+          </div>
+          <p id="bb-mark-err" style="display:none;font-size:12px;color:#ff8a8a;margin-top:6px;"></p>
+        </div>
         ${footerHTML({ hideSkip: true })}
       `;
       function renderPreview() {
@@ -334,6 +376,31 @@
           btn.disabled = false;
         }
       });
+      // Optional symbol / badge uploads.
+      card.querySelectorAll('[data-markup]').forEach((b) => b.addEventListener('click', () => {
+        card.querySelector(`[data-markinput="${b.dataset.markup}"]`).click();
+      }));
+      card.querySelectorAll('[data-markinput]').forEach((inp) => inp.addEventListener('change', async (e) => {
+        const kind = inp.dataset.markinput;
+        const file = e.target.files && e.target.files[0];
+        const err = card.querySelector('#bb-mark-err');
+        err.style.display = 'none';
+        if (!file) return;
+        const btn = card.querySelector(`[data-markup="${kind}"]`);
+        btn.textContent = 'Uploading…';
+        try {
+          const fd = new FormData(); fd.append('file', file); fd.append('kind', kind);
+          const resp = await fetch('/api/brandbook/sign-upload', { method: 'POST', body: fd });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.url) throw new Error(data.error || 'upload-failed');
+          BB[kind + 'Url'] = data.url;
+          btn.textContent = kind + ' ✓';
+        } catch (e2) {
+          err.textContent = 'Mark upload failed, try again.'; err.style.display = 'block';
+          btn.textContent = '+ ' + kind;
+        }
+      }));
+
       wireFooter(card, { onNext: async () => {
         if (!BB.logoUrl) {
           const err = card.querySelector('#bb-logo-err');
@@ -491,29 +558,79 @@
     }
 
     function renderTypeface(card) {
-      const fonts = ['Inter', 'Archivo', 'Space Grotesk', 'Manrope', 'Work Sans', 'IBM Plex Sans', 'DM Sans', 'Sora'];
+      // Preload preview fonts.
+      FONT_ROLES.forEach((r) => r.fonts.forEach((f) => ensureFontLoaded(f)));
+      Object.values(BB.fonts).forEach((f) => { if (f && f.url) ensureFontLoaded(f.family, f.url, f.format); });
+
+      const roleBlock = (role) => {
+        const cur = BB.fonts[role.key] || {};
+        const isCustom = !!cur.url;
+        const chips = role.fonts.map((f) => {
+          const sel = !isCustom && cur.family === f;
+          return `<button type="button" data-role="${role.key}" data-font="${f}" style="text-align:left;padding:11px 14px;background:${sel ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)'};border:${sel ? `2px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)'};border-radius:11px;color:#fff;font-family:'${f}',sans-serif;cursor:pointer;font-size:16px;font-weight:500;">${f}</button>`;
+        }).join('');
+        const customPill = isCustom
+          ? `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px;color:#6ee7a3;"><span style="font-family:'${cur.family}',sans-serif;">${escapeHtml(cur.family)} ✓ uploaded</span><button type="button" data-clear="${role.key}" style="background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;text-decoration:underline;font-size:11.5px;">remove</button></div>`
+          : '';
+        return `
+          <div style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;">
+              <span style="${STYLE_LABEL};margin:0;">${role.label}</span>
+              <span style="font-size:11px;color:rgba(255,255,255,0.4);">${role.hint}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">${chips}</div>
+            <div style="margin-top:8px;">
+              <button type="button" data-upload="${role.key}" style="font-size:12px;color:${ACCENT};background:none;border:1px dashed rgba(249,115,22,0.4);border-radius:9px;padding:8px 13px;cursor:pointer;">↑ Upload your own font</button>
+              <input type="file" accept=".woff2,.woff,.ttf,.otf" data-fileinput="${role.key}" style="display:none;" />
+            </div>
+            ${customPill}
+            <p data-fonterr="${role.key}" style="display:none;font-size:12px;color:#ff8a8a;margin-top:6px;"></p>
+          </div>`;
+      };
+
       card.innerHTML = `
         ${eyebrowHTML()}
-        <h2 style="${STYLE_TITLE}">Pick the brand typeface</h2>
-        <p style="${STYLE_HELPER}">The whole book is set in it, and it becomes your official brand font. All free for commercial use.</p>
-        <div id="bb-font-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          ${fonts.map((f) => {
-            const sel = BB.typeface === f;
-            return `
-              <button type="button" data-font="${f}" style="position:relative;text-align:left;padding:18px 20px;background:${sel ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)'};border:${sel ? `2px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)'};border-radius:14px;color:#fff;font-family:'${f}',sans-serif;cursor:pointer;transition:all .15s;${sel ? 'box-shadow:0 0 0 4px rgba(249,115,22,0.18);' : ''}">
-                <div style="font-size:21px;font-weight:600;letter-spacing:-0.01em;margin-bottom:2px;">${f}</div>
-                <div style="font-size:12px;color:rgba(255,255,255,0.55);">Aa Bb Cc 0123</div>
-              </button>
-            `;
-          }).join('')}
-        </div>
+        <h2 style="${STYLE_TITLE}">Your type system</h2>
+        <p style="${STYLE_HELPER}">Three roles. Pick a free Google font for each, or upload your own (.woff2, .woff, .ttf, .otf). Leave the defaults if unsure.</p>
+        <div>${FONT_ROLES.map(roleBlock).join('')}</div>
         ${footerHTML({ hideSkip: true })}
       `;
-      card.querySelector('#bb-font-grid').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-font]'); if (!b) return;
-        BB.typeface = b.dataset.font;
+
+      card.querySelectorAll('[data-font]').forEach((b) => b.addEventListener('click', () => {
+        BB.fonts[b.dataset.role] = { family: b.dataset.font };
+        if (b.dataset.role === 'display') BB.typeface = b.dataset.font;
         renderTypeface(card);
-      });
+      }));
+      card.querySelectorAll('[data-clear]').forEach((b) => b.addEventListener('click', () => {
+        const role = b.dataset.clear;
+        const def = FONT_ROLES.find((r) => r.key === role).fonts[0];
+        BB.fonts[role] = { family: def };
+        if (role === 'display') BB.typeface = def;
+        renderTypeface(card);
+      }));
+      card.querySelectorAll('[data-upload]').forEach((b) => b.addEventListener('click', () => {
+        card.querySelector(`[data-fileinput="${b.dataset.upload}"]`).click();
+      }));
+      card.querySelectorAll('[data-fileinput]').forEach((inp) => inp.addEventListener('change', async (e) => {
+        const role = inp.dataset.fileinput;
+        const file = e.target.files && e.target.files[0];
+        const err = card.querySelector(`[data-fonterr="${role}"]`);
+        err.style.display = 'none';
+        if (!file) return;
+        if (!/\.(woff2|woff|ttf|otf)$/i.test(file.name)) { err.textContent = 'Use .woff2, .woff, .ttf or .otf'; err.style.display = 'block'; return; }
+        if (file.size > 6 * 1024 * 1024) { err.textContent = 'Font too large (max 6 MB).'; err.style.display = 'block'; return; }
+        try {
+          const fd = new FormData(); fd.append('file', file); fd.append('kind', 'font');
+          const resp = await fetch('/api/brandbook/sign-upload', { method: 'POST', body: fd });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.url) throw new Error(data.error || 'upload-failed');
+          BB.fonts[role] = { family: data.family || 'Custom', url: data.url, format: data.format };
+          if (role === 'display') BB.typeface = BB.fonts[role].family;
+          renderTypeface(card);
+        } catch (e2) {
+          err.textContent = 'Upload failed, try again.'; err.style.display = 'block';
+        }
+      }));
       wireFooter(card);
     }
 
@@ -525,15 +642,15 @@
         <p style="${STYLE_HELPER}">A complete brand guidelines document: intro, values, tone of voice, logo rules, colors, typography. Around 20 pages, exportable as PDF.</p>
 
         <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:14px 18px;margin-bottom:18px;">
-          ${summaryRow('Template', BB.template.charAt(0).toUpperCase() + BB.template.slice(1))}
           ${summaryRow('Brand', escapeHtml(BB.name))}
           ${summaryRow('About', escapeHtml(BB.about.length > 64 ? BB.about.slice(0, 64) + '…' : BB.about))}
           ${BB.website ? summaryRow('Website', escapeHtml(BB.website)) : ''}
           ${summaryRow('Values', BB.values.length ? escapeHtml(BB.values.join(', ')) : 'AI decides')}
           ${summaryRow('Tone', BB.voice.length ? escapeHtml(BB.voice.join(', ')) : 'AI decides')}
           ${summaryRow('Logo', BB.logoUrl ? '<span style="color:#6ee7a3;">Uploaded ✓</span>' : '—')}
+          ${(BB.symbolUrl || BB.badgeUrl) ? summaryRow('Extra marks', [BB.symbolUrl ? 'symbol' : '', BB.badgeUrl ? 'badge' : ''].filter(Boolean).join(', ')) : ''}
           ${summaryRow('Colors', BB.colors.length ? BB.colors.map((c) => `<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${c.hex};border:1px solid rgba(255,255,255,0.2);margin-left:4px;vertical-align:-1px;"></span>`).join('') + ' + B/W' : 'Black & white')}
-          ${summaryRow('Typeface', escapeHtml(BB.typeface))}
+          ${summaryRow('Fonts', ['display', 'text', 'mono'].map((k) => escapeHtml((BB.fonts[k] && BB.fonts[k].family) || '') + (BB.fonts[k] && BB.fonts[k].url ? ' ✓' : '')).join(' · '))}
         </div>
 
         <button type="button" id="bb-go" style="${STYLE_BTN_PRIMARY};height:54px;width:100%;font-size:14.5px;background:linear-gradient(135deg,${ACCENT} 0%, #fdba74 140%);">
@@ -586,8 +703,11 @@
               values: BB.values,
               voiceKeywords: BB.voice,
               colors: BB.colors,
-              typeface: BB.typeface,
+              typeface: (BB.fonts.display && BB.fonts.display.family) || BB.typeface,
+              customFonts: BB.fonts,
               logoUrl: BB.logoUrl,
+              symbolUrl: BB.symbolUrl || undefined,
+              badgeUrl: BB.badgeUrl || undefined,
               logoIsLight: BB.logoIsLight,
               template: BB.template,
             }),
