@@ -48,6 +48,19 @@ export async function loadBrandBook(id: string, userId: string): Promise<BrandBo
   return (data as BrandBookRow | null) ?? null;
 }
 
+/** Load by id only — for the token-gated public share route (no user filter). */
+export async function loadBrandBookPublic(id: string): Promise<BrandBookRow | null> {
+  const client = createAdminClient();
+  const { data, error } = await client
+    .from('press_kits')
+    .select(SELECT)
+    .eq('id', id)
+    .eq('mode', 'brand_book')
+    .single();
+  if (error && error.code !== 'PGRST116') throw error;
+  return (data as BrandBookRow | null) ?? null;
+}
+
 // Default type roles. The user's single chosen typeface drives the display
 // face; body stays a readable neutral and the functional voice a monospace.
 // Any role the user uploaded a custom font for overrides the default.

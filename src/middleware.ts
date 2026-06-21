@@ -26,6 +26,7 @@ const PUBLIC_PREFIXES = [
   '/favicon',
   '/kit/',  // published press kits — anyone with the slug can view
   '/reels/share/',  // public shared reel analyses (gated by is_public in the page)
+  '/brandbook/share/',  // public shared brand books (gated by HMAC token in the route)
 ];
 
 function isPublic(path: string): boolean {

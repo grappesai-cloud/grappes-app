@@ -3,42 +3,39 @@
 // Replaces the old 4 paginated variants. Same HTML feeds the in-app viewer
 // (iframe), the PDF export and the downloadable asset pack.
 //
-// Design system:
-//  - Three type roles (display / text / mono); each can be a Google font OR a
-//    user-uploaded font file (@font-face).
-//  - One uploaded primary logo; white / black / accent variants are rendered as
-//    CSS-masked silhouettes so a single mark yields the whole system. An optional
-//    uploaded symbol/badge overrides the silhouette where provided.
-//  - Ground = ink + cream + white; signature = the brand's palette colours.
-//  - Applications are generic-adaptive (card, avatar, signage, merch, packaging,
-//    watermark), not music-specific.
+// Logo system: ONE uploaded logo yields the whole system. White/ink variants are
+// the original mark with a CSS `filter` (brightness/invert) — this works
+// cross-origin (the logo lives on R2, a different host) where CSS `mask` would be
+// blocked by CORS. The accent/gold variant is produced server-side (sharp) for
+// the downloadable pack; on-page we show the original full-colour mark.
+//
+// Three type roles (display/text/mono); each a Google font or an uploaded face.
+// Applications are generic-adaptive (card, avatar, signage, merch, packaging,
+// watermark), not music-specific.
 
 import type { BrandBookContent } from './brandbook-gen';
 
 export interface BrandFont {
-  family: string;   // Google family name OR a label for the custom face
-  url?: string;     // when set, an uploaded font file → @font-face src
-  format?: string;  // woff2 | woff | truetype (derived from url if omitted)
+  family: string;
+  url?: string;
+  format?: string;
 }
 
 export interface AllOneDoc {
   name: string;
   tagline: string;
-  headline?: string;          // short 2-4 word manifesto headline (optional)
+  headline?: string;
   industry?: string;
   foundedBy?: string;
-  logoUrl: string;            // primary mark (original, full colour)
-  symbolUrl?: string;         // optional uploaded symbol/icon; else silhouette of logo
-  badgeUrl?: string;          // optional uploaded badge; else logo inside a ring
-  logoIsLight: boolean;       // true = light mark (sits on dark)
-  colors: Array<{ hex: string; label?: string }>; // signature palette (1-4)
+  logoUrl: string;
+  symbolUrl?: string;
+  badgeUrl?: string;
+  logoIsLight: boolean;
+  colors: Array<{ hex: string; label?: string }>;
   fonts: { display: BrandFont; text: BrandFont; mono: BrandFont };
   donts: string[];
   content: BrandBookContent;
-  /** Download URLs; when absent the Downloads section is hidden (e.g. PDF render). */
-  downloads?: {
-    all?: string; logos?: string; fonts?: string;
-  };
+  downloads?: { all?: string; logos?: string; fonts?: string };
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -48,23 +45,19 @@ function esc(s: string): string {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
   ));
 }
-
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const h = (hex || '').replace('#', '');
   const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
   return { r: parseInt(v.slice(0, 2), 16) || 0, g: parseInt(v.slice(2, 4), 16) || 0, b: parseInt(v.slice(4, 6), 16) || 0 };
 }
-
 function luminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 }
-
 function rgbStr(hex: string): string {
   const { r, g, b } = hexToRgb(hex);
   return `${r} ${g} ${b}`;
 }
-
 function fontFormat(url: string): string {
   if (/\.woff2(\?|$)/i.test(url)) return 'woff2';
   if (/\.woff(\?|$)/i.test(url)) return 'woff';
@@ -73,11 +66,16 @@ function fontFormat(url: string): string {
   return 'woff2';
 }
 
-// A masked silhouette of `url` filled with `color` — yields white/black/accent
-// marks from a single uploaded logo without server-side image processing.
-function maskMark(url: string, color: string, cls = ''): string {
-  const u = esc(url);
-  return `<span class="mark ${cls}" style="--m:url('${u}');background:${color}"></span>`;
+// Logo variants via CSS filter (cross-origin safe, no CORS / no pixel read).
+const FILTER: Record<string, string> = {
+  white: 'brightness(0) invert(1)',
+  ink: 'brightness(0)',
+  original: '',
+};
+function mark(url: string, variant: 'white' | 'ink' | 'original', cls = '', extra = ''): string {
+  const f = FILTER[variant] || '';
+  const style = `${f ? `filter:${f};` : ''}${extra}`;
+  return `<img class="mk ${cls}" src="${esc(url)}" alt=""${style ? ` style="${style}"` : ''}>`;
 }
 
 // ── the renderer ──────────────────────────────────────────────────────────────
@@ -87,27 +85,21 @@ export function renderAllOneHTML(doc: AllOneDoc): string {
   const pal = (doc.colors || []).filter((x) => x && /^#?[0-9a-fA-F]{3,6}$/.test(x.hex || ''))
     .map((x) => ({ hex: x.hex.startsWith('#') ? x.hex : '#' + x.hex, label: x.label }));
 
-  // Ground: derive a near-black ink and a warm cream. Prefer the brand's darkest
-  // colour for ink if it is genuinely dark, else a neutral carbon.
   const darkest = pal.slice().sort((a, b) => luminance(a.hex) - luminance(b.hex))[0];
   const ink = darkest && luminance(darkest.hex) < 0.12 ? darkest.hex : '#0A0908';
   const cream = '#F0ECE4';
-
-  // Signature = first non-near-black/near-white colour; spark = second.
   const sig = pal.filter((x) => luminance(x.hex) > 0.1 && luminance(x.hex) < 0.95);
   const accent = (sig[0]?.hex) || '#C4A265';
   const spark = (sig[1]?.hex) || accent;
 
-  // Logo system. Original on neutral; silhouettes for the variants.
   const symbol = doc.symbolUrl || doc.logoUrl;
   const badge = doc.badgeUrl;
 
-  // Fonts.
   const fontFaces = (['display', 'text', 'mono'] as const)
     .map((role) => {
       const f = doc.fonts[role];
       if (!f?.url) return '';
-      const fmt = f.format || fontFormat(f.url);
+      const fmt = f.format && /^(woff2|woff|truetype|opentype)$/.test(f.format) ? f.format : fontFormat(f.url);
       return `@font-face{font-family:'BB-${role}';src:url('${esc(f.url)}') format('${fmt}');font-display:swap;font-weight:100 900}`;
     })
     .filter(Boolean).join('\n');
@@ -118,7 +110,6 @@ export function renderAllOneHTML(doc: AllOneDoc): string {
     return `'${f?.family || ''}', ${fallback}`;
   };
 
-  // Google fonts to load for the roles that are NOT custom uploads.
   const googleFamilies = (['display', 'text', 'mono'] as const)
     .map((role) => doc.fonts[role])
     .filter((f) => f && !f.url && f.family)
@@ -138,20 +129,12 @@ export function renderAllOneHTML(doc: AllOneDoc): string {
   ]).slice(0, 6);
   const dontIcons = ['↔', '◴', '▦', '◐', '▤', 'Aa'];
 
-  // Signature / spark inline highlight in the manifesto.
-  const accentName = sig[0]?.label || 'the signature';
-  const sparkName = sig[1]?.label || 'the spark';
-
-  const fh = doc.foundedBy ? `<span>Founded by<b>${esc(doc.foundedBy)}</b></span>` : '';
-  const fi = doc.industry ? `<span>Industry<b>${esc(doc.industry)}</b></span>` : '';
-
   const css = `
 ${fontFaces}
 :root{
-  --ink:${ink}; --carbon:${ink}; --cream:${cream}; --white:#fff;
+  --ink:${ink}; --cream:${cream}; --white:#fff;
   --grey:#8C8C8C; --line:rgba(255,255,255,.12);
-  --accent:${accent}; --spark:${spark};
-  --accent-rgb:${rgbStr(accent)};
+  --accent:${accent}; --spark:${spark}; --accent-rgb:${rgbStr(accent)};
   --disp:${fam('display', "'Space Grotesk',sans-serif")};
   --body:${fam('text', "'Inter',sans-serif")};
   --mono:${fam('mono', "'Space Mono',monospace")};
@@ -159,99 +142,96 @@ ${fontFaces}
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{background:var(--ink);color:var(--white);font-family:var(--body);font-weight:300;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-.wrap{max-width:1180px;margin:0 auto;padding:0 40px}
-section{padding:120px 0;border-top:1px solid var(--line)}
-.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--grey);margin-bottom:28px;display:flex;align-items:center;gap:14px}
+.wrap{max-width:1140px;margin:0 auto;padding:0 56px}
+section{padding:116px 0;border-top:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--grey);margin-bottom:26px;display:flex;align-items:center;gap:14px}
 .eyebrow::before{content:"";width:34px;height:1px;background:var(--grey)}
-h1,h2,h3{font-family:var(--disp);font-weight:500;line-height:1.04;letter-spacing:-.02em}
-h2{font-size:clamp(34px,5vw,64px);margin-bottom:28px}
-h3{font-size:23px;letter-spacing:0;margin-bottom:12px}
-p{max-width:62ch;color:#cfcfcf}
+h1,h2,h3{font-family:var(--disp);font-weight:500;line-height:1.05;letter-spacing:-.02em}
+h2{font-size:clamp(34px,5vw,62px);margin-bottom:26px}
+h3{font-size:22px;letter-spacing:0;margin-bottom:12px}
+p{max-width:64ch;color:#cfcfcf}
 p.lead{font-size:20px;color:#ececec;font-weight:300}
-.caps{text-transform:uppercase;letter-spacing:.26em;font-family:var(--mono);font-size:11px;color:var(--grey)}
+.caps{text-transform:uppercase;letter-spacing:.24em;font-family:var(--mono);font-size:11px;color:var(--grey)}
 .mono{font-family:var(--mono)}
+.mk{display:block;max-width:100%;max-height:100%;object-fit:contain}
 
-/* masked marks */
-.mark{display:inline-block;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
-
-nav{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 40px;backdrop-filter:blur(14px);background:rgba(10,10,10,.6);border-bottom:1px solid var(--line)}
+nav{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:18px 56px;backdrop-filter:blur(14px);background:rgba(10,10,10,.6);border-bottom:1px solid var(--line)}
 nav .brand{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase}
 nav .links{display:flex;gap:26px}
 nav .links a{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--grey);text-decoration:none}
 nav .links a:hover{color:#fff}
-@media(max-width:820px){nav .links{display:none}}
+@media(max-width:820px){nav .links{display:none}.wrap{padding:0 28px}nav{padding:16px 28px}}
 
-.hero{min-height:92vh;display:flex;flex-direction:column;justify-content:center;padding:150px 0 90px;border-top:none}
-.hero .logo{height:150px;width:min(820px,84%);-webkit-mask:var(--m) left center/contain no-repeat;mask:var(--m) left center/contain no-repeat;background:#fff;margin-bottom:48px}
+.hero{min-height:88vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:140px 0 90px;border-top:none}
+.hero .mk{height:150px;max-width:80%;width:auto;margin:0 auto 46px}
 .hero .tag{font-family:var(--disp);font-size:clamp(20px,2.4vw,30px);font-weight:300;color:#fff}
-.hero .meta{display:flex;gap:42px;flex-wrap:wrap;margin-top:50px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--grey)}
+.hero .meta{display:flex;gap:42px;flex-wrap:wrap;justify-content:center;margin-top:48px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--grey)}
 .hero .meta b{color:#fff;font-weight:400;display:block;margin-top:6px;letter-spacing:.16em}
 
-.two-col{display:grid;grid-template-columns:.85fr 1.15fr;gap:60px;align-items:start}
-@media(max-width:820px){.two-col{grid-template-columns:1fr;gap:28px}}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.two-col{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:start}
+@media(max-width:820px){.two-col{grid-template-columns:1fr;gap:26px}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
 
-.plate{border:1px solid var(--line);border-radius:5px;display:flex;align-items:center;justify-content:center;padding:56px;min-height:240px}
-.plate.dark{background:var(--ink)}
-.plate.light{background:var(--cream)}
-.plate .mark{width:70%;height:120px}
-.plate.sq .mark{width:54%;height:150px}
+.plate{border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;padding:50px;min-height:230px}
+.plate.dark{background:var(--ink)} .plate.light{background:var(--cream)}
+.plate .mk{max-height:110px;max-width:72%}
+.plate.sq .mk{max-height:140px;max-width:56%}
 .label-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:13px}
-.ring{width:170px;height:170px;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.ring .mark{width:64%;height:60px}
+.ring{width:168px;height:168px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+.ring .mk{max-width:62%;max-height:56px}
 
-.constr{background:#111;border:1px solid var(--line);border-radius:5px;padding:48px;position:relative;min-height:230px;display:flex;align-items:center;justify-content:center}
-.constr .mark{width:62%;height:90px;position:relative;z-index:2}
-.ruler{position:absolute;inset:48px;border:1px dashed rgba(var(--accent-rgb),.45);z-index:1}
+.constr{background:#111;border:1px solid var(--line);border-radius:6px;padding:46px;position:relative;min-height:230px;display:flex;align-items:center;justify-content:center}
+.constr .mk{max-width:60%;max-height:90px;position:relative;z-index:2}
+.ruler{position:absolute;inset:46px;border:1px dashed rgba(var(--accent-rgb),.5);z-index:1}
 ul.clean{list-style:none;margin-top:6px}
 ul.clean li{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-size:15px;color:#d4d4d4}
 ul.clean li .mono{color:var(--grey);font-size:12px;text-align:right;white-space:nowrap}
 
-.dont{border:1px solid var(--line);border-radius:5px;padding:26px;min-height:160px;display:flex;flex-direction:column;justify-content:space-between}
+.dont{border:1px solid var(--line);border-radius:6px;padding:26px;min-height:160px;display:flex;flex-direction:column;justify-content:space-between}
 .dont .x{font-family:var(--disp);font-size:28px;color:#ff5252;margin-bottom:auto}
 .dont p{font-size:14px;color:#bcbcbc}
 
-.swatch{border-radius:5px;overflow:hidden;border:1px solid var(--line)}
-.swatch .chip{height:140px}
-.swatch .info{padding:15px 17px;background:#0e0e0e}
+.swatch{border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.swatch .chip{height:140px} .swatch .info{padding:15px 17px;background:#0e0e0e}
 .swatch .info .n{font-family:var(--disp);font-size:15px;font-weight:500}
 .swatch .info .v{font-family:var(--mono);font-size:11px;color:var(--grey);margin-top:5px}
 
-.typeblock{border:1px solid var(--line);border-radius:5px;padding:34px;margin-bottom:16px}
+.typeblock{border:1px solid var(--line);border-radius:6px;padding:32px;margin-bottom:16px}
 .typeblock .name{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
 .glyphs{color:var(--grey);margin-top:14px;font-size:15px}
 
-.app{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:#0e0e0e}
-.app .canvas{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.app{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#0e0e0e}
+.app .canvas{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:18%}
+.app .canvas .mk{max-width:100%;max-height:100%}
 .app .cap{padding:13px 17px;font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--grey);border-top:1px solid var(--line)}
-.card{width:80%;aspect-ratio:1.62/1;background:var(--ink);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;justify-content:space-between;padding:22px}
-.card .mark{width:46%;height:26px;background:#fff;-webkit-mask:var(--m) left center/contain no-repeat;mask:var(--m) left center/contain no-repeat}
+.card{width:84%;aspect-ratio:1.62/1;background:var(--ink);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;justify-content:space-between;padding:20px}
+.card .mk{max-width:48%;max-height:26px;margin:0}
 .card .ln{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--grey)}
-.tee{width:100%;height:100%;background:var(--cream);display:flex;align-items:center;justify-content:center}
-.tee .mark{width:42%;height:60px;background:var(--ink);-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
-.pack{width:74%;aspect-ratio:1/1.1;background:#141312;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;position:relative}
-.pack .stripe{position:absolute;left:0;right:0;bottom:26%;height:8px;background:var(--accent)}
-.pack .mark{width:50%;height:46px;background:#fff;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat;z-index:2}
+.tee{position:absolute;inset:0;background:var(--cream);display:flex;align-items:center;justify-content:center}
+.tee .mk{max-width:46%;max-height:62px}
+.pack{width:78%;aspect-ratio:1/1.08;background:#141312;border:1px solid var(--line);border-radius:7px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.pack .stripe{position:absolute;left:0;right:0;bottom:24%;height:8px;background:var(--accent)}
+.pack .mk{max-width:52%;max-height:46px;z-index:2}
 
-footer{padding:90px 0 64px;border-top:1px solid var(--line);text-align:center}
-footer .mark{width:110px;height:54px;background:#fff;margin:0 auto 26px;display:block}
+footer{padding:88px 0 64px;border-top:1px solid var(--line);text-align:center}
+footer .mk{height:50px;width:auto;margin:0 auto 26px}
 footer .caps{justify-content:center}
 
 .dl-hero{display:flex;flex-wrap:wrap;gap:13px;margin-top:8px}
-.btn{display:inline-flex;align-items:center;gap:9px;padding:16px 24px;border:1px solid var(--line);border-radius:5px;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-decoration:none;background:#0e0d0c}
+.btn{display:inline-flex;align-items:center;gap:9px;padding:16px 24px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-decoration:none;background:#0e0d0c}
 .btn:hover{background:#fff;color:var(--ink)}
 .btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
 `;
 
   const meta = [
     `<span>Identity<b>${esc(doc.industry || 'Brand')}</b></span>`,
-    fh, fi,
+    doc.foundedBy ? `<span>Founded by<b>${esc(doc.foundedBy)}</b></span>` : '',
+    doc.industry ? `<span>Industry<b>${esc(doc.industry)}</b></span>` : '',
     `<span>Document<b>Brand Book v1.0</b></span>`,
   ].filter(Boolean).join('');
 
-  // signature swatches (ground first, then palette)
   const groundSwatches = [
     { hex: ink, n: 'Ink', v: `${ink.toUpperCase()} · the ground` },
     { hex: cream, n: 'Cream', v: `${cream.toUpperCase()} · light field` },
@@ -261,17 +241,13 @@ footer .caps{justify-content:center}
     ? pal.map((s) => `<div class="swatch"><div class="chip" style="background:${s.hex}"></div><div class="info"><div class="n">${esc(s.label || s.hex.toUpperCase())}</div><div class="v">${esc(s.hex.toUpperCase())}</div></div></div>`).join('')
     : '';
 
-  // applications (generic-adaptive)
   const apps = `
-  <div class="app"><div class="canvas"><div class="card"><span class="mark" style="--m:url('${esc(doc.logoUrl)}')"></span><div><div class="ln">${esc(doc.name.toUpperCase())}</div><div class="ln" style="margin-top:4px">${esc(doc.industry || '')}</div></div></div></div><div class="cap">Business card</div></div>
-  <div class="app"><div class="canvas" style="background:var(--ink)">${maskMark(symbol, '#fff', 'avatar')}</div><div class="cap">Social avatar</div></div>
-  <div class="app"><div class="canvas" style="background:#0d0d0d">${maskMark(doc.logoUrl, '#fff')}</div><div class="cap">Signage</div></div>
-  <div class="app"><div class="canvas"><div class="tee"><span class="mark" style="--m:url('${esc(doc.logoUrl)}')"></span></div></div><div class="cap">Merch · positive print</div></div>
-  <div class="app"><div class="canvas"><div class="pack"><div class="stripe"></div><span class="mark" style="--m:url('${esc(doc.logoUrl)}')"></span></div></div><div class="cap">Packaging</div></div>
-  <div class="app"><div class="canvas" style="background:var(--ink)">${maskMark(symbol, 'rgba(255,255,255,.16)', 'wm')}</div><div class="cap">Watermark</div></div>`;
-
-  // avatar / watermark sizing tweaks
-  const extraCss = `.app .avatar{width:60%;height:60%}.app .wm{width:46%;height:46%}.app .canvas .mark{width:62%;height:62%}`;
+  <div class="app"><div class="canvas" style="padding:14%"><div class="card">${mark(doc.logoUrl, 'white')}<div><div class="ln">${esc(doc.name.toUpperCase())}</div>${doc.industry ? `<div class="ln" style="margin-top:4px">${esc(doc.industry)}</div>` : ''}</div></div></div><div class="cap">Business card</div></div>
+  <div class="app"><div class="canvas" style="background:var(--ink)">${mark(symbol, 'white')}</div><div class="cap">Social avatar</div></div>
+  <div class="app"><div class="canvas" style="background:#0d0d0d">${mark(doc.logoUrl, 'white')}</div><div class="cap">Signage</div></div>
+  <div class="app"><div class="canvas" style="padding:0"><div class="tee">${mark(doc.logoUrl, 'ink')}</div></div><div class="cap">Merch · positive print</div></div>
+  <div class="app"><div class="canvas"><div class="pack"><div class="stripe"></div>${mark(doc.logoUrl, 'white')}</div></div><div class="cap">Packaging</div></div>
+  <div class="app"><div class="canvas" style="background:var(--ink)">${mark(symbol, 'white', '', 'opacity:.16')}</div><div class="cap">Watermark</div></div>`;
 
   const downloads = doc.downloads ? `
 <section id="downloads">
@@ -295,7 +271,7 @@ footer .caps{justify-content:center}
 </nav>
 
 <header class="hero wrap">
-  <span class="logo" style="--m:url('${esc(doc.logoUrl)}')"></span>
+  ${mark(doc.logoUrl, 'white', '', '')}
   <div class="tag">${esc(doc.tagline || '')}</div>
   <div class="meta">${meta}</div>
 </header>
@@ -316,15 +292,15 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">02 — The marks</div>
     <h2>The logo system</h2>
-    <p style="margin-bottom:44px">${esc(c.logomark?.[0] || 'One family of marks. Always reproduce from the master files. Never recreate, retype, or redraw.')}</p>
+    <p style="margin-bottom:42px">${esc(c.logomark?.[0] || 'One family of marks. Always reproduce from the master files. Never recreate, retype, or redraw.')}</p>
     <div class="grid2" style="margin-bottom:22px">
-      <div><div class="plate dark">${maskMark(doc.logoUrl, '#fff')}</div><div class="label-row"><span class="caps">Primary · reversed</span><span class="caps">on ink</span></div></div>
-      <div><div class="plate light">${maskMark(doc.logoUrl, ink)}</div><div class="label-row"><span class="caps">Primary · positive</span><span class="caps">on cream</span></div></div>
+      <div><div class="plate dark">${mark(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">Primary · reversed</span><span class="caps">on ink</span></div></div>
+      <div><div class="plate light">${mark(doc.logoUrl, 'ink')}</div><div class="label-row"><span class="caps">Primary · positive</span><span class="caps">on cream</span></div></div>
     </div>
     <div class="grid3">
-      <div><div class="plate dark sq">${maskMark(doc.logoUrl, accent)}</div><div class="label-row"><span class="caps">Accent mark</span><span class="caps">premium</span></div></div>
-      <div><div class="plate dark sq">${badge ? `<img class="mark" src="${esc(badge)}" style="width:54%;height:auto">` : `<div class="ring" style="border:2px solid #fff">${maskMark(symbol, '#fff')}</div>`}</div><div class="label-row"><span class="caps">Badge</span><span class="caps">avatars</span></div></div>
-      <div><div class="plate dark sq">${maskMark(symbol, '#fff')}</div><div class="label-row"><span class="caps">Symbol</span><span class="caps">app · favicon</span></div></div>
+      <div><div class="plate sq" style="background:${accent}">${mark(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">On brand colour</span><span class="caps">accent</span></div></div>
+      <div><div class="plate dark sq">${badge ? mark(badge, 'original') : `<div class="ring">${mark(symbol, 'white')}</div>`}</div><div class="label-row"><span class="caps">Badge</span><span class="caps">avatars</span></div></div>
+      <div><div class="plate dark sq">${mark(symbol, 'white')}</div><div class="label-row"><span class="caps">Symbol</span><span class="caps">app · favicon</span></div></div>
     </div>
   </div>
 </section>
@@ -333,8 +309,8 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">03 — Space & scale</div>
     <h2>Give it air</h2>
-    <div class="grid2" style="margin-top:36px;align-items:start">
-      <div class="constr"><div class="ruler"></div>${maskMark(doc.logoUrl, '#fff')}</div>
+    <div class="grid2" style="margin-top:34px;align-items:start">
+      <div class="constr"><div class="ruler"></div>${mark(doc.logoUrl, 'white')}</div>
       <div>
         <h3>Clear space</h3>
         <p>${esc(c.clear_space || 'Keep a clear margin around the logo on all four sides equal to the height of the mark. Nothing enters this zone.')}</p>
@@ -355,7 +331,7 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">04 — Misuse</div>
     <h2>Never do this</h2>
-    <div class="grid3" style="margin-top:36px">
+    <div class="grid3" style="margin-top:34px">
       ${donts.map((d, i) => {
         const t = d.replace(/^(do not|don't|never)\s+/i, '');
         const txt = t.charAt(0).toUpperCase() + t.slice(1);
@@ -369,9 +345,9 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">05 — Colour</div>
     <h2>The palette</h2>
-    <p style="margin-bottom:40px">${esc(c.color_intro || 'A near-black ink and a warm cream form the ground; the mark stays monochrome on top. The signature colours carry emphasis and energy, used with discipline.')}</p>
+    <p style="margin-bottom:38px">${esc(c.color_intro || 'A near-black ink and a warm cream form the ground; the mark stays monochrome on top. The signature colours carry emphasis and energy, used with discipline.')}</p>
     <div class="caps" style="margin-bottom:16px">Ground</div>
-    <div class="grid3" style="margin-bottom:${sigSwatches ? '52px' : '0'}">${groundSwatches}</div>
+    <div class="grid3" style="margin-bottom:${sigSwatches ? '50px' : '0'}">${groundSwatches}</div>
     ${sigSwatches ? `<div class="caps" style="margin-bottom:16px">Signature</div><div class="grid3">${sigSwatches}</div>` : ''}
   </div>
 </section>
@@ -380,9 +356,9 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">06 — Typography</div>
     <h2>Engineered & quiet</h2>
-    <p style="margin-bottom:40px">${esc(c.typeface_intro || 'A tight system: a display face for headlines, a neutral sans for reading, and a monospace for the functional voice of the brand.')}</p>
+    <p style="margin-bottom:38px">${esc(c.typeface_intro || 'A tight system: a display face for headlines, a neutral sans for reading, and a monospace for the functional voice of the brand.')}</p>
     <div class="typeblock">
-      <div class="name"><div style="font-family:var(--disp);font-size:50px;font-weight:500">${esc(doc.fonts.display.family || 'Display')}</div><span class="caps">Display</span></div>
+      <div class="name"><div style="font-family:var(--disp);font-size:48px;font-weight:500">${esc(doc.fonts.display.family || 'Display')}</div><span class="caps">Display</span></div>
       <div style="font-family:var(--disp);font-size:30px;font-weight:300">Headlines, titles, names.</div>
       <div class="glyphs" style="font-family:var(--disp)">AaBbCcDd 0123456789</div>
     </div>
@@ -403,14 +379,14 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">07 — In the world</div>
     <h2>Applications</h2>
-    <div class="grid3" style="margin-top:36px">${apps}</div>
+    <div class="grid3" style="margin-top:34px">${apps}</div>
   </div>
 </section>
 
 ${downloads}
 
 <footer>
-  ${maskMark(symbol, '#fff')}
+  ${mark(symbol, 'white')}
   <div class="caps">${esc(doc.name)} · Brand Book v1.0${doc.tagline ? ' · ' + esc(doc.tagline) : ''}</div>
   <div class="caps" style="margin-top:10px;color:#555">Identity by GRAPPES</div>
 </footer>`;
@@ -420,6 +396,6 @@ ${downloads}
 <title>${esc(doc.name)} — Brand Book</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 ${googleLink}
-<style>${css}\n${extraCss}\nfooter .mark{height:54px}</style>
+<style>${css}</style>
 </head><body>${body}</body></html>`;
 }

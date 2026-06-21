@@ -1,12 +1,15 @@
 ---
 import Dashboard from '../../layouts/Dashboard.astro';
 import { loadBrandBook } from '../../lib/brandbook-db';
+import { brandbookShareToken } from '../../lib/brandbook-share';
 
 const authUser = Astro.locals.user;
 if (!authUser) return Astro.redirect('/sign-in');
 
 const book = await loadBrandBook(Astro.params.id as string, authUser.id);
 if (!book) return Astro.redirect('/brandbook');
+
+const shareUrl = `${Astro.url.origin}/brandbook/share/${book.id}?t=${brandbookShareToken(book.id)}`;
 ---
 <Dashboard title={`${book.name} — Brand book`}>
   <style is:global>
@@ -18,14 +21,32 @@ if (!book) return Astro.redirect('/brandbook');
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       <span>Brand Book Lab</span>
     </a>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <a href="/brandbook/new" style="height:40px;display:inline-flex;align-items:center;padding:0 18px;background:transparent;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.16);border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.03em;">New book</a>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button type="button" id="bb-share" data-share={shareUrl} style="height:40px;display:inline-flex;align-items:center;gap:7px;padding:0 16px;background:transparent;color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.16);border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.03em;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span id="bb-share-label">Copy share link</span>
+      </button>
+      <a href={`/api/brandbook/${book.id}/zip`} style="height:40px;display:inline-flex;align-items:center;gap:7px;padding:0 16px;background:transparent;color:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.16);border-radius:999px;font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.03em;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download pack (ZIP)</span>
+      </a>
       <a href={`/api/brandbook/${book.id}/pdf`} style="height:40px;display:inline-flex;align-items:center;gap:8px;padding:0 20px;background:#f97316;color:#0a0a0a;border-radius:999px;font-size:12.5px;font-weight:700;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>Download PDF</span>
       </a>
     </div>
   </div>
+
+  <script is:inline>
+    document.getElementById('bb-share')?.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      const url = btn.getAttribute('data-share');
+      const label = document.getElementById('bb-share-label');
+      try { await navigator.clipboard.writeText(url); }
+      catch { window.prompt('Copy this share link:', url); }
+      if (label) { const o = label.textContent; label.textContent = 'Link copied ✓'; setTimeout(() => { label.textContent = o; }, 1800); }
+    });
+  </script>
 
   <div>
     <h1 style="font-family:'Inter',sans-serif;font-size:34px;font-weight:400;letter-spacing:-0.035em;color:#fff;margin:0 0 4px;">{book.name}</h1>
