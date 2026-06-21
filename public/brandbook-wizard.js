@@ -317,9 +317,13 @@
           };
           reader.readAsDataURL(file);
 
-          const { upload } = await import('/vendor/vercel-blob-client.js');
-          const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/brandbook/sign-upload' });
-          BB.logoUrl = blob.url;
+          // Same-origin multipart POST. Server stores to R2 and returns { url }.
+          const fd = new FormData();
+          fd.append('file', file);
+          const resp = await fetch('/api/brandbook/sign-upload', { method: 'POST', body: fd });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.url) throw new Error(data.error || 'upload-failed');
+          BB.logoUrl = data.url;
           renderPreview();
           btn.textContent = 'Replace logo';
         } catch (e2) {

@@ -256,9 +256,13 @@
       card.querySelector('#lg-ref-input').addEventListener('change', async (e) => {
         const file = e.target.files?.[0]; if (!file) return;
         try {
-          const { upload } = await import('/vendor/vercel-blob-client.js');
-          const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: `/api/logo/sign-upload` });
-          LG.refs = [...LG.refs, blob.url];
+          // Same-origin multipart POST. Server stores to R2 and returns { url }.
+          const fd = new FormData();
+          fd.append('file', file);
+          const resp = await fetch('/api/logo/sign-upload', { method: 'POST', body: fd });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.url) throw new Error(data.error || 'upload-failed');
+          LG.refs = [...LG.refs, data.url];
           renderRefs();
         } catch (err) {
           console.error(err);
