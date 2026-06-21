@@ -274,21 +274,39 @@ export async function extractAudio(
   dir: string,
 ): Promise<string> {
   const audioPath = join(dir, "audio.mp3");
-  await run(FFMPEG, [
-    "-y",
-    "-i",
-    videoPath,
-    "-vn",
-    "-acodec",
-    "libmp3lame",
-    "-ar",
-    "16000",
-    "-ac",
-    "1",
-    "-b:a",
-    "64k",
-    audioPath,
-  ]);
+  try {
+    await run(FFMPEG, [
+      "-y",
+      "-i",
+      videoPath,
+      // Select ONLY the first audio stream. iPhone .MOV files carry extra mebx
+      // data/metadata streams (codec "none") that ffmpeg would otherwise try to
+      // map into mp3 → "Decoder (codec none) not found". The trailing "?" keeps
+      // this from hard-failing when the clip genuinely has no audio track.
+      "-map",
+      "0:a:0?",
+      "-vn",
+      "-acodec",
+      "libmp3lame",
+      "-ar",
+      "16000",
+      "-ac",
+      "1",
+      "-b:a",
+      "64k",
+      audioPath,
+    ]);
+  } catch (err) {
+    // No audio track → ffmpeg writes no streams ("does not contain any stream").
+    // That's fine for music/visual reels: leave an empty file so the caller's
+    // size check skips transcription instead of crashing the whole pipeline.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/does not contain any stream|Output file is empty|Invalid argument/i.test(msg)) {
+      await writeFile(audioPath, Buffer.alloc(0));
+    } else {
+      throw err;
+    }
+  }
   return audioPath;
 }
 
