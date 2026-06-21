@@ -1,10 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { e } from './env';
 
+// Pin the SDK to the platform's native fetch (undici, available on Node 18+).
+// Left to itself the SDK uses its bundled node-fetch, whose gzip response
+// decoder throws ERR_STREAM_PREMATURE_CLOSE on this host even for valid
+// responses (node-fetch Gunzip bug) — it broke ALL model calls, including
+// Brand Book generation, with a 502. undici decodes gzip and streams cleanly.
+const nativeFetch: any =
+  typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined;
+
 export const anthropic = new Anthropic({
   apiKey: e('ANTHROPIC_API_KEY'),
   timeout: 600_000,
   maxRetries: 0,
+  ...(nativeFetch ? { fetch: nativeFetch } : {}),
 });
 
 // A dropped HTTP/SSE connection to the Anthropic API. On the self-hosted Node
