@@ -140,7 +140,7 @@ function timeAgo(d: Date | string): string {
 
     async function startUpload(file) {
       if (!file) return;
-      if (file.size > 200 * 1024 * 1024) { showError('File too large. Max 200MB.'); return; }
+      if (file.size > 1024 * 1024 * 1024) { showError('File too large. Max 1GB.'); return; }
       setBusy('Uploading…');
       progressBar.hidden = false;
 

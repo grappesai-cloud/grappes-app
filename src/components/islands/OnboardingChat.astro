@@ -606,8 +606,8 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
   async function doUpload(file, container, uiAction, dzBody, dzSuccess) {
     const zone = container.querySelector('.dz-zone');
     if (zone.dataset.uploaded) return;
-    if (file.size > 10 * 1024 * 1024) {
-      dzBody.innerHTML = '<div class="dz-icon">✗</div><div class="dz-label">File too large</div><div class="dz-hint">Maximum 10 MB</div>';
+    if (file.size > 1024 * 1024 * 1024) {
+      dzBody.innerHTML = '<div class="dz-icon">✗</div><div class="dz-label">File too large</div><div class="dz-hint">Maximum 1 GB</div>';
       return;
     }
     zone.dataset.uploaded = '1';
@@ -824,8 +824,8 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     return 'section';
   }
 
-  // Files > 4MB OR videos OR zips bypass the Vercel function (4.5MB body limit)
-  // and upload directly to Supabase Storage via signed URL.
+  // Files > 4MB OR videos OR zips skip the image-processing endpoint and stream
+  // straight to R2 via the same-origin upload proxy (no body cap on our server).
   const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024;
   function needsDirectUpload(file, type) {
     if (type === 'zip' || type === 'video') return true;
@@ -892,13 +892,14 @@ const currentPhaseIdx = Math.max(0, PHASES.indexOf(initialPhase));
     return { ok: true, asset: finData.asset, type: type };
   }
 
-  // Client-side size limits — must match sign-upload.ts MAX_BYTES
+  // Client-side size limits. Server (Node) has no body cap, so all 1 GB.
+  const GB = 1024 * 1024 * 1024;
   const SIZE_LIMITS = {
-    image:    20 * 1024 * 1024,
-    video:    50 * 1024 * 1024,
-    zip:     200 * 1024 * 1024,
-    document: 20 * 1024 * 1024,
-    font:      5 * 1024 * 1024,
+    image:    GB,
+    video:    GB,
+    zip:      GB,
+    document: GB,
+    font:     GB,
   };
 
   // File selected → stage (don't upload yet). User describes intent in message.

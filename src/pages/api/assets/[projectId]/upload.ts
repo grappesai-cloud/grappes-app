@@ -8,17 +8,18 @@ import { json } from '../../../../lib/api-utils';
 import { checkRateLimit } from '../../../../lib/rate-limit';
 import { isHeic, heicToJpeg } from '../../../../lib/heic';
 
+const GB = 1024 * 1024 * 1024;
 const TYPE_LIMITS: Record<AssetType, number> = {
-  logo: 2 * 1024 * 1024,
-  favicon: 512 * 1024,
-  og: 2 * 1024 * 1024,
-  hero: 10 * 1024 * 1024,
-  section: 5 * 1024 * 1024,
-  font: 2 * 1024 * 1024,
-  menu: 10 * 1024 * 1024,
-  video: 50 * 1024 * 1024,
-  document: 20 * 1024 * 1024,
-  other: 10 * 1024 * 1024,
+  logo: GB,
+  favicon: GB,
+  og: GB,
+  hero: GB,
+  section: GB,
+  font: GB,
+  menu: GB,
+  video: GB,
+  document: GB,
+  other: GB,
 };
 
 // Photo formats accepted for raster asset types. Includes HEIC/HEIF (iPhone

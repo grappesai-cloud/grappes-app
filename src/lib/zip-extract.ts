@@ -20,8 +20,8 @@ import { db } from './db';
 import type { AssetType } from './db';
 
 const MAX_ENTRIES   = 100;                  // hard cap on files extracted from one zip
-const MAX_PER_FILE  = 30 * 1024 * 1024;     // 30MB per individual file inside zip
-const MAX_TOTAL     = 250 * 1024 * 1024;    // 250MB total uncompressed
+const MAX_PER_FILE  = 1024 * 1024 * 1024;   // 1GB per individual file inside zip
+const MAX_TOTAL     = 1024 * 1024 * 1024;   // 1GB total uncompressed
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg']);
 

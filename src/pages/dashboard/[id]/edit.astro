@@ -377,7 +377,7 @@ const isLive = project.status === 'live';
   document.getElementById('tb-image-file').addEventListener('change', async function(e) {
     var file = e.target.files[0];
     if (!file || !selectedWnId) return;
-    if (file.size > 10 * 1024 * 1024) { flashStatus('⚠ Max 10MB'); return; }
+    if (file.size > 1024 * 1024 * 1024) { flashStatus('⚠ Max 1GB'); return; }
 
     // Show local preview immediately
     var localUrl = URL.createObjectURL(file);
