@@ -2,10 +2,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Tool } from "@anthropic-ai/sdk/resources/messages";
 import type { IntakeContext, NicheDetection } from "./types";
 
+// Native fetch (undici) — the SDK's bundled node-fetch drops responses with
+// ERR_STREAM_PREMATURE_CLOSE on the self-hosted server. See lib/reels/anthropic.ts.
+const nativeFetch: any =
+  typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined;
+
 let _client: Anthropic | null = null;
 function client(): Anthropic {
   if (!_client) {
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    _client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      ...(nativeFetch ? { fetch: nativeFetch } : {}),
+    });
   }
   return _client;
 }

@@ -9,12 +9,65 @@ import type {
 } from "./ffmpeg";
 import { nichePlaybook } from "./niche";
 
+// Pin the SDK to the platform's native fetch (undici). Its bundled node-fetch
+// tears long streaming responses down mid-flight with ERR_STREAM_PREMATURE_CLOSE
+// (gzip decoder bug) on the self-hosted server — that's the "Premature close"
+// the Reels Lab analysis was failing with. undici streams cleanly.
+const nativeFetch: any =
+  typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined;
+
 let _client: Anthropic | null = null;
 function client(): Anthropic {
   if (!_client) {
-    _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    _client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 600_000,
+      maxRetries: 0,
+      ...(nativeFetch ? { fetch: nativeFetch } : {}),
+    });
   }
   return _client;
+}
+
+function isConnError(err: any): boolean {
+  const code = err?.code || err?.cause?.code || err?.error?.code;
+  if (
+    code === "ERR_STREAM_PREMATURE_CLOSE" ||
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT" ||
+    code === "EPIPE" ||
+    code === "UND_ERR_SOCKET"
+  ) return true;
+  const msg = `${err?.message ?? ""} ${err?.cause?.message ?? ""}`.toLowerCase();
+  return /premature close|socket hang up|econnreset|fetch failed|terminated|network error|the operation was aborted/.test(msg);
+}
+
+// stream → finalMessage with retries on transient overload / rate-limit /
+// dropped-connection errors. These long thinking+tool calls must stream (the
+// SDK refuses non-streaming requests it estimates to exceed 10 min).
+async function streamFinal(
+  params: Parameters<Anthropic["messages"]["stream"]>[0],
+): Promise<Anthropic.Message> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await client().messages.stream(params).finalMessage();
+    } catch (e: any) {
+      lastErr = e;
+      const status = e?.status ?? e?.error?.status;
+      const overloaded = status === 529 || e?.error?.error?.type === "overloaded_error";
+      const rate = status === 429 || e?.error?.error?.type === "rate_limit_error";
+      const conn = isConnError(e);
+      if ((overloaded || rate || conn) && attempt < 3) {
+        const wait = rate ? 15000 : conn ? (attempt + 1) * 2500 : (attempt + 1) * 8000;
+        console.warn(`[reels/anthropic] ${rate ? "429 rate limit" : overloaded ? "529 overloaded" : `connection drop (${e?.cause?.code || e?.code || e?.message})`}, retrying in ${wait / 1000}s (attempt ${attempt + 1}/4)`);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr || new Error("Anthropic API unreachable after retries");
 }
 
 const SYSTEM_PROMPT = `You are the harshest short-form video critic in the industry. You review Instagram Reels, TikToks and YouTube Shorts and tell the creator EVERYTHING that will make their reel fail.
@@ -599,7 +652,7 @@ export async function analyzeWithClaude(
 
   // Stream → finalMessage: the SDK refuses long non-streaming calls (>10min
   // estimate) with extended thinking + large max_tokens. Same Message shape.
-  const response = await client().messages.stream({
+  const response = await streamFinal({
     model: "claude-sonnet-4-6",
     max_tokens: 20000,
     thinking: { type: "enabled", budget_tokens: 10000 },
@@ -618,7 +671,7 @@ export async function analyzeWithClaude(
         content: [{ type: "text", text: factsText }, ...frameBlocks],
       },
     ],
-  }).finalMessage();
+  });
 
   const toolUse = response.content.find(
     (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
@@ -693,7 +746,7 @@ export async function selfCritique(
     "```",
   ].join("\n");
 
-  const response = await client().messages.stream({
+  const response = await streamFinal({
     model: "claude-sonnet-4-6",
     max_tokens: 24000,
     thinking: { type: "enabled", budget_tokens: 4000 },
@@ -727,7 +780,7 @@ export async function selfCritique(
         ],
       },
     ],
-  }).finalMessage();
+  });
 
   const toolUse = response.content.find(
     (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
