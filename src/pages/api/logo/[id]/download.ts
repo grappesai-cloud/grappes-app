@@ -1,6 +1,6 @@
 // ── GET /api/logo/[id]/download?format=png|svg ───────────────────────────
-// Same-origin download proxy. The blob files live on *.blob.vercel-storage.com
-// and browsers ignore the `download` attribute on cross-origin links, so a
+// Same-origin download proxy. The files live on our R2 public host and
+// browsers ignore the `download` attribute on cross-origin links, so a
 // plain <a download href={blob_url}> just opens the image instead of saving
 // it. We stream the file through our origin with Content-Disposition:
 // attachment so the browser actually downloads it (desktop + mobile).

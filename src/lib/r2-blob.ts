@@ -22,6 +22,14 @@ export function r2Configured(): boolean {
   return Boolean(env("R2_BUCKET") && env("R2_ENDPOINT") && env("R2_ACCESS_KEY_ID") && env("R2_SECRET_ACCESS_KEY"));
 }
 
+// True when `url` is a public asset we hosted ourselves on R2. Used to reject
+// arbitrary/remote logo URLs in endpoints that embed user-supplied images.
+export function isOwnPublicUrl(url: string): boolean {
+  const base = PUBLIC_BASE();
+  if (!base || !url) return false;
+  return url.startsWith(base + "/");
+}
+
 let _client: S3Client | null = null;
 function client(): S3Client {
   if (_client) return _client;

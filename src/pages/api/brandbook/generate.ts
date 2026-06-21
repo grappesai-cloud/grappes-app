@@ -9,6 +9,7 @@ import { createAdminClient } from '../../../lib/supabase';
 import { generateBrandBookContent, DEFAULT_DONTS, type BrandBookInput } from '../../../lib/brandbook-gen';
 import { fetchWebsiteContext } from '../../../lib/website-context';
 import { consumeCredit, refundCredit } from '../../../lib/credits';
+import { isOwnPublicUrl } from '@lib/r2-blob';
 
 interface GenerateBody {
   name?: string;
@@ -49,8 +50,8 @@ export const POST: APIRoute = async ({ locals, request }) => {
   if (!name) return json({ error: 'Brand name is required.' }, 400);
   if (!about) return json({ error: 'Tell us what the brand does.' }, 400);
   if (!logoUrl) return json({ error: 'Upload your logo first.' }, 400);
-  // Only accept marks we hosted ourselves (the wizard upload).
-  if (!/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//.test(logoUrl)) {
+  // Only accept marks we hosted ourselves (the wizard upload to R2).
+  if (!isOwnPublicUrl(logoUrl)) {
     return json({ error: 'Invalid logo URL.' }, 400);
   }
 
