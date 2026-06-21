@@ -7,7 +7,6 @@
     const BB = { name: '', about: '', industry: '', website: '', values: [], voice: [], colors: [], typeface: 'Inter', logoUrl: '', logoDataUrl: '', logoIsLight: true, template: 'editorial' };
 
     const STEPS = [
-      { key: 'bb-template', chapter: 'Style',    title: 'Pick a template' },
       { key: 'bb-name',     chapter: 'Brand',    title: 'Brand name' },
       { key: 'bb-about',    chapter: 'Brand',    title: 'About the brand' },
       { key: 'bb-values',   chapter: 'Identity', title: 'Brand values' },

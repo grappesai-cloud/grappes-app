@@ -1,6 +1,6 @@
 // ── GET /api/brandbook/[id]/pdf — Puppeteer PDF export ────────────────────────
-// Same setup as offers/pdf: bundled Chromium, --no-sandbox. Pages are sized in
-// CSS (1200x900) so preferCSSPageSize keeps the 4:3 landscape format.
+// The book is a single scrolling page, so we export it as ONE tall PDF page
+// sized to the rendered content (no awkward A4 breaks across the dark sections).
 
 import type { APIRoute } from 'astro';
 import { json } from '../../../../lib/api-utils';
@@ -41,12 +41,18 @@ export const GET: APIRoute = async ({ locals, params }) => {
   }
   try {
     const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 1000, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 45_000 });
-    // Google Fonts can resolve after networkidle0 — wait for the font faces.
+    // Google Fonts / @font-face can resolve after networkidle0 — wait for them.
     await page.evaluate(() => (document as any).fonts.ready);
+    const height = await page.evaluate(() =>
+      Math.ceil(document.documentElement.scrollHeight),
+    );
     const pdf = await page.pdf({
       printBackground: true,
-      preferCSSPageSize: true,
+      width: '1280px',
+      height: `${height}px`,
+      pageRanges: '1',
     });
 
     return new Response(pdf, {
