@@ -61,6 +61,11 @@ export async function probe(videoPath: string): Promise<VideoMeta> {
   const video = parsed.streams.find(
     (s: { codec_type: string }) => s.codec_type === "video",
   );
+  // A reel must have a video track. Fail with a clear message instead of a
+  // "Cannot read properties of undefined" TypeError on audio-only / odd files.
+  if (!video) {
+    throw new Error("No video stream found in this file — upload a video.");
+  }
   const duration = parseFloat(parsed.format.duration);
   const size = parseInt(parsed.format.size, 10);
   const [num, den] = String(video.r_frame_rate).split("/").map(Number);
@@ -127,21 +132,26 @@ export async function sampleFrames(
   for (let i = 0; i < stamps.length; i++) {
     const stamp = stamps[i];
     const path = join(dir, `frame_${String(i).padStart(3, "0")}.jpg`);
-    await run(FFMPEG, [
-      "-y",
-      "-ss",
-      stamp.sec.toFixed(2),
-      "-i",
-      videoPath,
-      "-frames:v",
-      "1",
-      "-vf",
-      "scale='min(720,iw)':-2",
-      "-q:v",
-      "3",
-      path,
-    ]);
-    frames.push({ path, sec: stamp.sec, zone: stamp.zone });
+    try {
+      await run(FFMPEG, [
+        "-y",
+        "-ss",
+        stamp.sec.toFixed(2),
+        "-i",
+        videoPath,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale='min(720,iw)':-2",
+        "-q:v",
+        "3",
+        path,
+      ]);
+      frames.push({ path, sec: stamp.sec, zone: stamp.zone });
+    } catch {
+      // One bad seek/frame shouldn't fail the whole analysis — skip it.
+      continue;
+    }
   }
 
   return frames;
