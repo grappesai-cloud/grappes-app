@@ -60,8 +60,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
       if (!dbUser) return json({ error: 'Failed to create user profile' }, 500);
     }
 
+    // Owner-equivalent users (plan=owner OR extra_edits>=999999) get unlimited
+    // projects — skip both the free-site and projects_limit gates.
+    const isOwnerEquiv = dbUser.plan === 'owner' || (dbUser.extra_edits ?? 0) >= 999999;
+
     step = 'countFree';
-    if (dbUser.plan === 'free') {
+    if (!isOwnerEquiv && dbUser.plan === 'free') {
       const freeCount = await db.projects.countFree(user.id);
       if (freeCount >= 1) {
         return json(
@@ -72,12 +76,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
     }
 
     step = 'countByUser';
-    const count = await db.projects.countByUser(user.id);
-    if (count >= dbUser.projects_limit) {
-      return json(
-        { error: 'Project limit reached. Upgrade your plan to create more projects.' },
-        403
-      );
+    if (!isOwnerEquiv) {
+      const count = await db.projects.countByUser(user.id);
+      if (count >= dbUser.projects_limit) {
+        return json(
+          { error: 'Project limit reached. Upgrade your plan to create more projects.' },
+          403
+        );
+      }
     }
 
     step = 'slugExists';
@@ -91,9 +97,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     step = 'insertProject';
     const supabase = createAdminClient();
 
-    // Owner-equivalent users (plan=owner OR extra_edits>=999999) get unlimited
-    // AI editor iterations on every project they create.
-    const isOwnerEquiv = dbUser.plan === 'owner' || (dbUser.extra_edits ?? 0) >= 999999;
+    // Owner-equivalent users also get unlimited AI editor iterations per project.
     const projectInsert: Record<string, unknown> = { user_id: user.id, name, slug };
     if (isOwnerEquiv) projectInsert.iterations_quota = 999999;
 
