@@ -26,6 +26,12 @@ try {
 } catch (err) {
   console.error('[dashboard/sites] DB error:', err);
 }
+
+// IDs of projects still working — the page polls these and refreshes itself the
+// moment one finishes, so a freshly generated site appears without a manual reload.
+const pendingIds = projects
+  .filter(p => p.status === 'generating' || p.status === 'deploying')
+  .map(p => p.id);
 ---
 
 <Dashboard title="Sites">
@@ -61,4 +67,27 @@ try {
       <p style="font-size:13px;color:rgba(255,255,255,0.4);">Start your first AI-generated website with the button above.</p>
     </div>
   )}
+
+  <script is:inline define:vars={{ pendingIds }}>
+    (function () {
+      if (!pendingIds || !pendingIds.length) return;
+      var watching = pendingIds.slice();
+      var poll = setInterval(async function () {
+        try {
+          for (var i = 0; i < watching.length; i++) {
+            var res = await fetch('/api/projects/' + watching[i] + '/launch');
+            if (!res.ok) continue;
+            var data = await res.json();
+            if (data.status === 'generated' || data.status === 'live' || data.status === 'failed') {
+              clearInterval(poll);
+              window.location.reload();
+              return;
+            }
+          }
+        } catch (e) {}
+      }, 4000);
+      // Safety stop well past the worst-case generation time.
+      setTimeout(function () { clearInterval(poll); }, 30 * 60 * 1000);
+    })();
+  </script>
 </Dashboard>

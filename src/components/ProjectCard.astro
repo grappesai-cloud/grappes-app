@@ -20,6 +20,8 @@ function timeAgo(dateStr: string): string {
 
 const initial = project.name[0]?.toUpperCase() ?? '?';
 const hasPreview = !!project.preview_url;
+const isWorking = project.status === 'generating' || project.status === 'deploying';
+const workingLabel = project.status === 'deploying' ? 'Publishing…' : 'Generating…';
 ---
 
 <a href={`/dashboard/${project.id}`}
@@ -51,9 +53,11 @@ const hasPreview = !!project.preview_url;
         {project.name}
       </h3>
       <p style="font-size:11.5px;color:rgba(255,255,255,0.45);margin:0;line-height:1.3;">
-        {hasPreview
+        {isWorking
+          ? <span style="display:inline-flex;align-items:center;gap:6px;color:#06bfdd;"><span class="pc-pulse"></span>{workingLabel}</span>
+          : hasPreview
           ? <span data-time={project.updated_at}>{timeAgo(project.updated_at)}</span>
-          : <span>Your first site — let's build it</span>
+          : <span>Your first site, let's build it</span>
         }
       </p>
 
@@ -93,6 +97,15 @@ const hasPreview = !!project.preview_url;
   .pc-del:hover {
     background: rgba(220,38,38,0.6) !important;
     color: #fff !important;
+  }
+  .pc-pulse {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #06bfdd; flex: none;
+    animation: pc-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pc-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.7); }
   }
 </style>
 

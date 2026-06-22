@@ -22,8 +22,14 @@ export interface ClaimedJob {
 
 const MAX_ATTEMPTS = 3;
 // A 'running' job whose lock is older than this is treated as dead and reclaimed.
-// Matches STALE_GENERATION_MS in the launch route.
-const STALE_RUNNING = "interval '14 minutes'";
+// runJob() heartbeats locked_at every 60s for as long as the generation is
+// actually running, so a long-but-alive job (the GitHub worker allows up to
+// 45min) keeps its lock fresh and is NEVER reclaimed mid-flight — that stale
+// reclaim was what produced duplicate concurrent generations. This window now
+// only fires for a genuinely dead worker (≥5 missed heartbeats).
+const STALE_RUNNING = "interval '5 minutes'";
+// How often a running job refreshes its lock. Must be well under STALE_RUNNING.
+const HEARTBEAT_MS = 60_000;
 
 interface ClaimOpts {
   /** Only claim a job for this specific project (used by the GitHub dispatch). */
@@ -87,6 +93,16 @@ export async function runJob(job: ClaimedJob): Promise<void> {
     return;
   }
 
+  // Heartbeat: refresh this job's lock while the pipeline is genuinely running,
+  // so another worker can't mistake a slow-but-alive generation for a dead one
+  // and reclaim it (the cause of duplicate concurrent generations). Stops in the
+  // `finally`, so a crashed worker's lock goes stale within STALE_RUNNING.
+  const heartbeat = setInterval(() => {
+    sql`UPDATE generation_jobs SET locked_at=now(), updated_at=now() WHERE id=${job.id} AND status='running'`
+      .catch((e: any) => console.warn('[gen-queue] heartbeat failed (non-fatal):', e?.message || e));
+  }, HEARTBEAT_MS);
+  if (typeof (heartbeat as any).unref === 'function') (heartbeat as any).unref();
+
   try {
     await runPipeline(job.project_id, { wasLive: job.was_live });
     await sql`UPDATE generation_jobs SET status='done', error=null, updated_at=now() WHERE id=${job.id}`;
@@ -112,5 +128,7 @@ export async function runJob(job: ClaimedJob): Promise<void> {
       await db.projects.updateStatus(job.project_id, 'failed');
       await db.projects.updateSubstatus(job.project_id, `err:${errMsg}`);
     } catch {}
+  } finally {
+    clearInterval(heartbeat);
   }
 }

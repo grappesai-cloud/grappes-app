@@ -2192,8 +2192,10 @@ if (hasPreview) {
           }
         } catch {}
       }, 4000);
-      // Safety: stop polling after 15 minutes (generation maxDuration is 800s)
-      setTimeout(() => clearInterval(_launchPoll), 15 * 60 * 1000);
+      // Safety: stop polling after 30 minutes. Must outlast the worst-case
+      // generation (the GitHub worker allows up to 45min, but most finish in a
+      // few minutes); a too-short window was why a slow run never auto-reloaded.
+      setTimeout(() => clearInterval(_launchPoll), 30 * 60 * 1000);
     }
 
     // PUBLISH
