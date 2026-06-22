@@ -128,6 +128,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
       const configuredOrigin = (import.meta.env.PUBLIC_SITE_URL || import.meta.env.SITE || '').replace(/\/$/, '');
       const appOrigin = (import.meta.env.PUBLIC_APP_URL || '').replace(/\/$/, '');
       const allowed = new Set([requestOrigin, configuredOrigin, appOrigin].filter(Boolean));
+      // Also accept the www/apex sibling of each allowed origin — users hitting
+      // www.grappes.dev (or vice versa) would otherwise fail CSRF on every POST.
+      for (const o of [...allowed]) {
+        try {
+          const u = new URL(o);
+          const sibHost = u.host.startsWith('www.') ? u.host.slice(4) : `www.${u.host}`;
+          allowed.add(`${u.protocol}//${sibHost}`);
+        } catch {}
+      }
       if (!allowed.has(origin)) {
         return new Response(JSON.stringify({ error: 'CSRF: origin mismatch' }), {
           status: 403,
