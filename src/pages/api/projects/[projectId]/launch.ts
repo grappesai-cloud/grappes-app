@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { log } from '../../../../lib/logger';
-import { checkRateLimit, checkPersistentRateLimit } from '../../../../lib/rate-limit';
+import { checkRateLimit, checkPersistentRateLimit, recordPersistentRateLimit } from '../../../../lib/rate-limit';
 import { getPg } from '../../../../lib/supabase';
 import { e } from '../../../../lib/env';
 import { put } from '@lib/r2-blob';
@@ -27,6 +27,7 @@ import {
   type AssetData,
 } from '../../../../lib/creative-generation';
 import { stripFabricatedSrcset } from '../../../../lib/html-compat';
+import { sendManualBuildRequestEmail } from '../../../../lib/resend';
 import { runStructuralQA } from '../../../../lib/structural-qa';
 import { runVisualQAOnContent } from '../../../../lib/visual-qa';
 import { runPostQA } from '../../../../lib/post-qa';
@@ -82,7 +83,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
   // worker still on it. The job queue (generation_jobs) now owns the lifecycle —
   // a queued/running job is reclaimed + retried by the cron, so only declare the
   // project dead here when there is NO active job (truly orphaned state).
-  if (project.status === 'generating' && project.updated_at) {
+  if (project.status === 'generating' && (project as any).substatus !== 'manual_build' && project.updated_at) {
     const age = Date.now() - new Date(project.updated_at).getTime();
     if (age > STALE_GENERATION_MS) {
       const active = await getPg()`
@@ -226,56 +227,36 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }
   }
 
-  // ── Enqueue a durable generation job ────────────────────────────────────
-  // The heavy generate -> QA -> repair pipeline no longer runs inside this
-  // request: a slow/throttled/killed invocation would lose the whole run and the
-  // 800s function ceiling capped long jobs. Instead we enqueue a job that a
-  // worker (kicked below + a 1-min cron) claims and runs off the request path,
-  // retrying if its invocation dies. The dashboard polls GET for completion.
+  // ── Concierge flow: hand off to a human builder ──────────────────────────
+  // We no longer run the AI pipeline. The project stays in 'generating' (so the
+  // client sees a "we're building it" state and the dashboard keeps polling)
+  // with substatus 'manual_build' until an operator delivers the finished HTML
+  // via POST /api/admin/projects/[id]/deliver, which flips it to 'generated'.
+  // The GET watchdog skips 'manual_build' so it is never auto-failed for age.
   try {
-    const sql = getPg();
-    // Supersede any leftover active job for this project, then enqueue a fresh one.
-    await sql`UPDATE generation_jobs SET status='failed', error='superseded', updated_at=now()
-              WHERE project_id=${params.projectId!} AND status IN ('queued','running')`;
-    await sql`INSERT INTO generation_jobs (project_id, user_id, was_live)
-              VALUES (${params.projectId!}, ${user.id}, ${wasLive})`;
-  } catch (e: any) {
-    console.error('[launch] Failed to enqueue generation job:', e);
-    try {
-      await db.projects.updateStatus(params.projectId!, 'failed');
-      await db.projects.updateSubstatus(params.projectId!, 'err:could not enqueue generation');
-    } catch {}
-    return json({ error: 'Could not start generation. Please try again.' }, 500);
+    await db.projects.updateSubstatus(params.projectId!, 'manual_build');
+  } catch (e) {
+    console.warn('[launch] could not set manual_build substatus:', e);
   }
 
-  // Trigger the GitHub Actions worker — the primary executor, which runs with no
-  // 800s function cap (.github/workflows/generate.yml → run-generation-job.mts).
-  // Best-effort: if the dispatch fails or GitHub isn't configured, the Vercel
-  // cron (/api/cron/process-generation) drains the queue as the fallback.
+  // Notify the operator with the full brief (best-effort — never block the user).
   try {
-    const owner = e('GITHUB_ORG');
-    const token = e('GITHUB_TOKEN');
-    const repo = e('GITHUB_GEN_REPO') || 'grappes-app';
-    if (owner && token) {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 5000);
-      await fetch(`https://api.github.com/repos/${owner}/${repo}/dispatches`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${token}`,
-          accept: 'application/vnd.github+json',
-          'content-type': 'application/json',
-          'user-agent': 'grappes-app',
-        },
-        body: JSON.stringify({ event_type: 'generate', client_payload: { project_id: params.projectId } }),
-        signal: ctrl.signal,
-      }).catch(() => {});
-      clearTimeout(t);
-    } else {
-      console.warn('[launch] GITHUB_ORG/GITHUB_TOKEN not set — relying on the Vercel cron fallback');
-    }
-  } catch {
-    // Non-fatal — the Vercel cron picks up the queued job.
+    const briefRow = await db.briefs.findByProjectId(params.projectId!);
+    const r = await sendManualBuildRequestEmail({
+      projectId: params.projectId!,
+      projectName: project.name,
+      clientEmail: dbUser?.email ?? user.email ?? '',
+      clientName: (dbUser as any)?.name ?? undefined,
+      brief: briefRow?.data ?? {},
+    });
+    if (!r.success) console.error('[launch] build-request email not sent:', r.error);
+  } catch (e) {
+    console.error('[launch] manual-build notification failed:', e);
+  }
+
+  // Durably record the launch slot (the old AI worker did this on success).
+  if (!isOwnerEquiv) {
+    try { await recordPersistentRateLimit(launchRateKey); } catch {}
   }
 
   return json({ started: true, status: 'generating' });

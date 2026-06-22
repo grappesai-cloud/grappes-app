@@ -22,6 +22,7 @@ const [brief, conversation, deployments] = await Promise.all([
 const isOnboarding = ['onboarding'].includes(project.status);
 const isBriefReady = project.status === 'brief_ready';
 const isLaunching  = ['generating'].includes(project.status);
+const isManualBuild = isLaunching && (project as any).substatus === 'manual_build';
 const isDeploying  = project.status === 'deploying';
 const isGenerated  = project.status === 'generated';
 const isLive       = project.status === 'live';
@@ -1008,8 +1009,8 @@ if (hasPreview) {
         {isLaunching && (
           <div class="phase-generating">
             <div class="gen-spinner"></div>
-            <p class="gen-title">Generating your website...</p>
-            <p class="gen-sub">Takes 5–15 minutes. Feel free to close the tab — we'll save your progress.</p>
+            <p class="gen-title">{isManualBuild ? 'Building your website' : 'Generating your website...'}</p>
+            <p class="gen-sub">{isManualBuild ? "Our team is crafting it by hand. We'll email you the moment it's ready." : "Takes 5–15 minutes. Feel free to close the tab — we'll save your progress."}</p>
           </div>
         )}
 
@@ -1169,6 +1170,14 @@ if (hasPreview) {
         {hasPreview ? (
           <div class="preview-wrapper" id="preview-wrapper">
             <iframe class="preview-iframe" id="preview-iframe" src={`${previewUrl}?edit`} title={project.name}></iframe>
+          </div>
+        ) : isManualBuild ? (
+          /* Concierge build — a human is crafting the site by hand */
+          <div class="preview-empty" id="preview-empty">
+            <div class="empty-card">
+              <p class="preview-empty-title">We're building your site</p>
+              <p class="preview-empty-text">Thanks for the brief. Our team is now crafting your website by hand for the best possible result. You'll get an email the moment it's ready to view, no need to keep this tab open.</p>
+            </div>
           </div>
         ) : isLaunching ? (
           /* Generation theater — stages narrative + event log */

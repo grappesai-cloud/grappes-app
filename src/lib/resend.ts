@@ -394,6 +394,83 @@ You can change this password anytime from your account settings.`;
 }
 
 /**
+ * Operator notification (concierge flow): a client finished onboarding and their
+ * site is ready to be built by hand. Sent to ADMIN_EMAIL with the full brief so
+ * the operator can build it in Claude Code and deliver it via the API.
+ */
+export async function sendManualBuildRequestEmail(params: {
+  projectId: string;
+  projectName: string;
+  clientEmail: string;
+  clientName?: string;
+  brief: any;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const adminEmail = import.meta.env.ADMIN_EMAIL ?? 'grappes.ai@gmail.com';
+  const briefJson = JSON.stringify(params.brief ?? {}, null, 2);
+  const html = wrapEmail(`New site to build: ${escapeHtml(params.projectName)}`, `
+    <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.clientName || params.clientEmail)}</span> finished onboarding. Build the site in Claude Code, then deliver it via the API.</p>
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;width:100%;background:#f7f7f8;border-radius:12px;">
+      <tr><td style="padding:16px 20px;font-size:14px;line-height:1.9;color:#0a0a0a;">
+        <strong style="color:#6b7280;font-weight:600;">Project</strong><br>${escapeHtml(params.projectName)}<br>
+        <strong style="color:#6b7280;font-weight:600;">Project ID</strong><br><span style="font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;">${escapeHtml(params.projectId)}</span><br>
+        <strong style="color:#6b7280;font-weight:600;">Client</strong><br>${escapeHtml(params.clientEmail)}
+      </td></tr>
+    </table>
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Brief</p>
+    <pre style="margin:0;padding:16px;background:#0a0a0a;color:#e5e7eb;border-radius:10px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;font-family:'SFMono-Regular',Consolas,monospace;">${escapeHtml(briefJson)}</pre>
+    ${emailBtn(`${SITE_URL}/admin`, 'Open admin →')}
+  `);
+  const text = `New site to build: ${params.projectName}
+
+Client: ${params.clientEmail}
+Project ID: ${params.projectId}
+
+Brief:
+${briefJson}
+
+Pull brief:  GET  ${SITE_URL}/api/admin/projects/${params.projectId}/brief
+Deliver:     POST ${SITE_URL}/api/admin/projects/${params.projectId}/deliver  (x-admin-secret header, body = HTML)`;
+
+  return sendPlatformEmail({
+    to: adminEmail,
+    subject: `🛠 Build request: ${params.projectName}`,
+    html,
+    text,
+    reply_to: params.clientEmail || undefined,
+  });
+}
+
+/**
+ * Client notification (concierge flow): their hand-built site is ready to view.
+ */
+export async function sendSiteReadyEmail(params: {
+  to: string;
+  siteName: string;
+  projectId: string;
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const dashUrl = `${SITE_URL}/dashboard/${params.projectId}`;
+  const html = wrapEmail(`${escapeHtml(params.siteName)} is ready.`, `
+    <p style="margin:0 0 24px;">Your website is ready to view. Sign in to see it, then publish it and connect your own domain whenever you're happy with it.</p>
+    ${emailBtn(dashUrl, 'View your site →')}
+    <p style="margin:24px 0 0;font-size:13px;color:#c0c0c0;">Want changes? Just reply to this email.</p>
+  `);
+  const text = `${params.siteName} is ready!
+
+Your website is ready to view. Sign in to see it:
+${dashUrl}
+
+From there you can publish it and connect your own domain. Want changes? Just reply to this email.`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: `✦ ${params.siteName} is ready`,
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
  * Notification email when a site goes live after deployment.
  */
 export async function sendSiteLiveEmail(params: {
