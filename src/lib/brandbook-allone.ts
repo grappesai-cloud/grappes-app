@@ -91,9 +91,17 @@ export function renderAllOneHTML(doc: AllOneDoc): string {
   const darkest = pal.slice().sort((a, b) => luminance(a.hex) - luminance(b.hex))[0];
   const ink = darkest && luminance(darkest.hex) < 0.12 ? darkest.hex : '#0A0908';
   const cream = '#F0ECE4';
-  const sig = pal.filter((x) => luminance(x.hex) > 0.1 && luminance(x.hex) < 0.95);
-  const accent = (sig[0]?.hex) || '#C4A265';
-  const spark = (sig[1]?.hex) || accent;
+  // Honour the user's chosen palette: the accent IS their first colour and the
+  // spark their second, in the order they picked them — no filtering, no
+  // swapping for a default. Only fall back to a neutral gold when no colours
+  // were chosen at all.
+  const accent = pal[0]?.hex || '#C4A265';
+  const spark = pal[1]?.hex || accent;
+  // Colour that reads on top of the accent (light accent → ink text/mark, dark
+  // accent → white), so a chosen colour works whether it's light or dark.
+  const accentIsLight = luminance(accent) > 0.6;
+  const onAccent = accentIsLight ? ink : '#FFFFFF';
+  const accentMark: 'white' | 'ink' = accentIsLight ? 'ink' : 'white';
 
   const symbol = doc.symbolUrl || doc.logoUrl;
   const badge = doc.badgeUrl;
@@ -144,7 +152,7 @@ ${fontFaces}
 :root{
   --ink:${ink}; --cream:${cream}; --white:#fff;
   --grey:#8C8C8C; --line:rgba(255,255,255,.12);
-  --accent:${accent}; --spark:${spark}; --accent-rgb:${rgbStr(accent)};
+  --accent:${accent}; --spark:${spark}; --accent-rgb:${rgbStr(accent)}; --on-accent:${onAccent};
   --disp:${fam('display', "'Space Grotesk',sans-serif")};
   --body:${fam('text', "'Inter',sans-serif")};
   --mono:${fam('mono', "'Space Mono',monospace")};
@@ -232,7 +240,7 @@ footer .caps{justify-content:center}
 .dl-hero{display:flex;flex-wrap:wrap;gap:13px;margin-top:8px}
 .btn{display:inline-flex;align-items:center;gap:9px;padding:16px 24px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-decoration:none;background:#0e0d0c}
 .btn:hover{background:#fff;color:var(--ink)}
-.btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 `;
 
   const meta = [
@@ -309,7 +317,7 @@ footer .caps{justify-content:center}
       <div><div class="plate light">${mk(doc.logoUrl, 'ink')}</div><div class="label-row"><span class="caps">${opaque ? 'Primary' : 'Primary · positive'}</span><span class="caps">on cream</span></div></div>
     </div>
     <div class="grid3">
-      <div><div class="plate sq" style="background:${accent}">${mk(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">On brand colour</span><span class="caps">accent</span></div></div>
+      <div><div class="plate sq" style="background:${accent}">${mk(doc.logoUrl, accentMark)}</div><div class="label-row"><span class="caps">On brand colour</span><span class="caps">accent</span></div></div>
       <div><div class="plate dark sq">${badge ? mark(badge, 'original') : `<div class="ring">${mk(symbol, 'white')}</div>`}</div><div class="label-row"><span class="caps">Badge</span><span class="caps">avatars</span></div></div>
       <div><div class="plate dark sq">${mk(symbol, 'white')}</div><div class="label-row"><span class="caps">Symbol</span><span class="caps">app · favicon</span></div></div>
     </div>
@@ -356,10 +364,10 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">05 — Colour</div>
     <h2>The palette</h2>
-    <p style="margin-bottom:38px">${esc(c.color_intro || 'A near-black ink and a warm cream form the ground; the mark stays monochrome on top. The signature colours carry emphasis and energy, used with discipline.')}</p>
-    <div class="caps" style="margin-bottom:16px">Ground</div>
-    <div class="grid3" style="margin-bottom:${sigSwatches ? '50px' : '0'}">${groundSwatches}</div>
-    ${sigSwatches ? `<div class="caps" style="margin-bottom:16px">Signature</div><div class="grid3">${sigSwatches}</div>` : ''}
+    <p style="margin-bottom:38px">${esc(c.color_intro || (sigSwatches ? 'These are the brand colours. They carry the identity across every surface; the near-black and cream below are the neutral grounds they sit on.' : 'A near-black ink and a warm cream form the ground; the mark stays monochrome on top.'))}</p>
+    ${sigSwatches ? `<div class="caps" style="margin-bottom:16px">Brand colours</div><div class="grid3" style="margin-bottom:50px">${sigSwatches}</div>` : ''}
+    <div class="caps" style="margin-bottom:16px">Neutrals</div>
+    <div class="grid3">${groundSwatches}</div>
   </div>
 </section>
 
