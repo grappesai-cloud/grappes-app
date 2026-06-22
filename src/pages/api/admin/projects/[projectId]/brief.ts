@@ -27,6 +27,29 @@ export const GET: APIRoute = async ({ request, params }) => {
   const brief = await db.briefs.findByProjectId(projectId);
   const owner = project.user_id ? await db.users.findById(project.user_id) : null;
 
+  // All media the client uploaded at onboarding (photos, logo, video) — the
+  // operator downloads these to build the site by hand.
+  let assets: Array<Record<string, any>> = [];
+  try {
+    const rows = await db.assets.findByProject(projectId);
+    assets = rows
+      .filter((a: any) => a.public_url)
+      .map((a: any) => ({
+        id: a.id,
+        type: a.type,
+        url: a.public_url,
+        filename: a.filename ?? null,
+        mime: a.mime_type ?? null,
+        sizeBytes: a.size_bytes ?? null,
+        // section tag / responsive variants / video play mode, if present
+        sectionId: a.metadata?.sectionId ?? null,
+        playMode: a.metadata?.playMode ?? null,
+        variants: a.metadata?.variants ?? null,
+      }));
+  } catch (e) {
+    console.error('[admin/brief] asset load failed:', e);
+  }
+
   return json({
     projectId,
     name: project.name,
@@ -38,5 +61,7 @@ export const GET: APIRoute = async ({ request, params }) => {
     completeness: brief?.completeness ?? null,
     confirmed: brief?.confirmed ?? null,
     brief: brief?.data ?? null,
+    assets,
+    assetCount: assets.length,
   });
 };

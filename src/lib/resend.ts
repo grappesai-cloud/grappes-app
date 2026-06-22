@@ -404,16 +404,20 @@ export async function sendManualBuildRequestEmail(params: {
   clientEmail: string;
   clientName?: string;
   brief: any;
+  assetCount?: number;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const adminEmail = import.meta.env.ADMIN_EMAIL ?? 'grappes.ai@gmail.com';
   const briefJson = JSON.stringify(params.brief ?? {}, null, 2);
+  const mediaLine = typeof params.assetCount === 'number'
+    ? `<br><strong style="color:#6b7280;font-weight:600;">Uploaded media</strong><br>${params.assetCount} file(s) — URLs in the brief API response`
+    : '';
   const html = wrapEmail(`New site to build: ${escapeHtml(params.projectName)}`, `
     <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.clientName || params.clientEmail)}</span> finished onboarding. Build the site in Claude Code, then deliver it via the API.</p>
     <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;width:100%;background:#f7f7f8;border-radius:12px;">
       <tr><td style="padding:16px 20px;font-size:14px;line-height:1.9;color:#0a0a0a;">
         <strong style="color:#6b7280;font-weight:600;">Project</strong><br>${escapeHtml(params.projectName)}<br>
         <strong style="color:#6b7280;font-weight:600;">Project ID</strong><br><span style="font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;">${escapeHtml(params.projectId)}</span><br>
-        <strong style="color:#6b7280;font-weight:600;">Client</strong><br>${escapeHtml(params.clientEmail)}
+        <strong style="color:#6b7280;font-weight:600;">Client</strong><br>${escapeHtml(params.clientEmail)}${mediaLine}
       </td></tr>
     </table>
     <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Brief</p>
