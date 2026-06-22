@@ -259,13 +259,17 @@ export const POST: APIRoute = async ({ params, locals }) => {
   try {
     const briefRow = await db.briefs.findByProjectId(params.projectId!);
     const assetRows = await db.assets.findByProject(params.projectId!).catch(() => []);
+    const assets = assetRows
+      .filter((a: any) => a.public_url)
+      .map((a: any) => ({ type: a.type, url: a.public_url as string, filename: a.filename ?? null }));
     const r = await sendManualBuildRequestEmail({
       projectId: params.projectId!,
       projectName: project.name,
       clientEmail: dbUser?.email ?? user.email ?? '',
       clientName: (dbUser as any)?.name ?? undefined,
       brief: briefRow?.data ?? {},
-      assetCount: assetRows.filter((a: any) => a.public_url).length,
+      assetCount: assets.length,
+      assets,
     });
     if (!r.success) console.error('[launch] build-request email not sent:', r.error);
   } catch (e) {

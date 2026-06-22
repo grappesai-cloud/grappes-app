@@ -405,12 +405,19 @@ export async function sendManualBuildRequestEmail(params: {
   clientName?: string;
   brief: any;
   assetCount?: number;
+  assets?: Array<{ type?: string; url: string; filename?: string | null }>;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const adminEmail = import.meta.env.ADMIN_EMAIL ?? 'grappes.ai@gmail.com';
   const briefJson = JSON.stringify(params.brief ?? {}, null, 2);
-  const mediaLine = typeof params.assetCount === 'number'
-    ? `<br><strong style="color:#6b7280;font-weight:600;">Uploaded media</strong><br>${params.assetCount} file(s) — URLs in the brief API response`
-    : '';
+  const assets = params.assets ?? [];
+  const assetCount = params.assetCount ?? assets.length;
+  const mediaLine = `<br><strong style="color:#6b7280;font-weight:600;">Uploaded media</strong><br>${assetCount} file(s)`;
+  const mediaBlock = assets.length
+    ? `<p style="margin:24px 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Media (${assets.length})</p>
+       <table cellpadding="0" cellspacing="0" border="0" style="margin:0;width:100%;font-size:13px;line-height:1.9;">
+       ${assets.map((a) => `<tr><td style="padding:2px 0;color:#9ca3af;white-space:nowrap;padding-right:12px;vertical-align:top;">${escapeHtml(a.type || 'file')}${a.filename ? ` · ${escapeHtml(a.filename)}` : ''}</td><td style="padding:2px 0;"><a href="${escapeHtml(a.url)}" style="color:#2C32FE;text-decoration:none;word-break:break-all;">${escapeHtml(a.url)}</a></td></tr>`).join('')}
+       </table>`
+    : `<p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">No media uploaded by the client.</p>`;
   const html = wrapEmail(`New site to build: ${escapeHtml(params.projectName)}`, `
     <p style="margin:0 0 20px;"><span style="color:#0a0a0a;font-weight:600;">${escapeHtml(params.clientName || params.clientEmail)}</span> finished onboarding. Build the site in Claude Code, then deliver it via the API.</p>
     <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;width:100%;background:#f7f7f8;border-radius:12px;">
@@ -422,15 +429,19 @@ export async function sendManualBuildRequestEmail(params: {
     </table>
     <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Brief</p>
     <pre style="margin:0;padding:16px;background:#0a0a0a;color:#e5e7eb;border-radius:10px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;font-family:'SFMono-Regular',Consolas,monospace;">${escapeHtml(briefJson)}</pre>
+    ${mediaBlock}
     ${emailBtn(`${SITE_URL}/admin`, 'Open admin →')}
   `);
+  const mediaText = assets.length
+    ? `\n\nMedia (${assets.length}):\n${assets.map((a) => `- ${a.type || 'file'}${a.filename ? ` (${a.filename})` : ''}: ${a.url}`).join('\n')}`
+    : `\n\nMedia: none uploaded.`;
   const text = `New site to build: ${params.projectName}
 
 Client: ${params.clientEmail}
 Project ID: ${params.projectId}
 
 Brief:
-${briefJson}
+${briefJson}${mediaText}
 
 Pull brief:  GET  ${SITE_URL}/api/admin/projects/${params.projectId}/brief
 Deliver:     POST ${SITE_URL}/api/admin/projects/${params.projectId}/deliver  (x-admin-secret header, body = HTML)`;
