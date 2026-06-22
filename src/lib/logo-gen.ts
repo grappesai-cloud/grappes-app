@@ -365,6 +365,75 @@ function recolorSvgMono(svg: string, hex: string): string {
   return out;
 }
 
+/** Parse a near-white test on an rgb()/hex colour string. Returns true for the
+ *  off-white backplate Recraft draws (all channels >= 235). */
+function isNearWhite(val: string): boolean {
+  const t = val.trim().toLowerCase();
+  let r: number, g: number, b: number;
+  const rgb = /^rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(t);
+  const h6 = /^#?([0-9a-f]{6})$/i.exec(t);
+  if (rgb) { r = +rgb[1]; g = +rgb[2]; b = +rgb[3]; }
+  else if (h6) { const v = parseInt(h6[1], 16); r = (v >> 16) & 0xff; g = (v >> 8) & 0xff; b = v & 0xff; }
+  else if (t === 'white') { r = g = b = 255; }
+  else return false;
+  return r >= 235 && g >= 235 && b >= 235;
+}
+
+/**
+ * Strip the opaque backplate so the logo is transparent (PNG + SVG). Recraft
+ * draws a full-canvas off-white rectangle (as the first <path> or a <rect>) as
+ * the "paper". We remove ONLY elements whose geometry covers the whole viewBox
+ * AND whose fill is near-white — never coloured shapes, and never the smaller
+ * near-white DETAILS inside the mark (those aren't full-canvas).
+ */
+export function stripSvgBackground(svg: string): string {
+  // Canvas size from viewBox (preferred) or width/height.
+  let W = 0, H = 0;
+  const vb = /viewBox\s*=\s*"([-\d.\s]+)"/i.exec(svg);
+  if (vb) { const p = vb[1].trim().split(/[\s,]+/).map(Number); if (p.length === 4) { W = p[2]; H = p[3]; } }
+  if (!W || !H) {
+    const w = /\bwidth\s*=\s*"([\d.]+)"/i.exec(svg); const h = /\bheight\s*=\s*"([\d.]+)"/i.exec(svg);
+    if (w) W = +w[1]; if (h) H = +h[1];
+  }
+  if (!W || !H) return svg; // can't reason about geometry — leave untouched
+  const tol = Math.max(W, H) * 0.02;
+  const near = (v: number, target: number) => Math.abs(v - target) <= tol;
+
+  // True when a path `d` traces the full-canvas rectangle (all vertices on the
+  // outer corners, bounding box ≈ the whole viewBox).
+  const isFullCanvasPath = (d: string): boolean => {
+    const nums = (d.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) || []).map(Number);
+    if (nums.length < 8 || nums.length > 14) return false; // a rect is 4–6 points
+    const xs: number[] = [], ys: number[] = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) { xs.push(nums[i]); ys.push(nums[i + 1]); }
+    const onCorner = xs.every((x, i) => (near(x, 0) || near(x, W)) && (near(ys[i], 0) || near(ys[i], H)));
+    if (!onCorner) return false;
+    const spanX = Math.max(...xs) - Math.min(...xs);
+    const spanY = Math.max(...ys) - Math.min(...ys);
+    return spanX >= W - tol && spanY >= H - tol;
+  };
+
+  let removed = 0;
+  // Remove backplate <path> elements (Recraft emits `<path ...></path>`).
+  let out = svg.replace(/<path\b([^>]*)>(\s*<\/path>)?/gi, (m, attrs) => {
+    const fill = /fill\s*=\s*"([^"]+)"/i.exec(attrs)?.[1] ?? '';
+    const d = /\bd\s*=\s*"([^"]+)"/i.exec(attrs)?.[1] ?? '';
+    if (d && isNearWhite(fill) && isFullCanvasPath(d)) { removed++; return ''; }
+    return m;
+  });
+  // Remove a full-canvas near-white <rect> backplate, if present instead.
+  out = out.replace(/<rect\b([^>]*)\/?>(\s*<\/rect>)?/gi, (m, attrs) => {
+    const fill = /fill\s*=\s*"([^"]+)"/i.exec(attrs)?.[1] ?? '';
+    const x = +(/(?:^|\s)x\s*=\s*"([-\d.]+)"/i.exec(attrs)?.[1] ?? '0');
+    const y = +(/(?:^|\s)y\s*=\s*"([-\d.]+)"/i.exec(attrs)?.[1] ?? '0');
+    const w = +(/(?:^|\s)width\s*=\s*"([-\d.]+)"/i.exec(attrs)?.[1] ?? '0');
+    const h = +(/(?:^|\s)height\s*=\s*"([-\d.]+)"/i.exec(attrs)?.[1] ?? '0');
+    if (isNearWhite(fill) && near(x, 0) && near(y, 0) && w >= W - tol && h >= H - tol) { removed++; return ''; }
+    return m;
+  });
+  return removed > 0 ? out : svg;
+}
+
 /**
  * Render a PNG companion from the generated SVG using sharp. sharp accepts
  * SVG input natively — we size the longest edge to 1024px on a transparent
@@ -391,6 +460,12 @@ export async function generateLogo(input: GenerateLogoInput): Promise<GeneratedL
     console.error("[logo-gen] Recraft generation failed:", e);
     throw e;
   }
+
+  // Transparency: drop the off-white backplate Recraft paints so the SVG + PNG
+  // are transparent. This lets the mark drop cleanly onto any background and
+  // unlocks the reversed/single-colour variants in Brand Book Lab.
+  svg = stripSvgBackground(svg);
+  svgBytes = Buffer.from(svg, "utf8");
 
   // Deterministic color enforcement: when the user explicitly picked a color
   // (Force a specific color), Recraft's soft signal isn't reliable on V4 — so
