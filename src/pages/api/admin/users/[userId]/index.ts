@@ -2,7 +2,7 @@
 // Returns: user row, projects, recent support thread
 
 import type { APIRoute } from 'astro';
-import { createAdminClient } from '../../../../../lib/supabase';
+import { createAdminClient, getPg } from '../../../../../lib/supabase';
 import { verifyAdminSession } from '../../../../../lib/admin-auth';
 import { json } from '../../../../../lib/api-utils';
 
@@ -38,4 +38,30 @@ export const GET: APIRoute = async ({ cookies, params }) => {
     projects: projects ?? [],
     openThread: openThread || null,
   });
+};
+
+// DELETE /api/admin/users/[userId] — remove an account entirely.
+// Deletes the public.users profile first (so its FK to "user" can't block),
+// then the Better-Auth "user" row, which cascades sessions + accounts. If the
+// profile still has content protected by a RESTRICT foreign key, the delete
+// errors cleanly and nothing is removed.
+export const DELETE: APIRoute = async ({ cookies, params }) => {
+  if (!verifyAdminSession(cookies.get('admin_session')?.value)) return json({ error: 'Forbidden' }, 403);
+  const userId = params.userId;
+  if (!userId) return json({ error: 'missing userId' }, 400);
+
+  const sql = getPg();
+  try {
+    await sql`DELETE FROM public.users WHERE id = ${userId}`;
+    const deleted = await sql`DELETE FROM "user" WHERE id = ${userId} RETURNING id`;
+    if (deleted.length === 0) return json({ error: 'User not found' }, 404);
+    return json({ ok: true, deleted: userId });
+  } catch (err) {
+    console.error('[admin/users/delete] failed:', err);
+    const msg = err instanceof Error ? err.message : 'delete failed';
+    if (/foreign key|violates/i.test(msg)) {
+      return json({ error: 'This account still has content (sites, logos, etc.). Remove it first.' }, 409);
+    }
+    return json({ error: msg }, 500);
+  }
 };
