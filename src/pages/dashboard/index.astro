@@ -3,6 +3,8 @@ import Dashboard from '../../layouts/Dashboard.astro';
 import ProductTile from '../../components/ProductTile.astro';
 import { db } from '../../lib/db';
 import { createAdminClient } from '../../lib/supabase';
+import { toolAllowed } from '../../lib/tools';
+import type { CreditKind } from '../../lib/credits';
 
 const authUser = Astro.locals.user!;
 
@@ -46,6 +48,11 @@ try {
 } catch { /* table/columns not migrated yet — tile still renders */ }
 
 const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split('@')[0] ?? '').split(' ')[0];
+
+// Per-user tool access. NULL allowed_tools = full access (legacy + unrestricted).
+const allowedTools = ((dbUser as any)?.allowed_tools ?? null) as string[] | null;
+const can = (key: CreditKind) => toolAllowed(allowedTools, key);
+const anyTool = (['site','reel','social','audit','soc2','brandbook','logo','offer'] as CreditKind[]).some(can);
 
 const sitesIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>`;
 const reelsIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`;
@@ -118,6 +125,7 @@ try {
         <span class="section-label">Your tools</span>
       </div>
       <div class="tile-grid">
+        {can('site') && (
         <ProductTile
           name="Sites"
           tagline="AI-generated websites with custom design. From a brief to a live URL in about 15 minutes."
@@ -127,6 +135,8 @@ try {
           cta="Open Sites"
           accent="#06bfdd"
         />
+        )}
+        {can('reel') && (
         <ProductTile
           name="Reels Lab"
           tagline="Upload an Instagram reel, get a frame-by-frame AI breakdown with hook scores, pacing, and retention insights."
@@ -135,6 +145,8 @@ try {
           meter={`${reelCredits} credit${reelCredits === 1 ? '' : 's'} remaining`}
           cta={reelCredits > 0 ? 'Open Reels' : 'Get credits'}
           accent="#a78bfa"        />
+        )}
+        {can('social') && (
         <ProductTile
           name="Social Lab"
           tagline="Drop photos and videos into a folder. AI writes captions in your voice and posts them to Instagram, TikTok and Facebook on schedule."
@@ -143,6 +155,8 @@ try {
           meter={socialMeter}
           cta="Open Social"
           accent="#f472b6"        />
+        )}
+        {can('audit') && (
         <ProductTile
           name="Audit Lab"
           tagline="Paste a URL, get a 30-second AI audit. Performance, on-page SEO, technical SEO, and content scored 0-100 with concrete fixes."
@@ -151,6 +165,8 @@ try {
           meter={`${auditCredits} audit${auditCredits === 1 ? '' : 's'} remaining`}
           cta={auditCredits > 0 ? 'Run audit' : 'Get credits'}
           accent="#22d3ee"        />
+        )}
+        {can('soc2') && (
         <ProductTile
           name="SOC 2 Lab"
           tagline="Find your SOC 2 gaps before the auditor does. Code audit or an authorized live pentest, mapped to the Trust Service Criteria."
@@ -159,6 +175,8 @@ try {
           meter={`${soc2Credits} credit${soc2Credits === 1 ? '' : 's'} remaining`}
           cta="Open SOC 2"
           accent="#34d399"        />
+        )}
+        {can('brandbook') && (
         <ProductTile
           name="Brand Book Lab"
           tagline="Brand books, AI-built. Visual identity guidelines and editorial documents for your team."
@@ -167,6 +185,8 @@ try {
           meter={bookCount === 0 ? 'No brand books yet' : `${bookCount} brand book${bookCount === 1 ? '' : 's'}`}
           cta={bookCount > 0 ? 'Open Brand Book Lab' : 'New brand book'}
           accent="#f97316"        />
+        )}
+        {can('logo') && (
         <ProductTile
           name="Logo Lab"
           tagline="AI vector logo, instant SVG + PNG. A conversational flow that produces a clean mark in seconds."
@@ -175,6 +195,8 @@ try {
           meter={logoCount === 0 ? 'No logos yet' : `${logoCount} logo${logoCount === 1 ? '' : 's'}`}
           cta={logoCount > 0 ? 'Open Logo Lab' : 'New logo'}
           accent="#a78bfa"        />
+        )}
+        {can('offer') && (
         <ProductTile
           name="Offer Lab"
           tagline="Build a client offer or proposal and export it as a clean Grappes-branded PDF. Services, pricing, and a payment plan in minutes."
@@ -183,6 +205,10 @@ try {
           meter="Draft saved locally"
           cta="New offer"
           accent="#06bfdd"        />
+        )}
+        {!anyTool && (
+          <p style="grid-column:1/-1;color:rgba(255,255,255,0.5);font-size:14px;padding:24px 0;">No tools are enabled on your account yet. Contact your administrator.</p>
+        )}
       </div>
     </section>
   </div>

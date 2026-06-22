@@ -2,6 +2,7 @@
 import { createAdminClient } from '../../lib/supabase';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { timingSafeEqual, randomBytes, createHmac } from 'node:crypto';
+import { TOOLS } from '../../lib/tools';
 
 const ADMIN_SECRET = import.meta.env.ADMIN_SECRET ?? '';
 const COOKIE_NAME  = 'admin_session';
@@ -376,6 +377,46 @@ function fmt(dateStr: string | null | undefined): string {
     .usearch-name { font-size: 14px; font-weight: 500; }
     .usearch-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
 
+    /* Create account card */
+    .create-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 22px; max-width: 760px; }
+    .create-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .create-row input { flex: 1; min-width: 200px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; color: #fff; font-family: inherit; font-size: 14px; padding: 12px 14px; outline: none; transition: border-color 0.15s; }
+    .create-row input:focus { border-color: #06bfdd; }
+    .create-hint { font-size: 12.5px; color: rgba(255,255,255,0.45); margin-bottom: 14px; }
+    .tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-bottom: 16px; }
+    @media (min-width: 720px) { .tool-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    .tool-cell { display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px; }
+    .tool-cell-head { display: flex; align-items: center; gap: 8px; }
+    .tool-cell-head input[type=checkbox] { width: 15px; height: 15px; accent-color: #06bfdd; cursor: pointer; }
+    .tool-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .tool-name { font-size: 13px; font-weight: 500; color: #fff; }
+    .cu-credit { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff; font-family: inherit; font-size: 13px; padding: 7px 10px; outline: none; }
+    .cu-credit:focus { border-color: #06bfdd; }
+    .cu-credit:disabled { opacity: 0.35; }
+    .create-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .cu-sendmail { font-size: 13px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .cu-sendmail input { accent-color: #06bfdd; width: 15px; height: 15px; }
+    .btn-create { background: #06bfdd; color: #0a0a0a; border: none; border-radius: 999px; padding: 12px 26px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+    .btn-create:hover { opacity: 0.85; }
+    .btn-create:disabled { opacity: 0.5; cursor: wait; }
+    #cu-result { margin-top: 16px; }
+    #cu-result[hidden] { display: none; }
+    .cu-ok { background: rgba(110,231,163,0.08); border: 1px solid rgba(110,231,163,0.3); border-radius: 12px; padding: 16px 18px; }
+    .cu-ok h4 { font-size: 14px; color: #6ee7a3; margin-bottom: 10px; }
+    .cu-cred { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+    .cu-cred .k { color: rgba(255,255,255,0.45); width: 72px; }
+    .cu-cred .v { color: #fff; font-family: 'SFMono-Regular', Consolas, monospace; flex: 1; word-break: break-all; }
+    .cu-copy { background: rgba(6,191,221,0.12); color: #06bfdd; border: 1px solid rgba(6,191,221,0.3); border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .cu-err { background: rgba(255,123,123,0.1); border: 1px solid rgba(255,123,123,0.3); color: #ff7b7b; border-radius: 12px; padding: 14px 16px; font-size: 13px; }
+
+    /* Tool access (drawer) */
+    .ta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 6px 0 12px; }
+    .ta-cell { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 11px; font-size: 13px; color: #fff; cursor: pointer; }
+    .ta-cell input { accent-color: #06bfdd; width: 14px; height: 14px; }
+    .ta-cell.disabled { opacity: 0.45; }
+    .ta-full { font-size: 13px; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
+    .ta-full input { accent-color: #06bfdd; width: 15px; height: 15px; }
+
     /* User drawer */
     #user-drawer-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -451,6 +492,35 @@ function fmt(dateStr: string | null | undefined): string {
     <div class="usearch-box">
       <input id="usearch-input" type="text" placeholder="Search users by email or name…" autocomplete="off" />
       <div id="usearch-results" hidden></div>
+    </div>
+
+    <!-- Create account -->
+    <div class="section">
+      <div class="section-title">Create account</div>
+      <div class="create-card">
+        <div class="create-row">
+          <input id="cu-email" type="email" placeholder="person@email.com" autocomplete="off" />
+          <input id="cu-name" type="text" placeholder="Name (optional)" autocomplete="off" />
+        </div>
+        <p class="create-hint">Pick the tools this person sees in their account, and how many uses (credits) of each. A password is generated automatically.</p>
+        <div class="tool-grid">
+          {TOOLS.map((t) => (
+            <label class="tool-cell">
+              <span class="tool-cell-head">
+                <input type="checkbox" class="cu-tool" data-key={t.key} checked />
+                <span class="tool-dot" style={`background:${t.accent}`}></span>
+                <span class="tool-name">{t.label}</span>
+              </span>
+              <input type="number" class="cu-credit" data-key={t.key} min="0" value="0" placeholder="0" title="Credits / uses" />
+            </label>
+          ))}
+        </div>
+        <div class="create-foot">
+          <label class="cu-sendmail"><input id="cu-sendemail" type="checkbox" checked /> Email the login details to the user</label>
+          <button id="cu-submit" class="btn-create">Create account</button>
+        </div>
+        <div id="cu-result" hidden></div>
+      </div>
     </div>
 
     <!-- Stats row -->
@@ -634,6 +704,77 @@ function fmt(dateStr: string | null | undefined): string {
     });
   })();
 
+  // ── Tool catalog (mirrors src/lib/tools.ts) ─────────────────────────────────
+  var TOOLS = [
+    { key: 'site', label: 'Sites' }, { key: 'reel', label: 'Reels Lab' },
+    { key: 'social', label: 'Social Lab' }, { key: 'audit', label: 'Audit Lab' },
+    { key: 'soc2', label: 'SOC 2 Lab' }, { key: 'brandbook', label: 'Brand Book Lab' },
+    { key: 'logo', label: 'Logo Lab' }, { key: 'offer', label: 'Offer Lab' },
+  ];
+
+  // ── Create account ──────────────────────────────────────────────────────────
+  (function () {
+    var btn = document.getElementById('cu-submit');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      var email = (document.getElementById('cu-email').value || '').trim();
+      var name = (document.getElementById('cu-name').value || '').trim();
+      var sendEmail = document.getElementById('cu-sendemail').checked;
+      var result = document.getElementById('cu-result');
+      if (!email) { showCuErr('Enter an email.'); return; }
+
+      var tools = [];
+      document.querySelectorAll('.cu-tool').forEach(function (c) { if (c.checked) tools.push(c.getAttribute('data-key')); });
+      var credits = {};
+      document.querySelectorAll('.cu-credit').forEach(function (i) {
+        var v = parseInt(i.value, 10);
+        if (v > 0) credits[i.getAttribute('data-key')] = v;
+      });
+
+      btn.disabled = true; btn.textContent = 'Creating…';
+      try {
+        var res = await fetch('/api/admin/users/create', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, name: name || undefined, tools: tools, credits: credits, sendEmail: sendEmail }),
+        });
+        var d = await res.json();
+        if (!res.ok) { showCuErr(d.error || 'Failed to create account.'); return; }
+        result.hidden = false;
+        result.innerHTML =
+          '<div class="cu-ok">'
+          + '<h4>✓ Account created' + (d.emailed ? ' · login details emailed' : '') + '</h4>'
+          + '<div class="cu-cred"><span class="k">Email</span><span class="v" id="cu-r-email">' + d.email + '</span>'
+            + '<button class="cu-copy" onclick="cuCopy(\\'cu-r-email\\', this)">Copy</button></div>'
+          + '<div class="cu-cred"><span class="k">Password</span><span class="v" id="cu-r-pass">' + d.password + '</span>'
+            + '<button class="cu-copy" onclick="cuCopy(\\'cu-r-pass\\', this)">Copy</button></div>'
+          + '<p style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:6px;">Shown once. Copy the password now if you are not emailing it.</p>'
+          + '</div>';
+        // Reset the form for the next one.
+        document.getElementById('cu-email').value = '';
+        document.getElementById('cu-name').value = '';
+        document.querySelectorAll('.cu-credit').forEach(function (i) { i.value = '0'; });
+      } catch (e) {
+        showCuErr('Network error.');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Create account';
+      }
+    });
+    function showCuErr(msg) {
+      var result = document.getElementById('cu-result');
+      result.hidden = false;
+      result.innerHTML = '<div class="cu-err">✗ ' + msg + '</div>';
+    }
+  })();
+
+  window.cuCopy = function (id, btn) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(function () {
+      var o = btn.textContent; btn.textContent = 'Copied ✓';
+      setTimeout(function () { btn.textContent = o; }, 1500);
+    });
+  };
+
   // ── User drawer ─────────────────────────────────────────────────────────
   window.closeDrawer = function () {
     var d = document.getElementById('user-drawer');
@@ -667,9 +808,26 @@ function fmt(dateStr: string | null | undefined): string {
               + '</div>'
               + '</div>';
           }).join('');
+
+      // Tool access: null allowed_tools = full access; array = allowlist.
+      var allowed = u.allowed_tools; // null | string[]
+      var isFull = allowed == null;
+      var taHtml = '<div class="drawer-section"><h3>Tool access</h3>'
+        + '<label class="ta-full"><input type="checkbox" id="ta-full" ' + (isFull ? 'checked' : '') + ' onchange="taFullToggle()"> Full access (all tools)</label>'
+        + '<div class="ta-grid">'
+        + TOOLS.map(function (t) {
+            var on = isFull || (allowed && allowed.indexOf(t.key) >= 0);
+            return '<label class="ta-cell ' + (isFull ? 'disabled' : '') + '">'
+              + '<input type="checkbox" class="ta-tool" data-key="' + t.key + '" ' + (on ? 'checked' : '') + ' ' + (isFull ? 'disabled' : '') + '> ' + t.label + '</label>';
+          }).join('')
+        + '</div>'
+        + '<div class="drawer-actions"><button onclick="saveTools(\\'' + userId + '\\')">Save tool access</button></div>'
+        + '</div>';
+
       content.innerHTML =
         '<h2>' + (u.name || u.email) + '</h2>'
         + '<p class="u-email">' + u.email + '</p>'
+        + taHtml
         + '<div class="drawer-section"><h3>Account</h3>'
           + '<div class="kv-row"><span class="k">Plan</span><span>' + (u.plan || 'free') + '</span></div>'
           + '<div class="kv-row"><span class="k">Projects limit</span><span>' + u.projects_limit + '</span></div>'
@@ -726,6 +884,35 @@ function fmt(dateStr: string | null | undefined): string {
     m.textContent = text;
     setTimeout(function () { m.hidden = true; }, 5000);
   }
+
+  // ── Tool access (drawer) ────────────────────────────────────────────────────
+  window.taFullToggle = function () {
+    var full = document.getElementById('ta-full');
+    var on = full && full.checked;
+    document.querySelectorAll('.ta-tool').forEach(function (c) {
+      c.disabled = on;
+      if (on) c.checked = true;
+      c.closest('.ta-cell').classList.toggle('disabled', on);
+    });
+  };
+
+  window.saveTools = async function (userId) {
+    var full = document.getElementById('ta-full');
+    var tools;
+    if (full && full.checked) {
+      tools = null; // full access
+    } else {
+      tools = [];
+      document.querySelectorAll('.ta-tool').forEach(function (c) { if (c.checked) tools.push(c.getAttribute('data-key')); });
+    }
+    var res = await fetch('/api/admin/users/' + userId + '/tools', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tools: tools }),
+    });
+    var d = await res.json();
+    if (res.ok) drawerMsg('✓ Tool access saved' + (tools === null ? ' (full access)' : ' (' + tools.length + ' tools)'), 'success');
+    else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
 
   window.grantEdits = async function (userId, amount) {
     var res = await fetch('/api/admin/users/' + userId + '/grant-edits', {

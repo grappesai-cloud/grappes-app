@@ -3,6 +3,7 @@ import { auth } from './lib/auth';
 import { createAuthClient } from './lib/supabase';
 import { checkRateLimit, getClientIp } from './lib/rate-limit';
 import { e } from './lib/env';
+import { toolForPath, getAllowedTools, toolAllowed } from './lib/tools';
 
 /** Routes that render without any auth/DB dependency. */
 const PUBLIC_PATHS = new Set<string>([
@@ -78,6 +79,24 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const AUTHED_PREFIXES = ['/dashboard', '/soc2', '/audit', '/reels', '/social', '/logo', '/brandbook'];
   if (!isPublic(path) && AUTHED_PREFIXES.some((p) => context.url.pathname.startsWith(p)) && !user) {
     return context.redirect('/sign-in');
+  }
+
+  // Per-user tool access (admin-provisioned allowlist). Only runs for a signed-in
+  // user hitting a tool's page/API; public share routes are exempt via isPublic.
+  // NULL allowlist = full access, so existing users are unaffected.
+  if (user && !isPublic(path)) {
+    const toolKey = toolForPath(path);
+    if (toolKey) {
+      const allowed = await getAllowedTools(user.id);
+      if (!toolAllowed(allowed, toolKey)) {
+        if (path.startsWith('/api/')) {
+          return new Response(JSON.stringify({ error: 'This tool is not enabled for your account.' }), {
+            status: 403, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return context.redirect('/dashboard');
+      }
+    }
   }
 
   // CSRF protection on state-changing requests.

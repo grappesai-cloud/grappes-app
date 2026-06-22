@@ -347,6 +347,53 @@ Open Studio: ${SITE_URL}/dashboard`;
 }
 
 /**
+ * Account credentials email — sent when an admin provisions an account with a
+ * generated password. The recipient signs in with this email + password.
+ */
+export async function sendAccountCredentialsEmail(params: {
+  to: string;
+  name?: string;
+  password: string;
+  tools?: string[];
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const greeting = params.name ? `Welcome, ${escapeHtml(params.name)}.` : 'Your account is ready.';
+  const signInUrl = `${SITE_URL}/sign-in`;
+  const toolsLine = params.tools && params.tools.length
+    ? `<p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Your tools</p>
+       <p style="margin:0 0 24px;">${params.tools.map((t) => escapeHtml(t)).join(' · ')}</p>`
+    : '';
+  const html = wrapEmail(greeting, `
+    <p style="margin:0 0 24px;">An account has been created for you on Grappes Studio. Sign in with the credentials below.</p>
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;width:100%;background:#f7f7f8;border-radius:12px;">
+      <tr><td style="padding:18px 20px;font-size:14px;line-height:1.9;color:#0a0a0a;">
+        <strong style="color:#6b7280;font-weight:600;">Email</strong><br>${escapeHtml(params.to)}<br>
+        <strong style="color:#6b7280;font-weight:600;">Password</strong><br>
+        <span style="font-family:'SFMono-Regular',Consolas,monospace;font-size:15px;letter-spacing:0.02em;">${escapeHtml(params.password)}</span>
+      </td></tr>
+    </table>
+    <p style="margin:8px 0 24px;font-size:13px;color:#9ca3af;">You can change this password anytime from your account settings.</p>
+    ${toolsLine}
+    ${emailBtn(signInUrl, 'Sign in →')}
+  `);
+  const text = `Your Grappes account is ready.
+
+Sign in at ${signInUrl}
+
+Email: ${params.to}
+Password: ${params.password}
+
+You can change this password anytime from your account settings.`;
+
+  return sendPlatformEmail({
+    to: params.to,
+    subject: 'Your Grappes account is ready',
+    html,
+    text,
+    reply_to: 'support@grappes.dev',
+  });
+}
+
+/**
  * Notification email when a site goes live after deployment.
  */
 export async function sendSiteLiveEmail(params: {
