@@ -26,6 +26,8 @@ export const GET: APIRoute = async ({ request, params }) => {
 
   const brief = await db.briefs.findByProjectId(projectId);
   const owner = project.user_id ? await db.users.findById(project.user_id) : null;
+  // Raw, unedited onboarding Q&A — the exact questions + the client's answers.
+  const convo = await db.conversations.findByProjectId(projectId).catch(() => null);
 
   // All media the client uploaded at onboarding (photos, logo, video) — the
   // operator downloads these to build the site by hand.
@@ -60,6 +62,9 @@ export const GET: APIRoute = async ({ request, params }) => {
     clientName: (owner as any)?.name ?? null,
     completeness: brief?.completeness ?? null,
     confirmed: brief?.confirmed ?? null,
+    // Raw onboarding transcript (exact Q&A), unmodified — the source of truth.
+    conversation: (convo?.messages ?? []).map((m: any) => ({ role: m.role, content: m.content, timestamp: m.timestamp })),
+    // Structured/summarized brief — derived from the conversation, lossy.
     brief: brief?.data ?? null,
     assets,
     assetCount: assets.length,

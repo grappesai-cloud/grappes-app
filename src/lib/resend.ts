@@ -406,9 +406,20 @@ export async function sendManualBuildRequestEmail(params: {
   brief: any;
   assetCount?: number;
   assets?: Array<{ type?: string; url: string; filename?: string | null }>;
+  conversation?: Array<{ role: string; content: string }>;
 }): Promise<{ success: boolean; id?: string; error?: string }> {
   const adminEmail = import.meta.env.ADMIN_EMAIL ?? 'grappes.ai@gmail.com';
   const briefJson = JSON.stringify(params.brief ?? {}, null, 2);
+  const convo = (params.conversation ?? []).filter((m) => (m.content ?? '').trim());
+  const convoBlock = convo.length
+    ? `<p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Onboarding — exact Q&amp;A (unedited)</p>
+       <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;width:100%;background:#f7f7f8;border-radius:12px;"><tr><td style="padding:16px 20px;">
+       ${convo.map((m) => {
+         const isUser = m.role === 'user';
+         return `<p style="margin:0 0 12px;"><span style="display:block;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${isUser ? '#2C32FE' : '#9ca3af'};margin-bottom:2px;">${isUser ? 'Client' : 'Question'}</span><span style="color:#0a0a0a;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;">${escapeHtml(m.content)}</span></p>`;
+       }).join('')}
+       </td></tr></table>`
+    : '';
   const assets = params.assets ?? [];
   const assetCount = params.assetCount ?? assets.length;
   const mediaLine = `<br><strong style="color:#6b7280;font-weight:600;">Uploaded media</strong><br>${assetCount} file(s)`;
@@ -427,7 +438,8 @@ export async function sendManualBuildRequestEmail(params: {
         <strong style="color:#6b7280;font-weight:600;">Client</strong><br>${escapeHtml(params.clientEmail)}${mediaLine}
       </td></tr>
     </table>
-    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Brief</p>
+    ${convoBlock}
+    <p style="margin:0 0 8px;color:#0a0a0a;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;">Brief (structured summary)</p>
     <pre style="margin:0;padding:16px;background:#0a0a0a;color:#e5e7eb;border-radius:10px;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;font-family:'SFMono-Regular',Consolas,monospace;">${escapeHtml(briefJson)}</pre>
     ${mediaBlock}
     ${emailBtn(`${SITE_URL}/admin`, 'Open admin →')}
@@ -435,12 +447,15 @@ export async function sendManualBuildRequestEmail(params: {
   const mediaText = assets.length
     ? `\n\nMedia (${assets.length}):\n${assets.map((a) => `- ${a.type || 'file'}${a.filename ? ` (${a.filename})` : ''}: ${a.url}`).join('\n')}`
     : `\n\nMedia: none uploaded.`;
+  const convoText = convo.length
+    ? `\n\nOnboarding — exact Q&A (unedited):\n${convo.map((m) => `${m.role === 'user' ? 'CLIENT' : 'Q'}: ${m.content}`).join('\n\n')}`
+    : '';
   const text = `New site to build: ${params.projectName}
 
 Client: ${params.clientEmail}
-Project ID: ${params.projectId}
+Project ID: ${params.projectId}${convoText}
 
-Brief:
+Brief (structured summary):
 ${briefJson}${mediaText}
 
 Pull brief:  GET  ${SITE_URL}/api/admin/projects/${params.projectId}/brief
