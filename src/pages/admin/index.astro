@@ -417,6 +417,16 @@ function fmt(dateStr: string | null | undefined): string {
     .ta-full { font-size: 13px; color: rgba(255,255,255,0.8); display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer; }
     .ta-full input { accent-color: #06bfdd; width: 15px; height: 15px; }
 
+    /* Per-tool credits (drawer) */
+    .credit-row { display: grid; grid-template-columns: 1fr auto 68px auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .credit-row:last-child { border-bottom: none; }
+    .cr-name { font-size: 13px; color: rgba(255,255,255,0.85); }
+    .cr-bal { font-size: 13px; color: #06bfdd; font-weight: 700; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+    .cr-amt { width: 68px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #fff; font-family: inherit; font-size: 13px; padding: 6px 8px; outline: none; }
+    .cr-amt:focus { border-color: #06bfdd; }
+    .cr-add { background: rgba(6,191,221,0.12); color: #06bfdd; border: 1px solid rgba(6,191,221,0.3); border-radius: 999px; padding: 6px 14px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .cr-add:hover { background: rgba(6,191,221,0.22); }
+
     /* User drawer */
     #user-drawer-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -824,6 +834,20 @@ function fmt(dateStr: string | null | undefined): string {
         + '<div class="drawer-actions"><button onclick="saveTools(\\'' + userId + '\\')">Save tool access</button></div>'
         + '</div>';
 
+      // Per-tool credits: current balance + inline add (negative removes).
+      var creditsHtml = '<div class="drawer-section"><h3>Credits — uses per tool</h3>'
+        + '<p style="font-size:11.5px;color:rgba(255,255,255,0.4);margin-bottom:10px;">Balance shown per tool. Type an amount (negative to remove) and press Add.</p>'
+        + TOOLS.map(function (t) {
+            var bal = u[t.key + '_credits'] || 0;
+            return '<div class="credit-row">'
+              + '<span class="cr-name">' + t.label + '</span>'
+              + '<span class="cr-bal" id="bal-' + t.key + '">' + bal + '</span>'
+              + '<input type="number" class="cr-amt" id="amt-' + t.key + '" value="10">'
+              + '<button class="cr-add" onclick="addCredit(\\'' + userId + '\\', \\'' + t.key + '\\')">Add</button>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+
       content.innerHTML =
         '<h2>' + (u.name || u.email) + '</h2>'
         + '<p class="u-email">' + u.email + '</p>'
@@ -836,23 +860,7 @@ function fmt(dateStr: string | null | undefined): string {
           + '<div class="kv-row"><span class="k">SOC 2 credits</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
           + '<div class="kv-row"><span class="k">Multipage lifetime</span><span>' + (u.multipage_addon_lifetime ? 'Yes' : 'No') + '</span></div>'
         + '</div>'
-        + '<div class="drawer-section"><h3>Credits (per service)</h3>'
-          + '<div class="kv-row"><span class="k">Reels</span><span>' + (u.reel_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Audit</span><span>' + (u.audit_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">SOC 2</span><span>' + (u.soc2_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Logo</span><span>' + (u.logo_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Offer</span><span>' + (u.offer_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Brand Book</span><span>' + (u.brandbook_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Social</span><span>' + (u.social_credits ?? 0) + '</span></div>'
-          + '<div class="kv-row"><span class="k">Site</span><span>' + (u.site_credits ?? 0) + '</span></div>'
-          + '<div style="display:flex;gap:8px;margin-top:12px;align-items:center;">'
-            + '<select id="credit-kind" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:8px 10px;font-family:inherit;font-size:13px;">'
-              + '<option value="reel">Reels</option><option value="audit">Audit</option><option value="soc2">SOC 2</option><option value="logo">Logo</option><option value="offer">Offer</option><option value="brandbook">Brand Book</option><option value="social">Social</option><option value="site">Site</option>'
-            + '</select>'
-            + '<input id="credit-amount" type="number" value="10" style="width:78px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#fff;padding:8px 10px;font-family:inherit;font-size:13px;" />'
-            + '<button onclick="grantCredit(\\''+userId+'\\')" style="background:rgba(6,191,221,0.1);color:#06bfdd;border:1px solid rgba(6,191,221,0.3);border-radius:999px;padding:8px 16px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Grant</button>'
-          + '</div>'
-        + '</div>'
+        + creditsHtml
         + '<div class="drawer-section"><h3>Quick actions</h3>'
           + '<div class="drawer-actions">'
             + '<button onclick="grantEdits(\\''+userId+'\\', 10)">+10 edits</button>'
@@ -941,6 +949,25 @@ function fmt(dateStr: string | null | undefined): string {
     var d = await res.json();
     if (res.ok) drawerMsg('✓ SOC 2 credits → ' + d.soc2_credits, 'success');
     else        drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+  };
+
+  // Add (or remove, if negative) credits for one tool; updates the balance inline.
+  window.addCredit = async function (userId, kind) {
+    var amtEl = document.getElementById('amt-' + kind);
+    var amount = amtEl ? parseInt(amtEl.value, 10) : 0;
+    if (!amount) { drawerMsg('Enter a non-zero amount', 'error'); return; }
+    var res = await fetch('/api/admin/users/' + userId + '/grant-credits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: kind, amount: amount }),
+    });
+    var d = await res.json();
+    if (res.ok) {
+      var bal = document.getElementById('bal-' + kind);
+      if (bal) bal.textContent = d.balance;
+      drawerMsg('✓ ' + kind + ' credits → ' + d.balance, 'success');
+    } else {
+      drawerMsg('✗ ' + (d.error || 'Failed'), 'error');
+    }
   };
 
   // Per-service credit grant (universal endpoint: { kind, amount }).
