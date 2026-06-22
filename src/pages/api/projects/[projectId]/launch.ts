@@ -28,6 +28,7 @@ import {
 } from '../../../../lib/creative-generation';
 import { stripFabricatedSrcset } from '../../../../lib/html-compat';
 import { sendManualBuildRequestEmail } from '../../../../lib/resend';
+import { consumeCredit } from '../../../../lib/credits';
 import { runStructuralQA } from '../../../../lib/structural-qa';
 import { runVisualQAOnContent } from '../../../../lib/visual-qa';
 import { runPostQA } from '../../../../lib/post-qa';
@@ -142,6 +143,11 @@ export const POST: APIRoute = async ({ params, locals }) => {
   const project = await db.projects.findById(params.projectId!);
   if (!project || project.user_id !== user.id) return json({ error: 'Not found' }, 404);
 
+  // A site build is paid with one per-account site credit (granted from admin).
+  // Charge ONCE, on the first build (from onboarding/brief_ready). Re-builds /
+  // edits of an already-built site (generated/failed/live) are free.
+  const firstBuild = project.status === 'onboarding' || project.status === 'brief_ready';
+
   // Rate limit generation attempts per hour (each costs ~$0.10–0.50 in AI)
   // Owner plan: unlimited — skip rate limit entirely
   // Paid plans: 10/hour, Free: 3/hour
@@ -172,12 +178,7 @@ export const POST: APIRoute = async ({ params, locals }) => {
     }
   }
 
-  // Multi-page requires active billing
   const brief = await db.briefs.findByProjectId(params.projectId!);
-  const isMultiPageRequest = brief?.data?.preferences?.websiteType === 'multi-page';
-  if (isMultiPageRequest && project.billing_status !== 'active') {
-    return json({ error: 'Multi-page websites require an active plan. Please upgrade.' }, 403);
-  }
 
   // Brief completeness gate — very thin briefs produce mediocre output
   if (brief && (brief.completeness ?? 0) < 0.3) {
@@ -224,6 +225,21 @@ export const POST: APIRoute = async ({ params, locals }) => {
       }
     } else {
       return json({ error: `Cannot launch from status "${current?.status || project.status}"` }, 409);
+    }
+  }
+
+  // ── Charge one site credit on the first build ────────────────────────────
+  // Per-account credits (granted from admin) are the only gate. If the account
+  // has none, revert the lock and tell the client. Owner-equivalent operator
+  // accounts are not charged.
+  if (firstBuild && !isOwnerEquiv) {
+    const balance = await consumeCredit(user.id, 'site');
+    if (balance === null) {
+      try {
+        await db.projects.updateStatus(params.projectId!, 'brief_ready');
+        await db.projects.updateSubstatus(params.projectId!, null);
+      } catch {}
+      return json({ error: 'No site credits left on this account. Ask your admin to add credits.' }, 402);
     }
   }
 

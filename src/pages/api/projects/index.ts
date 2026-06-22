@@ -60,31 +60,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
       if (!dbUser) return json({ error: 'Failed to create user profile' }, 500);
     }
 
-    // Owner-equivalent users (plan=owner OR extra_edits>=999999) get unlimited
-    // projects — skip both the free-site and projects_limit gates.
-    const isOwnerEquiv = dbUser.plan === 'owner' || (dbUser.extra_edits ?? 0) >= 999999;
-
-    step = 'countFree';
-    if (!isOwnerEquiv && dbUser.plan === 'free') {
-      const freeCount = await db.projects.countFree(user.id);
-      if (freeCount >= 1) {
-        return json(
-          { error: 'You already have a free site. Activate it to create another one.' },
-          403
-        );
-      }
-    }
-
-    step = 'countByUser';
-    if (!isOwnerEquiv) {
-      const count = await db.projects.countByUser(user.id);
-      if (count >= dbUser.projects_limit) {
-        return json(
-          { error: 'Project limit reached. Upgrade your plan to create more projects.' },
-          403
-        );
-      }
-    }
+    // Creating a project (a draft) is free. Access is governed purely by
+    // per-account site credits (granted from admin), charged at build time
+    // (POST /launch) — no legacy free-site / projects_limit / plan gating.
+    const isOwnerEquiv = (dbUser.extra_edits ?? 0) >= 999999;
 
     step = 'slugExists';
     let slug = generateSlug(name);
