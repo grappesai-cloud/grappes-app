@@ -241,7 +241,16 @@ footer .caps{justify-content:center}
 .btn{display:inline-flex;align-items:center;gap:9px;padding:16px 24px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-decoration:none;background:#0e0d0c}
 .btn:hover{background:#fff;color:var(--ink)}
 .btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
-`;
+
+/* PDF / print: the hero uses min-height 88vh for the on-screen viewer. In print
+   media vh resolves against the (very tall) PDF page height, so the hero would
+   balloon to fill the whole document and push everything off the page. Collapse
+   it to content height and make the nav non-sticky for the export. */
+@media print {
+  .hero{min-height:0 !important;padding:80px 0 64px !important}
+  nav{position:static !important}
+  body{overflow:visible !important}
+}`;
 
   const meta = [
     `<span>Identity<b>${esc(doc.industry || 'Brand')}</b></span>`,

@@ -47,6 +47,10 @@ export const GET: APIRoute = async ({ locals, params }) => {
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 45_000 });
     // Google Fonts / @font-face can resolve after networkidle0 — wait for them.
     await page.evaluate(() => (document as any).fonts.ready);
+    // Render in PRINT media so the book's @media print rules (which drop the
+    // `vh`-based hero height) apply BEFORE we measure. Otherwise vh resolves
+    // against the custom PDF page height and the hero balloons to fill the page.
+    await page.emulateMediaType('print');
     const height = await page.evaluate(() =>
       Math.ceil(document.documentElement.scrollHeight),
     );
