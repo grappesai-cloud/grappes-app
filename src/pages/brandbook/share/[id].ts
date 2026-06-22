@@ -4,6 +4,7 @@
 
 import type { APIRoute } from 'astro';
 import { loadBrandBookPublic, toDoc, renderBookHTML } from '../../../lib/brandbook-db';
+import { logoHasTransparency } from '../../../lib/brandbook-logo';
 import { verifyBrandbookShareToken } from '../../../lib/brandbook-share';
 
 export const GET: APIRoute = async ({ params, url }) => {
@@ -16,6 +17,7 @@ export const GET: APIRoute = async ({ params, url }) => {
   const row = await loadBrandBookPublic(id);
   const doc = row && toDoc(row); // no downloads section in the public view
   if (!doc) return new Response('Not found', { status: 404 });
+  doc.logoHasAlpha = await logoHasTransparency(doc.logoUrl);
 
   return new Response(renderBookHTML(row, doc), {
     headers: {

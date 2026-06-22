@@ -6,6 +6,7 @@ import type { APIRoute } from 'astro';
 import { json } from '../../../../lib/api-utils';
 import { checkRateLimit } from '../../../../lib/rate-limit';
 import { loadBrandBook, toDoc, renderBookHTML } from '../../../../lib/brandbook-db';
+import { logoHasTransparency } from '../../../../lib/brandbook-logo';
 import { launchBrowser } from '../../../../lib/browser';
 
 function slugify(s: string): string {
@@ -29,6 +30,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
   const row = await loadBrandBook(params.id as string, user.id);
   const doc = row && toDoc(row);
   if (!doc) return json({ error: 'Brand book not found.' }, 404);
+  doc.logoHasAlpha = await logoHasTransparency(doc.logoUrl);
 
   const html = renderBookHTML(row, doc);
 

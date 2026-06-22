@@ -11,6 +11,7 @@ import { json } from '../../../../lib/api-utils';
 import { checkRateLimit } from '../../../../lib/rate-limit';
 import { loadBrandBook, toDoc } from '../../../../lib/brandbook-db';
 import { renderAllOneHTML } from '../../../../lib/brandbook-allone';
+import { logoHasTransparency } from '../../../../lib/brandbook-logo';
 
 function slugify(s: string): string {
   return (s || 'brand').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -108,6 +109,7 @@ export const GET: APIRoute = async ({ locals, params, url }) => {
   const row = await loadBrandBook(params.id as string, user.id);
   const doc = row && toDoc(row);
   if (!row || !doc) return json({ error: 'Brand book not found.' }, 404);
+  doc.logoHasAlpha = await logoHasTransparency(doc.logoUrl);
 
   const only = url.searchParams.get('only'); // 'logos' | 'fonts' | null
   const zip = new JSZip();
@@ -129,9 +131,13 @@ export const GET: APIRoute = async ({ locals, params, url }) => {
       const ext = extOf(m.src);
       logos.file(`${base}-${m.key}-original.${ext}`, buf); // master (true colours)
       if (ext === 'svg') logos.file(`${base}-${m.key}.svg`, buf);
-      for (const v of variants) {
-        const png = await recolor(buf, v.hex);
-        if (png) logos.file(`${base}-${m.key}-${v.name}.png`, png);
+      // Recolours only make sense for a transparent mark; an opaque source would
+      // fill into a solid block, so we ship only the original for those.
+      if (await logoHasTransparency(m.src)) {
+        for (const v of variants) {
+          const png = await recolor(buf, v.hex);
+          if (png) logos.file(`${base}-${m.key}-${v.name}.png`, png);
+        }
       }
     }
   }

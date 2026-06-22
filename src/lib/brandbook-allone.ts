@@ -31,6 +31,9 @@ export interface AllOneDoc {
   symbolUrl?: string;
   badgeUrl?: string;
   logoIsLight: boolean;
+  /** True when the logo has a real alpha channel (can be recoloured white/ink).
+   *  When false, the mark is opaque and shown as supplied. Defaults to true. */
+  logoHasAlpha?: boolean;
   colors: Array<{ hex: string; label?: string }>;
   fonts: { display: BrandFont; text: BrandFont; mono: BrandFont };
   donts: string[];
@@ -94,6 +97,13 @@ export function renderAllOneHTML(doc: AllOneDoc): string {
 
   const symbol = doc.symbolUrl || doc.logoUrl;
   const badge = doc.badgeUrl;
+
+  // Opaque logos (no alpha) can't be recoloured — a white/ink filter would fill
+  // the whole bounding box. Show them as supplied instead. `mk()` is `mark()`
+  // with that fallback baked in; the renderer uses it everywhere downstream.
+  const opaque = doc.logoHasAlpha === false;
+  const mk = (url: string, variant: 'white' | 'ink' | 'original', cls = '', extra = ''): string =>
+    mark(url, opaque ? 'original' : variant, cls, extra);
 
   const fontFaces = (['display', 'text', 'mono'] as const)
     .map((role) => {
@@ -242,12 +252,12 @@ footer .caps{justify-content:center}
     : '';
 
   const apps = `
-  <div class="app"><div class="canvas" style="padding:14%"><div class="card">${mark(doc.logoUrl, 'white')}<div><div class="ln">${esc(doc.name.toUpperCase())}</div>${doc.industry ? `<div class="ln" style="margin-top:4px">${esc(doc.industry)}</div>` : ''}</div></div></div><div class="cap">Business card</div></div>
-  <div class="app"><div class="canvas" style="background:var(--ink)">${mark(symbol, 'white')}</div><div class="cap">Social avatar</div></div>
-  <div class="app"><div class="canvas" style="background:#0d0d0d">${mark(doc.logoUrl, 'white')}</div><div class="cap">Signage</div></div>
-  <div class="app"><div class="canvas" style="padding:0"><div class="tee">${mark(doc.logoUrl, 'ink')}</div></div><div class="cap">Merch · positive print</div></div>
-  <div class="app"><div class="canvas"><div class="pack"><div class="stripe"></div>${mark(doc.logoUrl, 'white')}</div></div><div class="cap">Packaging</div></div>
-  <div class="app"><div class="canvas" style="background:var(--ink)">${mark(symbol, 'white', '', 'opacity:.16')}</div><div class="cap">Watermark</div></div>`;
+  <div class="app"><div class="canvas" style="padding:14%"><div class="card">${mk(doc.logoUrl, 'white')}<div><div class="ln">${esc(doc.name.toUpperCase())}</div>${doc.industry ? `<div class="ln" style="margin-top:4px">${esc(doc.industry)}</div>` : ''}</div></div></div><div class="cap">Business card</div></div>
+  <div class="app"><div class="canvas" style="background:var(--ink)">${mk(symbol, 'white')}</div><div class="cap">Social avatar</div></div>
+  <div class="app"><div class="canvas" style="background:#0d0d0d">${mk(doc.logoUrl, 'white')}</div><div class="cap">Signage</div></div>
+  <div class="app"><div class="canvas" style="padding:0"><div class="tee">${mk(doc.logoUrl, 'ink')}</div></div><div class="cap">Merch · positive print</div></div>
+  <div class="app"><div class="canvas"><div class="pack"><div class="stripe"></div>${mk(doc.logoUrl, 'white')}</div></div><div class="cap">Packaging</div></div>
+  <div class="app"><div class="canvas" style="background:var(--ink)">${mk(symbol, 'white', '', 'opacity:.16')}</div><div class="cap">Watermark</div></div>`;
 
   const downloads = doc.downloads ? `
 <section id="downloads">
@@ -271,7 +281,7 @@ footer .caps{justify-content:center}
 </nav>
 
 <header class="hero wrap">
-  ${mark(doc.logoUrl, 'white', '', '')}
+  ${mk(doc.logoUrl, 'white', '', '')}
   <div class="tag">${esc(doc.tagline || '')}</div>
   <div class="meta">${meta}</div>
 </header>
@@ -292,15 +302,16 @@ footer .caps{justify-content:center}
   <div class="wrap">
     <div class="eyebrow">02 — The marks</div>
     <h2>The logo system</h2>
-    <p style="margin-bottom:42px">${esc(c.logomark?.[0] || 'One family of marks. Always reproduce from the master files. Never recreate, retype, or redraw.')}</p>
+    <p style="margin-bottom:${opaque ? '20px' : '42px'}">${esc(c.logomark?.[0] || 'One family of marks. Always reproduce from the master files. Never recreate, retype, or redraw.')}</p>
+    ${opaque ? `<p class="caps" style="display:flex;align-items:center;gap:10px;margin-bottom:34px;color:var(--accent);text-transform:none;letter-spacing:.02em;font-size:13px"><span style="font-family:var(--disp)">⚠</span> Shown as supplied. Upload a transparent PNG or SVG to unlock the reversed and single-colour variants.</p>` : ''}
     <div class="grid2" style="margin-bottom:22px">
-      <div><div class="plate dark">${mark(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">Primary · reversed</span><span class="caps">on ink</span></div></div>
-      <div><div class="plate light">${mark(doc.logoUrl, 'ink')}</div><div class="label-row"><span class="caps">Primary · positive</span><span class="caps">on cream</span></div></div>
+      <div><div class="plate dark">${mk(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">${opaque ? 'Primary' : 'Primary · reversed'}</span><span class="caps">on ink</span></div></div>
+      <div><div class="plate light">${mk(doc.logoUrl, 'ink')}</div><div class="label-row"><span class="caps">${opaque ? 'Primary' : 'Primary · positive'}</span><span class="caps">on cream</span></div></div>
     </div>
     <div class="grid3">
-      <div><div class="plate sq" style="background:${accent}">${mark(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">On brand colour</span><span class="caps">accent</span></div></div>
-      <div><div class="plate dark sq">${badge ? mark(badge, 'original') : `<div class="ring">${mark(symbol, 'white')}</div>`}</div><div class="label-row"><span class="caps">Badge</span><span class="caps">avatars</span></div></div>
-      <div><div class="plate dark sq">${mark(symbol, 'white')}</div><div class="label-row"><span class="caps">Symbol</span><span class="caps">app · favicon</span></div></div>
+      <div><div class="plate sq" style="background:${accent}">${mk(doc.logoUrl, 'white')}</div><div class="label-row"><span class="caps">On brand colour</span><span class="caps">accent</span></div></div>
+      <div><div class="plate dark sq">${badge ? mark(badge, 'original') : `<div class="ring">${mk(symbol, 'white')}</div>`}</div><div class="label-row"><span class="caps">Badge</span><span class="caps">avatars</span></div></div>
+      <div><div class="plate dark sq">${mk(symbol, 'white')}</div><div class="label-row"><span class="caps">Symbol</span><span class="caps">app · favicon</span></div></div>
     </div>
   </div>
 </section>
@@ -310,7 +321,7 @@ footer .caps{justify-content:center}
     <div class="eyebrow">03 — Space & scale</div>
     <h2>Give it air</h2>
     <div class="grid2" style="margin-top:34px;align-items:start">
-      <div class="constr"><div class="ruler"></div>${mark(doc.logoUrl, 'white')}</div>
+      <div class="constr"><div class="ruler"></div>${mk(doc.logoUrl, 'white')}</div>
       <div>
         <h3>Clear space</h3>
         <p>${esc(c.clear_space || 'Keep a clear margin around the logo on all four sides equal to the height of the mark. Nothing enters this zone.')}</p>
@@ -386,7 +397,7 @@ footer .caps{justify-content:center}
 ${downloads}
 
 <footer>
-  ${mark(symbol, 'white')}
+  ${mk(symbol, 'white')}
   <div class="caps">${esc(doc.name)} · Brand Book v1.0${doc.tagline ? ' · ' + esc(doc.tagline) : ''}</div>
   <div class="caps" style="margin-top:10px;color:#555">Identity by GRAPPES</div>
 </footer>`;
