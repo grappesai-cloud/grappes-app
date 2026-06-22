@@ -33,10 +33,20 @@ export const GET: APIRoute = async ({ cookies, params }) => {
 
   if (!user) return json({ error: 'User not found' }, 404);
 
+  // Last activity = newest session touch (login / refresh).
+  let lastActive: string | null = null;
+  try {
+    const rows = await getPg()`
+      SELECT MAX(GREATEST(created_at, updated_at)) AS la FROM "session" WHERE user_id = ${userId}
+    ` as Array<{ la: string | null }>;
+    lastActive = rows?.[0]?.la ?? null;
+  } catch { /* session table unavailable — leave null */ }
+
   return json({
     user,
     projects: projects ?? [],
     openThread: openThread || null,
+    lastActive,
   });
 };
 

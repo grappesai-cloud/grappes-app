@@ -1,5 +1,5 @@
 ---
-import { createAdminClient } from '../../lib/supabase';
+import { createAdminClient, getPg } from '../../lib/supabase';
 import { checkRateLimit } from '../../lib/rate-limit';
 import { timingSafeEqual, randomBytes, createHmac } from 'node:crypto';
 import { TOOLS } from '../../lib/tools';
@@ -69,7 +69,6 @@ if (isAuthed) {
     { count: freeDeploymentsLive },
     { count: expiredSites },
     { count: failedCount },
-    { data: usersData },
     { data: projectsData },
     { data: failedData },
   ] = await Promise.all([
@@ -78,10 +77,6 @@ if (isAuthed) {
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'live').eq('billing_status', 'free'),
     client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'expired'),
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
-    client.from('users')
-      .select('id, email, created_at, plan')
-      .order('created_at', { ascending: false })
-      .limit(30),
     client.from('projects')
       .select('id, name, status, billing_status, billing_type, expires_at, preview_url, created_at')
       .order('created_at', { ascending: false })
@@ -92,6 +87,30 @@ if (isAuthed) {
       .order('created_at', { ascending: false }),
   ]);
 
+  // Recent users with total remaining credits + last activity (newest session).
+  // Raw SQL so we can sum the per-tool credit columns and join the auth session
+  // table in one query.
+  try {
+    recentUsers = await getPg()`
+      SELECT u.id, u.email, u.plan, u.created_at,
+        (COALESCE(u.reel_credits,0)+COALESCE(u.audit_credits,0)+COALESCE(u.soc2_credits,0)
+         +COALESCE(u.logo_credits,0)+COALESCE(u.offer_credits,0)+COALESCE(u.brandbook_credits,0)
+         +COALESCE(u.social_credits,0)+COALESCE(u.site_credits,0)) AS total_credits,
+        s.last_active
+      FROM public.users u
+      LEFT JOIN (
+        SELECT user_id, MAX(GREATEST(created_at, updated_at)) AS last_active
+        FROM "session" GROUP BY user_id
+      ) s ON s.user_id = u.id
+      ORDER BY u.created_at DESC
+      LIMIT 30
+    ` as any[];
+  } catch (err) {
+    console.error('[admin] recent users query failed:', err);
+    const { data } = await client.from('users').select('id, email, created_at, plan').order('created_at', { ascending: false }).limit(30);
+    recentUsers = (data ?? []) as any[];
+  }
+
   stats = {
     totalUsers:          totalUsers          ?? 0,
     activeSites:         activeSites         ?? 0,
@@ -100,7 +119,6 @@ if (isAuthed) {
     failedProjects:      failedCount         ?? 0,
   };
 
-  recentUsers    = (usersData   ?? []) as any[];
   allProjects    = (projectsData ?? []) as any[];
   failedProjects = (failedData  ?? []) as any[];
 }
@@ -112,9 +130,20 @@ function billingColor(status: string): string {
   return '#888';
 }
 
-function fmt(dateStr: string | null | undefined): string {
+function fmt(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** "Last active" — relative for recent, absolute date beyond a month. */
+function fmtWhen(d: string | Date | null | undefined): string {
+  if (!d) return 'Never';
+  const dt = new Date(d);
+  const days = Math.floor((Date.now() - dt.getTime()) / 86_400_000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days}d ago`;
+  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 ---
 
@@ -559,27 +588,31 @@ function fmt(dateStr: string | null | undefined): string {
 
     <!-- Recent Users -->
     <div class="section">
-      <div class="section-title">Recent Users (last 30)</div>
+      <div class="section-title">Recent Users (last 30) — click a row to manage</div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Email</th>
               <th>Plan</th>
+              <th>Credits left</th>
+              <th>Last active</th>
               <th>Joined</th>
             </tr>
           </thead>
           <tbody>
             {recentUsers.length === 0 ? (
-              <tr class="empty-row"><td colspan="3">No users found.</td></tr>
+              <tr class="empty-row"><td colspan="5">No users found.</td></tr>
             ) : recentUsers.map((u: any) => (
-              <tr>
+              <tr style="cursor:pointer;" onclick={`openUser('${u.id}')`}>
                 <td>{u.email}</td>
                 <td>
                   <span class={`badge ${u.plan === 'agency' ? 'badge-orange' : u.plan === 'pro' ? 'badge-blue' : u.plan === 'starter' ? 'badge-green' : 'badge-gray'}`}>
                     {u.plan ?? 'free'}
                   </span>
                 </td>
+                <td style="font-weight:700;color:#06bfdd;font-variant-numeric:tabular-nums;">{Number(u.total_credits ?? 0)}</td>
+                <td>{fmtWhen(u.last_active)}</td>
                 <td>{fmt(u.created_at)}</td>
               </tr>
             ))}
@@ -714,6 +747,18 @@ function fmt(dateStr: string | null | undefined): string {
     });
   })();
 
+  // "Last active" formatter (relative for recent, date beyond a month).
+  function fmtWhenJS(d) {
+    if (!d) return 'Never';
+    var dt = new Date(d);
+    if (isNaN(dt.getTime())) return 'Never';
+    var days = Math.floor((Date.now() - dt.getTime()) / 86400000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return days + 'd ago';
+    return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
   // ── Tool catalog (mirrors src/lib/tools.ts) ─────────────────────────────────
   var TOOLS = [
     { key: 'site', label: 'Sites' }, { key: 'reel', label: 'Reels Lab' },
@@ -807,6 +852,7 @@ function fmt(dateStr: string | null | undefined): string {
       if (!res.ok) { content.innerHTML = '<p style="color:#ff7b7b">Failed to load user.</p>'; return; }
       var data = await res.json();
       var u = data.user;
+      var lastActive = data.lastActive;
       var ps = data.projects || [];
       var projectsHtml = ps.length === 0
         ? '<p style="color:rgba(255,255,255,0.4);font-size:12px;">No projects</p>'
@@ -853,6 +899,7 @@ function fmt(dateStr: string | null | undefined): string {
         + '<p class="u-email">' + u.email + '</p>'
         + taHtml
         + '<div class="drawer-section"><h3>Account</h3>'
+          + '<div class="kv-row"><span class="k">Last active</span><span>' + fmtWhenJS(lastActive) + '</span></div>'
           + '<div class="kv-row"><span class="k">Plan</span><span>' + (u.plan || 'free') + '</span></div>'
           + '<div class="kv-row"><span class="k">Projects limit</span><span>' + u.projects_limit + '</span></div>'
           + '<div class="kv-row"><span class="k">Edits used</span><span>' + (u.edits_used ?? 0) + '</span></div>'
