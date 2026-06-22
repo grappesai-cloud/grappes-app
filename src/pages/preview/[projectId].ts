@@ -7,7 +7,7 @@ import type { APIRoute } from 'astro';
 import { createHmac } from 'node:crypto';
 import { db } from '../../lib/db';
 import { buildSiteArchitecture } from '../../lib/generation';
-import { assemblePreviewPage, injectEditModeIntoFullPage, injectWnIds, HTML_KEY_PREFIX, FULL_PAGE_KEY } from '../../lib/html-compat';
+import { assemblePreviewPage, injectEditModeIntoFullPage, injectWnIds, stripFabricatedSrcset, HTML_KEY_PREFIX, FULL_PAGE_KEY } from '../../lib/html-compat';
 import { stripTypescriptFromHtml } from '../../lib/strip-ts';
 
 /** Generate a share token for public preview access */
@@ -56,7 +56,7 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
     const pageHtml = gen.files[pageKey];
     if (pageHtml) {
       // Rewrite relative page hrefs to use ?page= so navigation works in preview
-      const rewritten = rewritePageLinks(pageHtml, params.projectId!);
+      const rewritten = stripFabricatedSrcset(rewritePageLinks(pageHtml, params.projectId!));
       return new Response(rewritten, {
         status: 200,
         headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store, no-cache' },
@@ -169,6 +169,12 @@ function normalizeOldHtml(html: string, projectId: string): string {
   // Replace adsnow.ro backlink with grappes.dev
   html = html.replace(/https:\/\/adsnow\.ro(?=['"])/g, 'https://grappes.dev');
   html = html.replace(/by adsnow\.ro/g, 'by grappes.dev');
+
+  // Drop AI-fabricated responsive srcset variants that 404 against our asset
+  // bucket (only one size per asset is ever stored). Fixes already-generated
+  // sites at serve time — a browser otherwise prefers a 404 srcset candidate
+  // over the working `src`, breaking the hero image (blank-looking desktop).
+  html = stripFabricatedSrcset(html);
 
   // Strip any `<meta http-equiv="Content-Security-Policy">` tag — older
   // generated sites may have a strict CSP meta that blocks eval used by

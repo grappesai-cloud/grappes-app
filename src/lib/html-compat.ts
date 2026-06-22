@@ -84,6 +84,26 @@ export function stripLenisFromHtml(html: string): string {
   return out;
 }
 
+// ─── stripFabricatedSrcset ────────────────────────────────────────────────────
+// AI generators sometimes invent responsive `srcset` variants by mutating the
+// real image filename (e.g. deriving width-suffixed names). We only ever upload
+// ONE size per asset, so those fabricated variant URLs 404. Because a browser
+// prefers a matching `srcset` candidate over `src`, the image renders BROKEN —
+// most visibly the hero, which fills the desktop first screen (the page then
+// "looks blank on desktop" while a stacked mobile layout still reads fine).
+// Strip `srcset`/`sizes` from any <img> (or <source>) whose URL points at our
+// own asset bucket, leaving the working `src`. External imgs are left untouched.
+const ASSET_PATH_RE = /\/(?:grappes\/)?assets\//i;
+export function stripFabricatedSrcset(html: string): string {
+  return html.replace(/<(img|source)\b[^>]*>/gi, (tag) => {
+    if (!/\bsrcset\s*=/i.test(tag)) return tag;
+    if (!ASSET_PATH_RE.test(tag)) return tag; // only touch our own assets
+    return tag
+      .replace(/\s+srcset\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/\s+sizes\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  });
+}
+
 // ─── injectWnIds ────────────────────────────────────────────────────────────
 // Adds stable `data-wn-id` attributes to all editable leaf elements.
 // IDs are short deterministic counters (wn-0001, wn-0002, …).
@@ -803,7 +823,7 @@ export function buildStaticPublishFiles(params: {
   const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${sitemapUrls.join('\n')}\n</urlset>`;
 
   const output: Record<string, string> = {
-    'index.html': fullHtml ?? assemblePreviewPage({ sectionHtmls, arch, editMode: false }),
+    'index.html': stripFabricatedSrcset(fullHtml ?? assemblePreviewPage({ sectionHtmls, arch, editMode: false })),
     'favicon.svg': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="8" fill="${arch.primaryColor ?? '#6366f1'}"/>
   <text x="16" y="22" text-anchor="middle" font-size="18" font-family="sans-serif" fill="white" font-weight="bold">${letter}</text>
@@ -816,7 +836,7 @@ export function buildStaticPublishFiles(params: {
   // Inner pages
   for (const [key, html] of Object.entries(allFiles)) {
     if (key.startsWith(INNER_FULL_KEY_PREFIX) && html) {
-      output[`${key.replace(INNER_FULL_KEY_PREFIX, '')}.html`] = html;
+      output[`${key.replace(INNER_FULL_KEY_PREFIX, '')}.html`] = stripFabricatedSrcset(html);
     }
   }
 

@@ -26,6 +26,7 @@ import {
   GEN_MODEL,
   type AssetData,
 } from '../../../../lib/creative-generation';
+import { stripFabricatedSrcset } from '../../../../lib/html-compat';
 import { runStructuralQA } from '../../../../lib/structural-qa';
 import { runVisualQAOnContent } from '../../../../lib/visual-qa';
 import { runPostQA } from '../../../../lib/post-qa';
@@ -664,6 +665,10 @@ export async function runPipeline(projectId: string, opts: { wasLive?: boolean }
   const existingGen = await db.generatedFiles.findLatest(projectId);
   const version = (existingGen?.version ?? 0) + 1;
 
+  // Drop AI-fabricated responsive srcset variants (they 404 → broken hero on
+  // desktop). We only ever store one size per asset, so `src` is authoritative.
+  html = stripFabricatedSrcset(html);
+
   const files: Record<string, string> = {
     [FULL_PAGE_KEY]: html,
     '__structural-qa.json': JSON.stringify(structuralReport, null, 2),
@@ -674,7 +679,7 @@ export async function runPipeline(projectId: string, opts: { wasLive?: boolean }
   // Store multi-page files
   if (multiPageFiles && multiPageFiles.length >= 1) {
     for (const page of multiPageFiles) {
-      files[`__page__${page.filename}`] = page.html;
+      files[`__page__${page.filename}`] = stripFabricatedSrcset(page.html);
     }
     files['__multipage'] = JSON.stringify(
       multiPageFiles.map(p => ({ slug: p.slug, filename: p.filename, title: p.title }))
