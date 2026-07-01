@@ -255,24 +255,6 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
       color: rgba(255,255,255,0.5); letter-spacing: 0;
     }
 
-    /* ── Top-up chips ────────────────────────────────────────────── */
-    .acc-topup { display: flex; flex-wrap: wrap; gap: 8px; }
-    .acc-chip {
-      display: inline-flex; align-items: center;
-      font-family: inherit; font-size: 12px; font-weight: 600;
-      padding: 8px 14px; border-radius: 999px;
-      background: color-mix(in srgb, var(--c-accent) 10%, transparent);
-      color: var(--c-accent);
-      border: 1px solid color-mix(in srgb, var(--c-accent) 30%, transparent);
-      cursor: pointer; text-decoration: none;
-      transition: all 0.2s;
-    }
-    .acc-chip:hover {
-      background: color-mix(in srgb, var(--c-accent) 18%, transparent);
-      border-color: color-mix(in srgb, var(--c-accent) 50%, transparent);
-      transform: translateY(-1px);
-    }
-
     /* ── Language toggle ────────────────────────────────────────── */
     .acc-lang { display: flex; gap: 8px; }
     .acc-lang-btn {
@@ -287,39 +269,6 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
       background: rgba(6,191,221,0.1); color: #06bfdd;
       border-color: rgba(6,191,221,0.35);
     }
-
-    /* ── Plan cards (multipage) ──────────────────────────────────── */
-    .acc-active-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .acc-active-badge {
-      font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(110,231,163,0.12); color: #6ee7a3;
-      border: 1px solid rgba(110,231,163,0.3);
-    }
-    .acc-active-meta { font-size: 12.5px; color: rgba(255,255,255,0.55); }
-
-    .acc-plan-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 8px;
-    }
-    .acc-plan {
-      display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 12px; padding: 14px 16px;
-      cursor: pointer; transition: all 0.2s;
-      font-family: inherit;
-    }
-    .acc-plan:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
-    .acc-plan:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .acc-plan--featured { background: rgba(6,191,221,0.06); border-color: rgba(6,191,221,0.22); }
-    .acc-plan--featured:hover { background: rgba(6,191,221,0.12); border-color: rgba(6,191,221,0.4); }
-    .acc-plan-name { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.55); }
-    .acc-plan--featured .acc-plan-name { color: rgba(6,191,221,0.85); }
-    .acc-plan-price { font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.025em; }
-    .acc-plan--featured .acc-plan-price { color: #06bfdd; }
-    .acc-plan-unit { font-size: 11.5px; color: rgba(255,255,255,0.45); font-weight: 500; margin-left: 2px; }
 
     .acc-card--danger { border-color: rgba(239,68,68,0.18); }
   </style>
