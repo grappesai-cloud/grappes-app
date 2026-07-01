@@ -15,19 +15,13 @@ const ENV_SPEC: Record<string, { group: string; required: boolean }> = {
   PUBLIC_SUPABASE_URL:       { group: 'Supabase',  required: true },
   PUBLIC_SUPABASE_ANON_KEY:  { group: 'Supabase',  required: true },
   SUPABASE_SERVICE_ROLE_KEY: { group: 'Supabase',  required: true },
-  // Anthropic — required for generation
+  // Anthropic — required for AI features
   ANTHROPIC_API_KEY:         { group: 'Anthropic', required: true },
-  // Vercel — required for deploy flow
-  VERCEL_TOKEN:              { group: 'Vercel',    required: true },
-  VERCEL_TEAM_ID:            { group: 'Vercel',    required: true },
   // GitHub — required for repo creation
   GITHUB_TOKEN:              { group: 'GitHub',    required: true },
   GITHUB_ORG:                { group: 'GitHub',    required: true },
   // Resend — required for transactional email
   RESEND_API_KEY:            { group: 'Resend',    required: true },
-  // Stripe — optional until real payments
-  STRIPE_SECRET_KEY:         { group: 'Stripe',    required: false },
-  STRIPE_WEBHOOK_SECRET:     { group: 'Stripe',    required: false },
   // Sentry — optional, error tracking
   SENTRY_DSN:                { group: 'Sentry',    required: false },
   // Zernio — optional, powers Social Lab (posting + analytics)

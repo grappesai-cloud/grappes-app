@@ -5,7 +5,7 @@ import { createAdminClient } from './supabase';
 // ──────────────────────────────────────────────────────────
 
 export type UserPlan = 'free' | 'starter' | 'pro' | 'agency' | 'owner';
-// DB storage type — includes 'free'. For paid-only contexts use SiteBillingType from site-billing.ts
+// DB storage type — includes 'free'.
 export type SiteBillingType = 'free' | 'monthly' | 'annual' | 'lifetime';
 export type SiteBillingStatus = 'free' | 'active' | 'expired';
 export type ProjectStatus =
@@ -315,16 +315,6 @@ export const db = {
         query = query.in('billing_status', fromStatuses);
       }
       const { error } = await query;
-      if (error) throw error;
-    },
-
-    /** Set 7-day free expiry when a free site goes live */
-    async setFreeExpiry(id: string): Promise<void> {
-      const { getFreeExpiresAt } = await import('./site-billing');
-      const { error } = await getClient()
-        .from('projects')
-        .update({ expires_at: getFreeExpiresAt(), updated_at: now() })
-        .eq('id', id);
       if (error) throw error;
     },
 

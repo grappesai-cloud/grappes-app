@@ -447,9 +447,6 @@ async function svgToPng(svgBytes: Buffer): Promise<Buffer> {
 }
 
 export async function generateLogo(input: GenerateLogoInput): Promise<GeneratedLogo> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN ?? (import.meta as any).env?.BLOB_READ_WRITE_TOKEN;
-  if (!token) throw new Error("BLOB_READ_WRITE_TOKEN not configured");
-
   let svg: string;
   let svgBytes: Buffer;
   try {
@@ -483,12 +480,10 @@ export async function generateLogo(input: GenerateLogoInput): Promise<GeneratedL
   const pngBlob = await put(`${prefix}/logo-${ts}.png`, pngBytes, {
     access: "public",
     contentType: "image/png",
-    token,
   });
   const svgBlob = await put(`${prefix}/logo-${ts}.svg`, svg, {
     access: "public",
     contentType: "image/svg+xml",
-    token,
   });
 
   return {

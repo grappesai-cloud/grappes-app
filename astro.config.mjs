@@ -1,41 +1,17 @@
 import { defineConfig } from 'astro/config';
-import vercel from '@astrojs/vercel';
 import node from '@astrojs/node';
 import react from '@astrojs/react';
 import sentry from '@sentry/astro';
 import tailwindcss from '@tailwindcss/vite';
-import { existsSync } from 'node:fs';
 
-// ffmpeg + ffprobe binaries are loaded by their installer packages via a
-// computed `require(\`@x-installer/${platform}-${arch}/...\`)` call.
-// @vercel/nft can't trace dynamic requires, so we explicitly include the
-// linux-x64 binaries (the ones Vercel serverless functions run on).
-// Only include paths that exist on the build machine — on a local macOS
-// build these don't exist (only darwin-arm64 does), but Vercel installs
-// linux-x64 via optionalDependencies when running on Linux.
-const ffBinaries = [
-  './node_modules/@ffmpeg-installer/linux-x64/ffmpeg',
-  './node_modules/@ffmpeg-installer/linux-x64/package.json',
-  './node_modules/@ffprobe-installer/linux-x64/ffprobe',
-  './node_modules/@ffprobe-installer/linux-x64/package.json',
-].filter((p) => existsSync(p));
-
-// Note: Chromium is NOT bundled. We use @sparticuz/chromium-min, which fetches
-// the headless binary from a remote pack at runtime, keeping the serverless
-// function under Vercel's 250 MB limit (see src/lib/browser.ts).
-
-// DEPLOY_TARGET=node → standalone Node server (Coolify/Hetzner). Default = Vercel.
-const adapter = process.env.DEPLOY_TARGET === 'node'
-  ? node({ mode: 'standalone' })
-  : vercel({
-      maxDuration: 800,
-      includeFiles: ffBinaries,
-    });
+// Standalone Node server (Coolify/Hetzner). Chromium is NOT bundled — we use
+// @sparticuz/chromium-min, which fetches the headless binary at runtime
+// (see src/lib/browser.ts).
 
 export default defineConfig({
   output: 'server',
-  adapter,
-  security: { checkOrigin: false }, // CSRF handled via auth middleware — Astro's checkOrigin breaks Vercel preview URLs
+  adapter: node({ mode: 'standalone' }),
+  security: { checkOrigin: false }, // CSRF handled via auth middleware
 
   server: {
     host: '0.0.0.0',

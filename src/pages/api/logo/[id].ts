@@ -20,13 +20,10 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
     .maybeSingle();
   if (!logo || logo.user_id !== user.id) return json({ error: "Not found" }, 404);
 
-  // Best-effort Blob cleanup — not critical, the row delete is what matters.
-  const token = process.env.BLOB_READ_WRITE_TOKEN ?? (import.meta as any).env?.BLOB_READ_WRITE_TOKEN;
-  if (token) {
-    const urls = [logo.png_url, logo.svg_url].filter(Boolean) as string[];
-    if (urls.length) {
-      try { await del(urls, { token }); } catch (e) { console.warn("[logo delete] blob cleanup failed:", e); }
-    }
+  // Best-effort R2 cleanup — not critical, the row delete is what matters.
+  const urls = [logo.png_url, logo.svg_url].filter(Boolean) as string[];
+  if (urls.length) {
+    try { await del(urls); } catch (e) { console.warn("[logo delete] blob cleanup failed:", e); }
   }
 
   const { error } = await client.from("user_logos").delete().eq("id", params.id);

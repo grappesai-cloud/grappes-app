@@ -507,13 +507,10 @@ Judge the first impression for each viewport shown. Return the JSON now.`,
 /** Upload a base64 JPEG to Blob, return its public URL (undefined on failure). */
 async function uploadShot(b64: string, key: string): Promise<string | undefined> {
   try {
-    const token = process.env.BLOB_READ_WRITE_TOKEN ?? (import.meta as any).env?.BLOB_READ_WRITE_TOKEN;
-    if (!token) return undefined;
     const bytes = Buffer.from(b64.replace(/^data:[^,]+,/, ""), "base64");
     const blob = await put(`audits/${key}.jpg`, bytes, {
       access: "public",
       contentType: "image/jpeg",
-      token,
       addRandomSuffix: true,
     });
     return blob.url;

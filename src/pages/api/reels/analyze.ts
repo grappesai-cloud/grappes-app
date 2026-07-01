@@ -1,18 +1,14 @@
 // Kick off the reel analysis pipeline.
-// Uses @vercel/functions waitUntil so the function returns the id immediately
-// while the pipeline keeps running in the background up to maxDuration.
+// Returns the analysis id immediately and runs the pipeline in the background.
+// On the long-running Node server (Coolify) a detached promise keeps executing
+// after the response is sent, so no serverless waitUntil is needed.
 
 import type { APIRoute } from 'astro';
-import { waitUntil } from '@vercel/functions';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { insertAnalysis, setFailed } from '../../../lib/reels/db';
 import { runAnalysis } from '../../../lib/reels/pipeline';
 import { json } from '../../../lib/api-utils';
-
-// Vercel serverless can run up to 800s on Pro plans — enough for the
-// frame-extraction + Whisper + Claude pipeline.
-export const config = { maxDuration: 800 } as any;
 
 const Body = z.object({
   blobUrl: z.string().url(),
@@ -43,17 +39,16 @@ export const POST: APIRoute = async ({ locals, request }) => {
     return json({ error: 'Could not register analysis.' }, 500);
   }
 
-  // Run the pipeline in the background. waitUntil keeps the function alive
-  // until the promise settles or maxDuration is hit, while the response
-  // returns to the client immediately.
-  waitUntil((async () => {
+  // Run the pipeline in the background (detached). The Node server keeps the
+  // event loop alive, so this keeps running after the response is returned.
+  void (async () => {
     try {
       await runAnalysis(id, blobUrl);
     } catch (e: any) {
       console.error('[reels/analyze] pipeline failed:', e?.message);
       await setFailed(id, e?.message ?? 'Pipeline error');
     }
-  })());
+  })();
 
   return json({ id });
 };
