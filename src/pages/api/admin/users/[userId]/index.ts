@@ -18,10 +18,10 @@ export const GET: APIRoute = async ({ cookies, params }) => {
     { data: openThread },
   ] = await Promise.all([
     client.from('users')
-      .select('id, email, name, plan, projects_limit, extra_edits, edits_used, edits_period_start, multipage_addon, multipage_addon_lifetime, reel_credits, audit_credits, soc2_credits, logo_credits, offer_credits, brandbook_credits, social_credits, site_credits, allowed_tools, marketing_opt_out, email_bounced_at, created_at')
+      .select('id, email, name, plan, projects_limit, extra_edits, edits_used, edits_period_start, reel_credits, audit_credits, soc2_credits, logo_credits, offer_credits, brandbook_credits, social_credits, site_credits, allowed_tools, marketing_opt_out, email_bounced_at, created_at')
       .eq('id', userId).maybeSingle(),
     client.from('projects')
-      .select('id, name, status, billing_status, billing_type, expires_at, preview_url, created_at, updated_at')
+      .select('id, name, status, preview_url, created_at, updated_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     client.from('support_threads')

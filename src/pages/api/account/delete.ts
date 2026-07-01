@@ -20,10 +20,10 @@ export const POST: APIRoute = async ({ locals }) => {
   const client = createAdminClient();
 
   try {
-    // 1. Archive all projects (preserves generated sites briefly for Vercel cleanup)
+    // 1. Archive all projects
     await client
       .from('projects')
-      .update({ status: 'archived', billing_status: 'expired', updated_at: new Date().toISOString() })
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
       .eq('user_id', user.id);
 
     // 2. Delete user-linked data (cascading from user_id foreign keys)

@@ -55,7 +55,7 @@ if (Astro.request.method === 'POST') {
 const isAuthed = verifySessionToken(Astro.cookies.get(COOKIE_NAME)?.value ?? '');
 
 // ── Fetch dashboard data (only if authed) ─────────────────────────────────
-let stats = { totalUsers: 0, activeSites: 0, freeDeploymentsLive: 0, expiredSites: 0, failedProjects: 0 };
+let stats = { totalUsers: 0, liveSites: 0, failedProjects: 0 };
 let recentUsers: any[]    = [];
 let allProjects: any[]    = [];
 let failedProjects: any[] = [];
@@ -65,20 +65,16 @@ if (isAuthed) {
 
   const [
     { count: totalUsers },
-    { count: activeSites },
-    { count: freeDeploymentsLive },
-    { count: expiredSites },
+    { count: liveSites },
     { count: failedCount },
     { data: projectsData },
     { data: failedData },
   ] = await Promise.all([
     client.from('users').select('*', { count: 'exact', head: true }),
-    client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'active'),
-    client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'live').eq('billing_status', 'free'),
-    client.from('projects').select('*', { count: 'exact', head: true }).eq('billing_status', 'expired'),
+    client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'live'),
     client.from('projects').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
     client.from('projects')
-      .select('id, name, status, billing_status, billing_type, expires_at, preview_url, created_at')
+      .select('id, name, status, preview_url, created_at')
       .order('created_at', { ascending: false })
       .limit(50),
     client.from('projects')
@@ -112,22 +108,13 @@ if (isAuthed) {
   }
 
   stats = {
-    totalUsers:          totalUsers          ?? 0,
-    activeSites:         activeSites         ?? 0,
-    freeDeploymentsLive: freeDeploymentsLive ?? 0,
-    expiredSites:        expiredSites        ?? 0,
-    failedProjects:      failedCount         ?? 0,
+    totalUsers:     totalUsers  ?? 0,
+    liveSites:      liveSites   ?? 0,
+    failedProjects: failedCount ?? 0,
   };
 
   allProjects    = (projectsData ?? []) as any[];
   failedProjects = (failedData  ?? []) as any[];
-}
-
-function billingColor(status: string): string {
-  if (status === 'active')  return '#06bfdd';
-  if (status === 'free')    return '#60a5fa';
-  if (status === 'expired') return '#f87171';
-  return '#888';
 }
 
 function fmt(dateStr: string | Date | null | undefined): string {
@@ -569,16 +556,8 @@ function fmtWhen(d: string | Date | null | undefined): string {
         <div class="stat-value default">{stats.totalUsers}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Sites</div>
-        <div class="stat-value green">{stats.activeSites}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Free Live</div>
-        <div class="stat-value blue">{stats.freeDeploymentsLive}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Expired Sites</div>
-        <div class="stat-value red">{stats.expiredSites}</div>
+        <div class="stat-label">Live Sites</div>
+        <div class="stat-value green">{stats.liveSites}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Failed Projects</div>
@@ -630,9 +609,6 @@ function fmtWhen(d: string | Date | null | undefined): string {
             <tr>
               <th>Name</th>
               <th>Status</th>
-              <th>Billing Status</th>
-              <th>Billing Type</th>
-              <th>Expires At</th>
               <th>Preview</th>
             </tr>
           </thead>
@@ -647,14 +623,6 @@ function fmtWhen(d: string | Date | null | undefined): string {
                     {p.status ?? '—'}
                   </span>
                 </td>
-                <td>
-                  <span class={`badge ${p.billing_status === 'active' ? 'badge-green' : p.billing_status === 'free' ? 'badge-blue' : p.billing_status === 'expired' ? 'badge-red' : 'badge-gray'}`}
-                    style={`color:${billingColor(p.billing_status ?? '')};`}>
-                    {p.billing_status ?? '—'}
-                  </span>
-                </td>
-                <td>{p.billing_type ?? '—'}</td>
-                <td>{fmt(p.expires_at)}</td>
                 <td>
                   {p.preview_url ? (
                     <a class="preview-link" href={p.preview_url} target="_blank" rel="noopener noreferrer">↗ View</a>
@@ -859,7 +827,7 @@ function fmtWhen(d: string | Date | null | undefined): string {
         : ps.map(function (p) {
             return '<div class="proj-item">'
               + '<div class="proj-name">' + (p.name || '—') + '</div>'
-              + '<div class="proj-meta">' + p.status + ' · ' + (p.billing_status || 'free') + ' · <code>' + p.id.slice(0, 8) + '</code>'
+              + '<div class="proj-meta">' + p.status + ' · <code>' + p.id.slice(0, 8) + '</code>'
               + (p.status === 'failed' ? ' <button onclick="adminRetry(\''+p.id+'\', this)" style="margin-left:6px;background:rgba(246,197,71,0.15);color:#f6c547;border:1px solid rgba(246,197,71,0.3);font-size:10px;padding:2px 8px;border-radius:999px;cursor:pointer;">Retry</button>' : '')
               + '</div>'
               + '</div>';

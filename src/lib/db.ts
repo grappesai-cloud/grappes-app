@@ -271,52 +271,6 @@ export const db = {
       return count ?? 0;
     },
 
-    /** Count projects with billing_status = 'free' (unactivated, non-archived) for a user */
-    async countFree(userId: string): Promise<number> {
-      const { count, error } = await getClient()
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('billing_status', 'free')
-        .neq('status', 'archived');
-      if (error) throw error;
-      return count ?? 0;
-    },
-
-    /** Count projects with billing_status = 'active' for a user */
-    async countActive(userId: string): Promise<number> {
-      const { count, error } = await getClient()
-        .from('projects')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('billing_status', 'active');
-      if (error) throw error;
-      return count ?? 0;
-    },
-
-    async updateBilling(
-      id: string,
-      data: Partial<Pick<Project,
-        | 'billing_type'
-        | 'billing_status'
-        | 'site_subscription_id'
-        | 'site_payment_intent_id'
-        | 'activated_at'
-        | 'expires_at'
-      >>,
-      /** Only transition if current billing_status is one of these values (prevents race conditions) */
-      fromStatuses?: SiteBillingStatus[]
-    ): Promise<void> {
-      let query = getClient()
-        .from('projects')
-        .update({ ...data, updated_at: now() })
-        .eq('id', id);
-      if (fromStatuses?.length) {
-        query = query.in('billing_status', fromStatuses);
-      }
-      const { error } = await query;
-      if (error) throw error;
-    },
 
     async slugExists(slug: string, userId: string): Promise<boolean> {
       const { data } = await getClient()

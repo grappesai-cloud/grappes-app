@@ -41,7 +41,7 @@ await client.from('support_threads').update({ unread_for_admin: false }).eq('id'
 // Pull latest project for context
 let project: any = null;
 if (thread.project_id) {
-  const { data: p } = await client.from('projects').select('id, name, status, billing_status, expires_at').eq('id', thread.project_id).maybeSingle();
+  const { data: p } = await client.from('projects').select('id, name, status').eq('id', thread.project_id).maybeSingle();
   project = p;
 }
 

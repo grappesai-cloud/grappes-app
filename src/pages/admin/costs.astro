@@ -45,16 +45,6 @@ const maxDaily = Math.max(1e-6, ...dailyValues);
 // Projection to end of month (linear)
 const projectedAnthropic = (anthropicTotal / dayOfMonth) * daysInMonth;
 
-// Stripe activity this month — sum of active projects * price (rough estimate)
-const { data: activations } = await client
-  .from('projects')
-  .select('billing_type, activated_at')
-  .gte('activated_at', monthStart.toISOString())
-  .lt('activated_at', monthEnd.toISOString())
-  .eq('billing_status', 'active');
-const PRICES: Record<string, number> = { monthly: 5, annual: 30, lifetime: 99 };
-const grossRevenue = (activations ?? []).reduce((s, a) => s + (PRICES[a.billing_type as string] ?? 0), 0);
-const stripeFeeEstimate = grossRevenue * 0.029 + (activations?.length ?? 0) * 0.30;
 
 // Resend sends — call Resend API
 let resendSent = 0;
@@ -157,16 +147,6 @@ function prettyType(t: string): string {
         <p class="card-sub">linear extrapolation</p>
       </div>
       <div class="card">
-        <p class="card-label">Gross revenue</p>
-        <p class="card-value aqua">{fmtEur(grossRevenue)}</p>
-        <p class="card-sub">{activations?.length ?? 0} activations</p>
-      </div>
-      <div class="card">
-        <p class="card-label">Stripe fees (est.)</p>
-        <p class="card-value">{fmtEur(stripeFeeEstimate)}</p>
-        <p class="card-sub">2.9% + €0.30/txn</p>
-      </div>
-      <div class="card">
         <p class="card-label">Resend sent</p>
         <p class="card-value">{resendSent}</p>
         <p class="card-sub">{resendError || 'last 100 events'}</p>
@@ -216,31 +196,8 @@ function prettyType(t: string): string {
       )}
     </div>
 
-    <!-- Activations detail -->
-    <div class="section">
-      <h2>Activations this month</h2>
-      {!activations || activations.length === 0 ? (
-        <p class="note">No new activations this month.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr><th>Billing type</th><th>Count</th><th>Revenue</th></tr>
-          </thead>
-          <tbody>
-            {(['monthly', 'annual', 'lifetime'] as const).map(b => {
-              const count = activations.filter(a => a.billing_type === b).length;
-              const rev = count * (PRICES[b] ?? 0);
-              return (
-                <tr><td style="text-transform:capitalize;">{b}</td><td>{count}</td><td>{fmtEur(rev)}</td></tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-    </div>
-
     <p class="note">
-      ⚠️ <span class="warn">Note:</span> Vercel build minutes + Resend transactional costs not aggregated here — check their dashboards directly. Stripe fees are an estimate at 2.9% + €0.30/txn (actual may vary by card type/country).
+      ⚠️ <span class="warn">Note:</span> Resend transactional costs not aggregated here — check the Resend dashboard directly.
     </p>
   </div>
 </body>
