@@ -6,7 +6,6 @@ import { createAdminClient } from '../../lib/supabase';
 const authUser = Astro.locals.user!;
 const dbUser = await db.users.findById(authUser.id);
 const auditCredits = dbUser?.audit_credits ?? 0;
-const justPurchased = Astro.url.searchParams.get('credits_purchased') === '1';
 
 // Last 8 audits for this user
 const client = createAdminClient();
@@ -60,12 +59,6 @@ function timeAgo(dateStr: string): string {
     </p>
   </div>
 
-  {justPurchased && (
-    <div style="max-width:620px;margin:0 auto 18px;background:rgba(110,231,163,0.08);border:1px solid rgba(110,231,163,0.28);border-radius:14px;padding:12px 18px;color:#6ee7a3;font-size:13.5px;text-align:center;">
-      ✓ Payment received. Your credits are ready.
-    </div>
-  )}
-
   <form id="audit-form" style="max-width:620px;margin:0 auto 40px;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
       <input
@@ -81,7 +74,7 @@ function timeAgo(dateStr: string): string {
         id="audit-submit"
         style="height:50px;padding:0 28px;background:#22d3ee;color:#0a0a0a;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;letter-spacing:0.02em;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px;"
       >
-        <span id="audit-submit-label">{auditCredits > 0 ? 'Run audit' : 'Buy credits'}</span>
+        <span id="audit-submit-label">Run audit</span>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
     </div>
@@ -114,12 +107,9 @@ function timeAgo(dateStr: string): string {
   <div style="max-width:760px;margin:0 auto;">
     {auditCredits === 0 && (
       <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.22);border-radius:14px;padding:22px;text-align:center;margin-bottom:24px;">
-        <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0 0 12px;line-height:1.5;">
-          Out of credits? Grab a pack to keep auditing.
+        <p style="font-size:14px;color:rgba(255,255,255,0.7);margin:0;line-height:1.5;">
+          You're out of audit credits. Contact your administrator to top up your balance.
         </p>
-        <button type="button" id="buy-audit-credits-btn" style="display:inline-flex;align-items:center;gap:8px;background:#22d3ee;color:#0a0a0a;border:none;border-radius:999px;padding:10px 22px;font-size:13px;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:inherit;">
-          <span>Buy 10 audits, €20</span>
-        </button>
       </div>
     )}
 
@@ -182,7 +172,6 @@ function timeAgo(dateStr: string): string {
     const submitBtn = document.getElementById('audit-submit');
     const progress = document.getElementById('audit-progress');
     const errorEl = document.getElementById('audit-error');
-    const buyBtn = document.getElementById('buy-audit-credits-btn');
     const goalInput = document.getElementById('audit-goal');
     const goalCards = document.querySelectorAll('.goal-card');
 
@@ -194,23 +183,11 @@ function timeAgo(dateStr: string): string {
       });
     });
 
-    async function buyCredits(btn) {
-      btn.disabled = true;
-      try {
-        const r = await fetch('/api/billing/buy-audit-credits', { method: 'POST' });
-        const data = await r.json();
-        if (data.url) { window.location.href = data.url; return; }
-        alert(data.error || 'Payment error.');
-      } catch { alert('Network error.'); }
-      btn.disabled = false;
-    }
-
-    buyBtn?.addEventListener('click', function() { buyCredits(this); });
-
     form?.addEventListener('submit', async function(ev) {
       ev.preventDefault();
       if (!hasCredits) {
-        buyCredits(submitBtn);
+        errorEl.textContent = 'You have no audit credits. Ask your admin to add credits.';
+        errorEl.style.display = 'block';
         return;
       }
       errorEl.style.display = 'none';

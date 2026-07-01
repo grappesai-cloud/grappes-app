@@ -2,7 +2,6 @@
 import OnboardingChat from '../../../components/islands/OnboardingChat.astro';
 import StatusBadge from '../../../components/StatusBadge.astro';
 import { db } from '../../../lib/db';
-import { getSitePrice } from '../../../lib/site-billing';
 import { generateShareToken } from '../../preview/[projectId]';
 
 const { id } = Astro.params;
@@ -11,7 +10,6 @@ const authUser = Astro.locals.user!;
 const project = await db.projects.findById(id!);
 if (!project || project.user_id !== authUser.id) return Astro.redirect('/dashboard');
 
-const justActivated = new URL(Astro.request.url).searchParams.get('activated') === '1';
 
 const [brief, conversation, deployments] = await Promise.all([
   db.briefs.findByProjectId(id!),
@@ -36,25 +34,7 @@ const shareToken = generateShareToken(id!);
 const siteUrl = import.meta.env.SITE ?? import.meta.env.PUBLIC_SITE_URL ?? 'https://grappes.dev';
 const sharePreviewUrl = `${siteUrl}/preview/${id}?token=${shareToken}`;
 
-// ── Billing status ──────────────────────────────────────────────────────────
-const billingStatus = project.billing_status ?? 'free';
-const isBillingActive = billingStatus === 'active';
-const isFreeSite      = billingStatus === 'free';
-const isExpiredSite   = billingStatus === 'expired';
-const showActivate    = (isFreeSite || isExpiredSite) && hasPreview;
 const isBrandingRemoved = !!(project as any).branding_removed;
-
-const expiresAt = project.expires_at ? new Date(project.expires_at) : null;
-const daysRemaining = expiresAt
-  ? Math.max(0, Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000))
-  : null;
-
-// Prices for activation modal
-const activatePrices = {
-  monthly:  getSitePrice('monthly'),
-  annual:   getSitePrice('annual'),
-  lifetime: getSitePrice('lifetime'),
-};
 
 const previewUrl = `/preview/${project.id}`;
 
@@ -946,22 +926,6 @@ if (hasPreview) {
         {hasPreview && (
           <button class="topbar-btn topbar-btn--share" onclick={`navigator.clipboard.writeText('${sharePreviewUrl}').then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Share preview'},1500)})`}>Share preview</button>
         )}
-        {/* Billing status badge */}
-        {isBillingActive && (
-          <span class="billing-badge billing-badge--active">✓ Activ</span>
-        )}
-        {isFreeSite && daysRemaining !== null && isLive && (
-          <span class={`billing-badge ${daysRemaining <= 2 ? 'billing-badge--warn' : 'billing-badge--free'}`}>
-            {daysRemaining > 0 ? `${daysRemaining}d free` : 'Expired'}
-          </span>
-        )}
-        {isExpiredSite && (
-          <span class="billing-badge billing-badge--expired">Expired</span>
-        )}
-
-        {hasPreview && !isBillingActive && (
-          <button class="topbar-btn topbar-btn--activate" id="activate-btn">Subscribe &amp; publish</button>
-        )}
         {canLaunch && !isLaunching && !hasPreview && (
           <button class={`topbar-btn topbar-btn--primary ${isBriefReady ? 'topbar-btn--ready' : ''}`} id="launch-btn">
             {isFailed ? 'Retry →' : 'Generate ✦'}
@@ -1020,35 +984,6 @@ if (hasPreview) {
             <div class="live-dot"></div>
             <span>Live:</span>
             <a href={project.preview_url} target="_blank" class="live-url">{project.preview_url} ↗</a>
-          </div>
-        )}
-
-        {/* Custom domain strip — only for active paid sites */}
-        {isLive && isBillingActive && (
-          <div class="domain-strip" id="domain-strip">
-            {project.custom_domain ? (
-              <div class="domain-set">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span class="domain-set-name">{project.custom_domain}</span>
-                {project.domain_verified
-                  ? <span class="domain-verified-badge">✓ Verified</span>
-                  : <span class="domain-pending-badge">⏳ Pending</span>
-                }
-                <button class="domain-remove-btn" id="domain-remove-btn" title="Remove domain">×</button>
-              </div>
-            ) : (
-              <div class="domain-actions">
-                <button class="domain-add-btn" id="domain-add-btn">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                  I already have a domain
-                </button>
-                <span class="domain-or">or</span>
-                <button class="domain-buy-btn" id="domain-buy-btn">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                  Buy a new domain
-                </button>
-              </div>
-            )}
           </div>
         )}
 
@@ -1296,47 +1231,6 @@ if (hasPreview) {
     </div>
   </div>
 
-  <!-- Activate modal -->
-  <div id="activate-modal">
-    <div class="activate-backdrop" id="activate-backdrop"></div>
-    <div class="activate-dialog">
-      <p class="activate-title">Activate your site</p>
-      <p class="activate-sub">Choose a plan — your site stays live and editable.</p>
-      <div class="activate-plans">
-        <div class="activate-plan" data-billing="monthly">
-          <div class="ap-left">
-            <span class="ap-name">Monthly</span>
-            <span class="ap-desc">Automatic monthly renewal</span>
-          </div>
-          <div class="ap-right">
-            <span class="ap-price">{activatePrices.monthly}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /mo</span></span>
-          </div>
-        </div>
-        <div class="activate-plan highlight" data-billing="annual">
-          <div class="ap-left">
-            <span class="ap-name">Annual ★</span>
-            <span class="ap-desc">Best price — a full year</span>
-          </div>
-          <div class="ap-right">
-            <span class="ap-price">{activatePrices.annual}€<span style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.4)"> /yr</span></span>
-          </div>
-        </div>
-        <div class="activate-plan" data-billing="lifetime">
-          <div class="ap-left">
-            <span class="ap-name">Lifetime</span>
-            <span class="ap-desc">Pay once, forever</span>
-          </div>
-          <div class="ap-right">
-            <span class="ap-price">{activatePrices.lifetime}€</span>
-          </div>
-        </div>
-      </div>
-      <p class="activate-loading" id="activate-loading">Redirecting to Stripe...</p>
-    </div>
-  </div>
-
-  <!-- Activated success banner -->
-  <div id="activated-banner">✓ Site activated successfully!</div>
 
   <!-- QA report modal -->
   <div id="qa-report-modal">
@@ -1351,77 +1245,6 @@ if (hasPreview) {
       </div>
       <div id="qa-issues-list"></div>
       <p style="text-align:center;margin-top:16px;"><a href="#" id="qa-report-close" style="color:rgba(255,255,255,0.4);font-size:13px;text-decoration:none;">Close</a></p>
-    </div>
-  </div>
-
-  <!-- Iteration limit reached modal -->
-  <div id="iter-limit-modal" style="display:none;">
-    <div class="activate-backdrop" id="iter-limit-backdrop"></div>
-    <div class="activate-dialog">
-      <p class="activate-title">You've used all 20 iterations</p>
-      <p class="activate-sub">This project has used its included AI editing budget. Buy +10 more iterations to keep editing.</p>
-      <div class="activate-plans">
-        <div class="activate-plan highlight" id="iter-buy-pack" style="cursor:pointer;">
-          <div class="ap-left">
-            <span class="ap-name">+10 iterations</span>
-            <span class="ap-desc">Added to this project — instant</span>
-          </div>
-          <div class="ap-right">
-            <span class="ap-price">$5</span>
-          </div>
-        </div>
-      </div>
-      <p class="activate-loading" id="iter-loading" style="display:none;">Redirecting to Stripe...</p>
-      <p style="text-align:center;margin-top:16px;"><a href="#" id="iter-limit-close" style="color:rgba(255,255,255,0.4);font-size:13px;text-decoration:none;">Close</a></p>
-    </div>
-  </div>
-
-  <!-- Domain modal -->
-  <div id="domain-modal">
-    <div class="domain-backdrop" id="domain-backdrop"></div>
-    <div class="domain-dialog">
-      <p class="domain-modal-title">Add custom domain</p>
-      <p class="domain-modal-sub">Enter your domain (e.g. <code>yourdomain.com</code> or <code>www.yourdomain.com</code>).</p>
-      <input class="domain-input" id="domain-input" type="text" placeholder="yourdomain.com" autocomplete="off" spellcheck="false" />
-      <div id="domain-modal-error" class="domain-modal-error" hidden></div>
-      <button class="domain-modal-btn" id="domain-modal-save">Save domain</button>
-
-      <div id="domain-ns-section" hidden>
-        <p class="domain-ns-title">Change your domain's nameservers at your registrar:</p>
-        <div class="domain-ns-list">
-          <div class="domain-ns-item">
-            <code>ns1.vercel-dns.com</code>
-            <button class="domain-ns-copy" data-value="ns1.vercel-dns.com">Copy</button>
-          </div>
-          <div class="domain-ns-item">
-            <code>ns2.vercel-dns.com</code>
-            <button class="domain-ns-copy" data-value="ns2.vercel-dns.com">Copy</button>
-          </div>
-        </div>
-        <p class="domain-ns-note">After you change the nameservers, DNS propagation can take 24–48h. Your site will be reachable on the custom domain once Vercel verifies the domain.</p>
-        <button class="domain-modal-close-btn" id="domain-modal-close">Got it, close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Buy domain modal -->
-  <div id="buy-domain-modal">
-    <div class="buy-domain-backdrop" id="buy-domain-backdrop"></div>
-    <div class="buy-domain-dialog">
-      <p class="buy-domain-title">Buy a new domain</p>
-      <p class="buy-domain-sub">Check availability and buy directly through the platform.</p>
-
-      <div class="buy-domain-search">
-        <input class="buy-domain-input" id="buy-domain-input" type="text" placeholder="example.com" autocomplete="off" spellcheck="false" />
-        <button class="buy-domain-check-btn" id="buy-domain-check-btn">Check</button>
-      </div>
-
-      <div id="buy-domain-result" hidden>
-        <!-- filled by JS -->
-      </div>
-
-      <div id="buy-domain-error" class="buy-domain-error" hidden></div>
-      <div id="buy-domain-success" class="buy-domain-success" hidden></div>
     </div>
   </div>
 
@@ -1662,7 +1485,7 @@ if (hasPreview) {
     }
   </style>
 
-  <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, previewUrl, justActivated, showActivate, serverSectionIds }}>
+  <script define:vars={{ projectId: id, isLaunching, isLive, isGenerated, hasPreview, previewUrl, serverSectionIds }}>
     // LANGUAGE (forced to English)
     const _lang = 'en';
     document.querySelectorAll('.edit-suggestion[data-msg-en]').forEach(btn => {
@@ -1673,7 +1496,6 @@ if (hasPreview) {
     // EDIT QUOTA — load on mount and update UI
     const quotaBar   = document.getElementById('edit-quota-bar');
     const quotaLabel = document.getElementById('quota-label');
-    const buyBtn     = document.getElementById('buy-edits-btn');
 
     async function loadQuota() {
       try {
@@ -1703,138 +1525,15 @@ if (hasPreview) {
         if (remaining <= 0) {
           quotaLabel.textContent = '0 iterations left';
           quotaLabel.className = 'quota-label empty';
-          if (buyBtn) buyBtn.style.display = 'inline';
         } else {
           quotaLabel.textContent = `${remaining} / ${quota} iterations left`;
           quotaLabel.className = `quota-label${remaining <= 2 ? ' warn' : ''}`;
-          if (buyBtn) buyBtn.style.display = remaining <= 3 ? 'inline' : 'none';
         }
       }
-    }
-
-    if (buyBtn) {
-      buyBtn.textContent = '+10 iterations · $5';
-      buyBtn.addEventListener('click', async e => {
-        e.preventDefault();
-        buyBtn.textContent = '...';
-        try {
-          const res  = await fetch('/api/billing/buy-iterations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId }),
-          });
-          const data = await res.json();
-          if (data.url) window.location.href = data.url;
-          else alert(data.error || 'Stripe not configured yet.');
-        } catch {
-          alert('Error. Try again.');
-        }
-        buyBtn.textContent = '+10 iterations · $5';
-      });
     }
 
     if (hasPreview) loadQuota();
 
-    // ACTIVATE MODAL
-    const activateModal    = document.getElementById('activate-modal');
-    const activateBackdrop = document.getElementById('activate-backdrop');
-    const activateLoading  = document.getElementById('activate-loading');
-    const activatedBanner  = document.getElementById('activated-banner');
-
-    document.getElementById('activate-btn')?.addEventListener('click', () => {
-      if (activateModal) { activateModal.style.display = 'flex'; activateModal.classList.add('open'); }
-    });
-
-    // Auto-open activation modal when arriving from /expired (?renew=1)
-    if (new URLSearchParams(window.location.search).get('renew') === '1' && activateModal) {
-      activateModal.style.display = 'flex';
-      activateModal.classList.add('open');
-      // clean the URL so a refresh doesn't reopen it
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    activateBackdrop?.addEventListener('click', () => {
-      if (activateModal) { activateModal.style.display = 'none'; activateModal.classList.remove('open'); }
-    });
-
-    document.querySelectorAll('.activate-plan').forEach(plan => {
-      plan.addEventListener('click', async () => {
-        const billingType = plan.dataset.billing;
-        if (!billingType) return;
-        if (activateLoading) activateLoading.style.display = 'block';
-        document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = 'none');
-        try {
-          const res  = await fetch('/api/billing/activate-site', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId, billingType }),
-          });
-          const data = await res.json();
-          if (data.url) {
-            window.location.href = data.url;
-          } else {
-            alert(data.error || 'Error creating Stripe session.');
-            if (activateLoading) activateLoading.style.display = 'none';
-            document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
-          }
-        } catch {
-          alert('Network error. Please try again.');
-          if (activateLoading) activateLoading.style.display = 'none';
-          document.querySelectorAll('.activate-plan').forEach(p => p.style.pointerEvents = '');
-        }
-      });
-    });
-
-    // Show success banner if redirected back after activation
-    if (justActivated && activatedBanner) {
-      activatedBanner.style.display = 'block';
-      setTimeout(() => { activatedBanner.style.display = 'none'; }, 4000);
-    }
-
-    // ── Iteration-limit modal (buy +10 iterations / $5) ────────────────────
-    const iterLimitModal    = document.getElementById('iter-limit-modal');
-    const iterLimitBackdrop = document.getElementById('iter-limit-backdrop');
-    const iterLimitClose    = document.getElementById('iter-limit-close');
-    const iterBuyPack       = document.getElementById('iter-buy-pack');
-    const iterLoading       = document.getElementById('iter-loading');
-    const closeIterModal = () => {
-      if (iterLimitModal) { iterLimitModal.style.display = 'none'; iterLimitModal.classList.remove('open'); }
-    };
-    iterLimitBackdrop?.addEventListener('click', closeIterModal);
-    iterLimitClose?.addEventListener('click', e => { e.preventDefault(); closeIterModal(); });
-    iterBuyPack?.addEventListener('click', async () => {
-      if (iterLoading) iterLoading.style.display = 'block';
-      iterBuyPack.style.pointerEvents = 'none';
-      try {
-        const res  = await fetch('/api/billing/buy-iterations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId }),
-        });
-        const data = await res.json();
-        if (data.url) window.location.href = data.url;
-        else { alert(data.error || 'Stripe not configured.'); if (iterLoading) iterLoading.style.display = 'none'; iterBuyPack.style.pointerEvents = ''; }
-      } catch {
-        alert('Network error. Please try again.');
-        if (iterLoading) iterLoading.style.display = 'none';
-        iterBuyPack.style.pointerEvents = '';
-      }
-    });
-
-    // Refresh quota counter after returning from Stripe ($5 pack purchase)
-    if (new URLSearchParams(window.location.search).get('iterations_bought') === '1') {
-      window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(loadQuota, 500); // give webhook a moment to land
-    }
-
-    // Show banner after domain purchase redirect
-    if (new URLSearchParams(window.location.search).get('domain_purchased') === '1') {
-      const b = document.createElement('div');
-      b.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:200;backdrop-filter:blur(10px);';
-      b.textContent = '✓ Domain purchased! It will be active in a few minutes.';
-      document.body.appendChild(b);
-      setTimeout(() => b.remove(), 5000);
-      window.history.replaceState({}, '', `/dashboard/${projectId}`);
-    }
 
     // VIEWPORT TOGGLES (panel sidebar)
 
@@ -1972,183 +1671,6 @@ if (hasPreview) {
         .catch(() => {});
     }
 
-    // CUSTOM DOMAIN
-    const domainModal    = document.getElementById('domain-modal');
-    const domainBackdrop = document.getElementById('domain-backdrop');
-    const domainInput    = /** @type {HTMLInputElement|null} */ (document.getElementById('domain-input'));
-    const domainSaveBtn  = /** @type {HTMLButtonElement|null} */ (document.getElementById('domain-modal-save'));
-    const domainErrEl    = document.getElementById('domain-modal-error');
-    const domainNsSection = document.getElementById('domain-ns-section');
-    const domainCloseBtn = document.getElementById('domain-modal-close');
-
-    document.getElementById('domain-add-btn')?.addEventListener('click', () => {
-      if (domainModal) domainModal.classList.add('open');
-      if (domainNsSection) domainNsSection.hidden = true;
-      if (domainErrEl) { domainErrEl.hidden = true; }
-      if (domainInput) domainInput.value = '';
-      setTimeout(() => domainInput?.focus(), 100);
-    });
-
-    domainBackdrop?.addEventListener('click', () => domainModal?.classList.remove('open'));
-    domainCloseBtn?.addEventListener('click', () => domainModal?.classList.remove('open'));
-
-    domainSaveBtn?.addEventListener('click', async () => {
-      const domain = domainInput?.value.trim();
-      if (!domain) return;
-      domainSaveBtn.disabled = true;
-      domainSaveBtn.textContent = 'Saving...';
-      if (domainErrEl) domainErrEl.hidden = true;
-
-      try {
-        const res  = await fetch(`/api/projects/${projectId}/domain`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ domain }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          if (domainErrEl) { domainErrEl.textContent = data.error || 'Error. Please try again.'; domainErrEl.hidden = false; }
-        } else {
-          // Hide form, show nameservers
-          domainSaveBtn.style.display = 'none';
-          if (domainInput) domainInput.style.display = 'none';
-          if (domainNsSection) domainNsSection.hidden = false;
-        }
-      } catch {
-        if (domainErrEl) { domainErrEl.textContent = 'Network error. Please try again.'; domainErrEl.hidden = false; }
-      }
-      domainSaveBtn.disabled = false;
-      domainSaveBtn.textContent = 'Save domain';
-    });
-
-    // Copy nameserver buttons
-    document.querySelectorAll('.domain-ns-copy').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const val = btn.dataset.value ?? '';
-        navigator.clipboard.writeText(val).then(() => {
-          btn.textContent = 'Copiat ✓';
-          setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
-        });
-      });
-    });
-
-    // Remove domain
-    document.getElementById('domain-remove-btn')?.addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to delete the custom domain?')) return;
-      await fetch(`/api/projects/${projectId}/domain`, { method: 'DELETE' });
-      window.location.reload();
-    });
-
-    // BUY DOMAIN MODAL
-    const buyDomainModal    = document.getElementById('buy-domain-modal');
-    const buyDomainBackdrop = document.getElementById('buy-domain-backdrop');
-    const buyDomainInput    = /** @type {HTMLInputElement|null} */ (document.getElementById('buy-domain-input'));
-    const buyDomainCheckBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('buy-domain-check-btn'));
-    const buyDomainResult   = document.getElementById('buy-domain-result');
-    const buyDomainError    = document.getElementById('buy-domain-error');
-    const buyDomainSuccess  = document.getElementById('buy-domain-success');
-
-    document.getElementById('domain-buy-btn')?.addEventListener('click', () => {
-      buyDomainModal?.classList.add('open');
-      if (buyDomainResult) { buyDomainResult.hidden = true; buyDomainResult.innerHTML = ''; }
-      if (buyDomainError)  { buyDomainError.hidden = true; }
-      if (buyDomainSuccess){ buyDomainSuccess.hidden = true; }
-      if (buyDomainInput)  buyDomainInput.value = '';
-      setTimeout(() => buyDomainInput?.focus(), 100);
-    });
-    buyDomainBackdrop?.addEventListener('click', () => buyDomainModal?.classList.remove('open'));
-
-    function showBuyError(msg) {
-      if (buyDomainError) { buyDomainError.textContent = msg; buyDomainError.hidden = false; }
-    }
-
-    buyDomainCheckBtn?.addEventListener('click', checkDomain);
-    buyDomainInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkDomain(); });
-
-    async function checkDomain() {
-      const name = buyDomainInput?.value.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*/,'');
-      if (!name) return;
-      if (buyDomainError)  buyDomainError.hidden = true;
-      if (buyDomainResult) { buyDomainResult.hidden = true; buyDomainResult.innerHTML = ''; }
-      if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = true; buyDomainCheckBtn.textContent = 'Checking…'; }
-
-      try {
-        const res  = await fetch(`/api/domains/check?name=${encodeURIComponent(name)}`);
-        const data = await res.json();
-
-        if (!res.ok) { showBuyError(data.error || 'Eroare la verificare.'); return; }
-
-        if (!buyDomainResult) return;
-        buyDomainResult.hidden = false;
-
-        if (data.available) {
-          const vercelPriceUsd = data.price ?? 0;
-          // Platform charge = Vercel price (≈EUR) + markup (shown from API)
-          // We'll fetch the exact charge from the buy-domain endpoint, but estimate here
-          const markupEur = 5; // default; actual value from DOMAIN_MARKUP_EUR env
-          const chargeEur = Math.ceil(vercelPriceUsd) + markupEur;
-          const priceText = vercelPriceUsd ? `€${chargeEur} / year` : 'Price unavailable';
-          const premiumNote = data.premium ? '<span class="bdr-premium">★ Domeniu premium</span>' : '';
-          buyDomainResult.innerHTML = `
-            <div class="buy-domain-result-card available">
-              <div class="bdr-left">
-                <span class="bdr-name">${name}</span>
-                <span class="bdr-status-available">✓ Disponibil</span>
-                <span class="bdr-price">${priceText}</span>
-                ${premiumNote}
-              </div>
-              <button class="buy-confirm-btn" id="buy-confirm-btn" data-name="${name}" data-price="${vercelPriceUsd}">
-                Buy
-              </button>
-            </div>
-          `;
-          document.getElementById('buy-confirm-btn')?.addEventListener('click', confirmPurchase);
-        } else {
-          buyDomainResult.innerHTML = `
-            <div class="buy-domain-result-card unavailable">
-              <div class="bdr-left">
-                <span class="bdr-name">${name}</span>
-                <span class="bdr-status-unavailable">✗ Indisponibil</span>
-              </div>
-            </div>
-          `;
-        }
-      } catch {
-        showBuyError('Network error. Try again.');
-      } finally {
-        if (buyDomainCheckBtn) { buyDomainCheckBtn.disabled = false; buyDomainCheckBtn.textContent = 'Check'; }
-      }
-    }
-
-    async function confirmPurchase(e) {
-      const btn = /** @type {HTMLButtonElement} */ (e.currentTarget);
-      const name       = btn.dataset.name;
-      const priceUsd   = Number(btn.dataset.price) || 0;
-
-      btn.disabled = true; btn.textContent = 'Preparing payment…';
-      if (buyDomainError) buyDomainError.hidden = true;
-
-      try {
-        const res  = await fetch('/api/billing/buy-domain', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, domainName: name, domainPriceUsd: priceUsd }),
-        });
-        const data = await res.json();
-
-        if (!res.ok || !data.url) {
-          showBuyError(data.error || 'Failed to create checkout session. Try again.');
-          btn.disabled = false; btn.textContent = 'Buy';
-          return;
-        }
-
-        // Redirect to Stripe Checkout
-        window.location.href = data.url;
-      } catch {
-        showBuyError('Network error. Try again.');
-        btn.disabled = false; btn.textContent = 'Buy';
-      }
-    }
 
     // LAUNCH — confirm brief, fire generation (don't await pipeline), reload to show spinner
     document.getElementById('launch-btn')?.addEventListener('click', async function() {
@@ -2864,14 +2386,10 @@ if (hasPreview) {
 
           // Helper: show quota-exceeded message + open buy modal
           const showLimitError = (d) => {
-            const used  = d.used  ?? 0;
             const quota = d.quota ?? 20;
-            const msg = `You've used all ${quota} AI iterations on this project. Buy +10 more for $5.`;
+            const msg = `You've used all ${quota} AI iterations on this project. Ask your admin to add more.`;
             addEditMessage('system', msg);
-            if (buyBtn) buyBtn.style.display = 'inline';
             if (quotaLabel) { quotaLabel.textContent = `0 / ${quota} iterations left`; quotaLabel.className = 'quota-label empty'; }
-            const m = document.getElementById('iter-limit-modal');
-            if (m) { m.style.display = 'flex'; m.classList.add('open'); }
           };
 
           // Helper: full-page iterate (used as primary or fallback)
@@ -3314,37 +2832,6 @@ if (hasPreview) {
     })();
   </script>
 
-  {hasPreview && !isBrandingRemoved && (
-    <div id="rb-modal" class="rb-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rb-modal-title">
-      <div class="rb-backdrop" id="rb-backdrop"></div>
-      <div class="rb-card">
-        <button type="button" class="rb-close" id="rb-close" aria-label="Close">×</button>
-        <div class="rb-eyebrow">One-time purchase</div>
-        <h3 class="rb-title" id="rb-modal-title">Remove the “by grappes.dev” badge</h3>
-        <p class="rb-body">
-          Your published site shows a small “by grappes.dev” link in the bottom-right corner.
-          Pay once and it disappears forever — no subscription, no renewal.
-        </p>
-        <ul class="rb-list">
-          <li>One-time payment, no subscription</li>
-          <li>Site is automatically re-deployed without the badge</li>
-          <li>Applies to this project only</li>
-        </ul>
-        <div class="rb-price-row">
-          <span class="rb-price">$5</span>
-          <span class="rb-price-sub">USD · one-time</span>
-        </div>
-        <div class="rb-actions">
-          <button type="button" class="rb-cancel" id="rb-cancel">Maybe later</button>
-          <button type="button" class="rb-pay" id="rb-pay" data-project-id={id}>
-            Pay $5 and remove badge →
-          </button>
-        </div>
-        <p class="rb-fineprint">Powered by Stripe. Secure checkout, no card details ever touch our servers.</p>
-      </div>
-    </div>
-  )}
-
   <style>
     .topbar-btn--remove-brand {
       background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.75);
@@ -3413,66 +2900,5 @@ if (hasPreview) {
     .rb-fineprint { font-size: 11px; color: rgba(255,255,255,0.4); margin: 14px 0 0; text-align: center; }
   </style>
 
-  <script is:inline>
-    (function () {
-      var openBtn  = document.getElementById('remove-brand-btn');
-      var modal    = document.getElementById('rb-modal');
-      if (!openBtn || !modal) return;
-
-      var backdrop = document.getElementById('rb-backdrop');
-      var closeBtn = document.getElementById('rb-close');
-      var cancelBtn = document.getElementById('rb-cancel');
-      var payBtn   = document.getElementById('rb-pay');
-      var projectId = payBtn && payBtn.dataset.projectId;
-
-      function open()  { modal.hidden = false; document.body.style.overflow = 'hidden'; }
-      function close() { modal.hidden = true;  document.body.style.overflow = ''; }
-
-      openBtn.addEventListener('click', open);
-      closeBtn && closeBtn.addEventListener('click', close);
-      cancelBtn && cancelBtn.addEventListener('click', close);
-      backdrop && backdrop.addEventListener('click', close);
-      document.addEventListener('keydown', function (e) {
-        if (!modal.hidden && e.key === 'Escape') close();
-      });
-
-      payBtn && payBtn.addEventListener('click', async function () {
-        if (!projectId) return;
-        var orig = payBtn.textContent;
-        payBtn.disabled = true;
-        payBtn.textContent = 'Redirecting to Stripe…';
-        try {
-          var res = await fetch('/api/billing/remove-branding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ projectId: projectId }),
-          });
-          var data = await res.json().catch(function () { return {}; });
-          if (res.ok && data.url) {
-            window.location.href = data.url;
-            return;
-          }
-          alert(data.error || 'Could not start checkout. Please try again.');
-        } catch (e) {
-          alert('Network error. Please try again.');
-        } finally {
-          payBtn.disabled = false;
-          payBtn.textContent = orig;
-        }
-      });
-
-      // Auto-show success toast if we just came back from Stripe
-      var params = new URLSearchParams(window.location.search);
-      if (params.get('branding_removed') === '1') {
-        var toast = document.createElement('div');
-        toast.textContent = '✓ Badge removed — your site will redeploy in a moment.';
-        toast.style.cssText = 'position:fixed;top:80px;right:24px;z-index:9700;background:linear-gradient(135deg,#06bfdd,#6c6bf3);color:#0a0a0a;padding:14px 20px;border-radius:12px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:700;box-shadow:0 8px 32px rgba(0,0,0,0.4);';
-        document.body.appendChild(toast);
-        setTimeout(function () { toast.remove(); }, 6000);
-        history.replaceState({}, '', window.location.pathname);
-      }
-    })();
-  </script>
 </body>
 </html>

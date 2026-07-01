@@ -17,9 +17,6 @@ const quotaDisplay = quota.limit > 0
   ? `${quota.used} / ${quota.limit}${quota.extra > 0 ? ` + ${quota.extra} extra` : ''}`
   : `${totalRemaining} ${quota.extra > 0 ? 'extra' : ''} available`.trim();
 
-const hasMultipage         = !!dbUser?.multipage_addon;
-const isMultipageLifetime  = !!dbUser?.multipage_addon_lifetime;
-
 const reelCredits  = dbUser?.reel_credits  ?? 0;
 const auditCredits = dbUser?.audit_credits ?? 0;
 
@@ -89,13 +86,7 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
             <span class="acc-usage-value">— <span class="acc-usage-unit">soon</span></span>
           </div>
         </div>
-        <div class="acc-help acc-help--top">Need more? Top up below.</div>
-        <div class="acc-topup">
-          <button id="buy-edits-btn" class="acc-chip" style="--c-accent:#06bfdd;">+10 AI edits, €5</button>
-          <a href="/dashboard/reels" class="acc-chip" style="--c-accent:#a78bfa;">+10 reel credits, €50</a>
-          <a href="/audit" class="acc-chip" style="--c-accent:#22d3ee;">+10 audit credits, €20</a>
-        </div>
-        <div id="edits-msg" class="acc-msg" hidden></div>
+        <div class="acc-help acc-help--top">Credits are provisioned by your administrator. Contact them to top up your balance.</div>
       </section>
 
       <!-- Language -->
@@ -107,43 +98,6 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
           <button class="acc-lang-btn" id="lang-ro" data-lang="ro">🇷🇴 Română</button>
           <button class="acc-lang-btn" id="lang-en" data-lang="en">🇬🇧 English</button>
         </div>
-      </section>
-
-      <!-- Multipage Add-on -->
-      <section class="acc-card">
-        <div class="acc-card-head">
-          <span class="acc-label">Multipage add-on</span>
-        </div>
-        {hasMultipage ? (
-          <>
-            <div class="acc-active-row">
-              <span class="acc-active-badge">Active</span>
-              <span class="acc-active-meta">
-                {isMultipageLifetime ? 'Lifetime, never expires' : 'Subscription, renews automatically'}
-              </span>
-            </div>
-            <p class="acc-help">You can generate unlimited pages per site.</p>
-          </>
-        ) : (
-          <>
-            <p class="acc-help">Unlock multi-page websites. Pick a cadence:</p>
-            <div class="acc-plan-grid">
-              <button class="acc-plan" id="addon-month-btn" data-interval="month">
-                <span class="acc-plan-name">Monthly</span>
-                <span class="acc-plan-price">€9<span class="acc-plan-unit">/mo</span></span>
-              </button>
-              <button class="acc-plan" id="addon-year-btn" data-interval="year">
-                <span class="acc-plan-name">Annual</span>
-                <span class="acc-plan-price">€49<span class="acc-plan-unit">/yr</span></span>
-              </button>
-              <button class="acc-plan acc-plan--featured" id="addon-lifetime-btn" data-interval="lifetime">
-                <span class="acc-plan-name">Lifetime</span>
-                <span class="acc-plan-price">€499</span>
-              </button>
-            </div>
-            <div id="addon-msg" class="acc-msg" hidden></div>
-          </>
-        )}
       </section>
 
       <!-- Support -->
@@ -372,50 +326,6 @@ const firstName = (authUser.user_metadata?.full_name ?? authUser.user_metadata?.
 </Dashboard>
 
 <script>
-  // ── Stripe checkout helper ────────────────────────────────────────────────
-  async function redirectToCheckout(endpoint: string, body: object, btnEl: HTMLButtonElement, msgEl: HTMLElement, loadingText: string) {
-    const originalHtml = btnEl.innerHTML;
-    btnEl.disabled = true;
-    btnEl.textContent = loadingText;
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        msgEl.hidden = false;
-        msgEl.className = 'acc-msg error';
-        msgEl.textContent = data.error || 'Something went wrong.';
-        btnEl.disabled = false;
-        btnEl.innerHTML = originalHtml;
-      }
-    } catch {
-      msgEl.hidden = false;
-      msgEl.className = 'acc-msg error';
-      msgEl.textContent = 'Network error. Try again.';
-      btnEl.disabled = false;
-      btnEl.innerHTML = originalHtml;
-    }
-  }
-
-  ['month', 'year', 'lifetime'].forEach(interval => {
-    document.getElementById(`addon-${interval}-btn`)?.addEventListener('click', () => {
-      const btn = document.getElementById(`addon-${interval}-btn`) as HTMLButtonElement;
-      const msg = document.getElementById('addon-msg')!;
-      redirectToCheckout('/api/billing/multipage-addon', { interval }, btn, msg, 'Redirecting…');
-    });
-  });
-
-  document.getElementById('buy-edits-btn')?.addEventListener('click', () => {
-    const btn = document.getElementById('buy-edits-btn') as HTMLButtonElement;
-    const msg = document.getElementById('edits-msg')!;
-    redirectToCheckout('/api/billing/buy-edits', {}, btn, msg, 'Redirecting…');
-  });
-
   document.getElementById('reset-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('reset-btn') as HTMLButtonElement;
     const msg = document.getElementById('reset-msg')!;
